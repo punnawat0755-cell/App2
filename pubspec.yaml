@@ -1,0 +1,28 @@
+name: flutter_application_1
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.3 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # ไอคอนมาตรฐาน
+  cupertino_icons: ^1.0.8
+
+  # ตัวเชื่อมต่อ database (Postgres)
+  postgres: ^3.5.9
+  supabase_flutter: ^2.12.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+# ส่วนตั้งค่า Flutter (ต้องมีแค่ที่เดียวตรงนี้)
+flutter:
+  uses-material-design: true
