@@ -159,7 +159,7 @@ Widget authCard({
                   ),
                   child: const Icon(
                     Icons.cloud,
-                    size: 30,
+                    size: 33,
                     color: AppColors.primaryBlue,
                   ),
                 ),
