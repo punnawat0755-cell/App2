@@ -163,7 +163,7 @@ Widget authCard({
                     color: AppColors.primaryBlue,
                   ),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 77),
                 Text(title, style: Theme.of(context).textTheme.headlineSmall),
                 const SizedBox(height: 6),
                 Text(
