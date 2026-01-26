@@ -1,0 +1,61 @@
+import 'package:flutter/material.dart';
+import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:flutter_application_1/module/feed/view/feed_view.dart';
+import 'package:flutter_application_1/module/home/view/home.dart';
+
+class BottomNavBar extends StatefulWidget {
+  const BottomNavBar({super.key});
+
+  @override
+  _BottomNavBarState createState() => _BottomNavBarState();
+}
+
+class _BottomNavBarState extends State<BottomNavBar> {
+  int _page = 0;
+  final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
+
+  // ---------------------------------------------------------
+  // 1. กำหนดรายการหน้าจอ (Pages) ที่นี่
+  // เรียงลำดับตาม icon ใน Navigation Bar (0, 1, 2, 3, 4)
+  // ---------------------------------------------------------
+  final List<Widget> _pages = [
+    const HomePage(), // Index 0: หน้า Feed (ที่เราทำไว้)
+    const SocialFeedScreen(), // Index 1: หน้าค้นหา
+    Container(),
+    Container(),
+    Container(),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      extendBody: true, // ให้เนื้อหาไหลไปอยู่ใต้ Nav Bar
+      // 2. ส่วน Body จะเปลี่ยนไปตามค่า _page ที่เลือก
+      body: _pages[_page],
+
+      bottomNavigationBar: CurvedNavigationBar(
+        key: _bottomNavigationKey,
+        index: 0,
+        height: 60.0,
+        items: const <Widget>[
+          Icon(Icons.home, size: 30, color: Colors.white),
+          Icon(Icons.search, size: 30, color: Colors.white),
+          Icon(Icons.compare_arrows, size: 30, color: Colors.white),
+          Icon(Icons.notifications, size: 30, color: Colors.white),
+          Icon(Icons.person, size: 30, color: Colors.white),
+        ],
+        color: Colors.blueAccent,
+        buttonBackgroundColor: Colors.blueAccent,
+        backgroundColor: Colors.transparent,
+        animationCurve: Curves.easeInOut,
+        animationDuration: const Duration(milliseconds: 300),
+        onTap: (index) {
+          setState(() {
+            _page = index; // อัปเดต index เพื่อเปลี่ยนหน้า
+          });
+        },
+        letIndexChange: (index) => true,
+      ),
+    );
+  }
+}

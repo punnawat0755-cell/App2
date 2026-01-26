@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../supabase_client.dart';
+import '../../../supabase_client.dart';
 
 
 class HomePage extends StatelessWidget {

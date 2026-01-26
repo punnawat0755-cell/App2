@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../supabase_client.dart';
-import 'home.dart';
+import '../../../supabase_client.dart';
+import '../../home/view/home.dart';
 import 'register.dart';
 
 class LoginPage extends StatefulWidget {
