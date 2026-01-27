@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home.dart';
 
@@ -19,8 +20,10 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // เรียงลำดับตาม icon ใน Navigation Bar (0, 1, 2, 3, 4)
   // ---------------------------------------------------------
   final List<Widget> _pages = [
-    const HomePage(), // Index 0: หน้า Feed (ที่เราทำไว้)
-    const SocialFeedScreen(), // Index 1: หน้าค้นหา
+    const ChatSelectionPage(), // Index 0: หน้า Feed (ที่เราทำไว้)
+    const HomePage(),
+    const FeedPage(),
+    // Index 1: หน้าค้นหา
     Container(),
     Container(),
     Container(),
