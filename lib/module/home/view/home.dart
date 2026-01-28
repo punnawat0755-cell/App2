@@ -50,7 +50,7 @@ class _HomePageState extends State<HomePage> {
     const name = 'Seal';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F9FF),
+      backgroundColor: const Color(0xFFE6F7FF),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -96,7 +96,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 5),
               Text(
                 'สวัสดี,$name',
                 style: const TextStyle(
@@ -105,7 +105,7 @@ class _HomePageState extends State<HomePage> {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 15),
 
               // --- Banner Section ---
               SizedBox(
@@ -119,13 +119,13 @@ class _HomePageState extends State<HomePage> {
                   },
                   children: [
                     _buildDailyMissionBanner(),
-                    _buildClownFishBanner(),
-                    _buildLoveJobBanner(),
+                    // _buildClownFishBanner(),
+                    // _buildLoveJobBanner(),
                   ],
                 ),
               ),
 
-              const SizedBox(height: 12),
+              const SizedBox(height: 15),
 
               // จุดไข่ปลา
               Row(
@@ -146,7 +146,7 @@ class _HomePageState extends State<HomePage> {
                 }),
               ),
 
-              const SizedBox(height: 25),
+              const SizedBox(height: 10),
 
               // --- Short Clips ---
               _buildSectionHeader('คลิปสั้น'),
@@ -264,22 +264,17 @@ class _HomePageState extends State<HomePage> {
   // --------------------------------------------------------------------------
   // WIDGETS
   // --------------------------------------------------------------------------
-
   Widget _buildDailyMissionBanner() {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 5),
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFE0F7FA), Color(0xFFD3EBF8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFFB5EFFF),
+        borderRadius: BorderRadius.circular(30),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.15),
+            color: Colors.blue.withOpacity(0.5),
             blurRadius: 10,
-            offset: const Offset(0, 5),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -302,28 +297,32 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
           Positioned(
-            left: 110,
-            top: 35,
+            left: 105,
+            top: 18,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
                   'ภารกิจรายวัน :',
                   style: TextStyle(
-                    color: Color(0xFF455A64),
-                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF4489D7),
+                    fontWeight: FontWeight.w200,
                     fontSize: 15,
                   ),
                 ),
                 const Text(
                   'ตอบคำถามเพื่อรับเพื่อนแก้เหงา',
-                  style: TextStyle(color: Color(0xFF607D8B), fontSize: 15),
+                  style: TextStyle(
+                    color: Color(0xFF4489D7),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w200,
+                  ),
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Image.asset('assets/images/k1.png'),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 5),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: const [
@@ -331,15 +330,15 @@ class _HomePageState extends State<HomePage> {
                           'DAY',
                           style: TextStyle(
                             color: Color(0xFF4489D7),
-                            fontWeight: FontWeight.w900,
-                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 26,
                           ),
                         ),
                         Text(
                           '138',
                           style: TextStyle(
                             color: Color(0xFF4489D7),
-                            fontWeight: FontWeight.w900,
+                            fontWeight: FontWeight.bold,
                             fontSize: 26,
                             height: 0.9,
                           ),
@@ -373,7 +372,7 @@ class _HomePageState extends State<HomePage> {
       child: Stack(
         children: [
           Positioned(
-            top: 10,
+            top: 4,
             bottom: -15,
             right: 10,
             left: 10,
@@ -451,7 +450,11 @@ class _HomePageState extends State<HomePage> {
                   SizedBox(height: 4),
                   Text(
                     'ถ้าวันนี้คุณเหนื่อยก็แค่กลับไปพัก',
-                    style: TextStyle(color: Color(0xFF1976D2), fontSize: 16),
+                    style: TextStyle(
+                      color: Color(0xFF1565C0),
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
                 ],
               ),

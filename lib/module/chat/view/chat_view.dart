@@ -1,23 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'dart:async';
 
 // ---------------------------------------------------------
-// 1. Controller
+// 1. Controller (Logic)
 // ---------------------------------------------------------
 class ChatSelectionController extends GetxController {
   void goToStartChat() {
-    print("User clicked: Start Chat");
-    // Get.to(() => StartChatPage());
+    Get.to(() => const WaitingChatPage());
   }
 
   void goToCounseling() {
-    print("User clicked: Give Counseling");
-    // Get.to(() => CounselingPage());
+    // ฟังก์ชันสำหรับปุ่มขวา
   }
 }
 
 // ---------------------------------------------------------
-// 2. Page
+// 2. Main Page (View) - หน้าเลือกโหมด
 // ---------------------------------------------------------
 class ChatSelectionPage extends StatelessWidget {
   const ChatSelectionPage({super.key});
@@ -31,27 +30,7 @@ class ChatSelectionPage extends StatelessWidget {
       body: SafeArea(
         child: Stack(
           children: [
-            // --- รูปโปรไฟล์มุมขวาบน ---
-            Positioned(
-              top: 15,
-              right: 25,
-              child: Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 2),
-                  image: const DecorationImage(
-                    image: NetworkImage(
-                      'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                    ),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ),
-
-            // --- เนื้อหาตรงกลาง ---
+            const _ProfileHeader(),
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -66,57 +45,42 @@ class ChatSelectionPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // ส่วนปุ่มครึ่งวงกลม 2 อัน
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 50),
                     child: SizedBox(
                       height: 300,
                       child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          // ---------------------------------------------------
-                          // [ปุ่มฝั่งซ้าย] เริ่มแชท (คนร้องไห้)
-                          // ---------------------------------------------------
-                          _buildHalfCircleButton(
+                          HalfCircleButton(
                             title: 'เริ่มแชท',
                             imagePath: 'assets/images/sad.png',
                             backgroundColor: const Color(0xFFAEDEF4),
                             textColor: const Color(0xFF4489D7),
                             isLeft: true,
                             onTap: controller.goToStartChat,
-
-                            // --- [ตั้งค่าฝั่งซ้าย] ---
-                            // ขยับรูป: top=ลง, bottom=ขึ้น, left=ขวา, right=ซ้าย
                             imagePadding: const EdgeInsets.only(
-                              top: 20,
+                              top: 10,
+                              bottom: 25,
                               left: 20,
                             ),
-                            imageScale: 0.9,
+                            imageScale: 0.95,
+                            textPadding: const EdgeInsets.only(left: 55),
                           ),
-
                           const SizedBox(width: 9),
-
-                          // ---------------------------------------------------
-                          // [ปุ่มฝั่งขวา] ให้คำปรึกษา (คนยิ้ม)
-                          // ---------------------------------------------------
-                          _buildHalfCircleButton(
+                          HalfCircleButton(
                             title: 'ให้คำปรึกษา',
                             imagePath: 'assets/images/fine.png',
                             backgroundColor: const Color(0xFFFDE6A8),
                             textColor: const Color(0xFF8D6E63),
                             isLeft: false,
                             onTap: controller.goToCounseling,
-
-                            // --- [ตั้งค่าฝั่งขวา] ---
-                            // แยกอิสระจากฝั่งซ้าย อยากขยับแค่ฝั่งนี้แก้ตรงนี้
                             imagePadding: const EdgeInsets.only(
-                              top: 9,
-                              right: 4,
+                              bottom: 3,
+                              right: 8,
                             ),
-                            imageScale:
-                                0.7, // เช่น อยากให้ฝั่งนี้ตัวใหญ่กว่าหน่อย
+                            imageScale: 0.8,
+                            textPadding: const EdgeInsets.only(right: 50),
                           ),
                         ],
                       ),
@@ -130,20 +94,64 @@ class ChatSelectionPage extends StatelessWidget {
       ),
     );
   }
+}
 
-  // Widget สร้างปุ่ม (รองรับการตั้งค่าแยก)
-  Widget _buildHalfCircleButton({
-    required String title,
-    required String imagePath,
-    required Color backgroundColor,
-    required Color textColor,
-    required bool isLeft,
-    required VoidCallback onTap,
-    EdgeInsetsGeometry? imagePadding,
-    double imageScale = 1.0,
-  }) {
+// ---------------------------------------------------------
+// 3. Custom Widgets (Components)
+// ---------------------------------------------------------
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 20,
+      right: 35,
+      child: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 2),
+          image: const DecorationImage(
+            image: NetworkImage(
+              'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+            ),
+            fit: BoxFit.cover,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HalfCircleButton extends StatelessWidget {
+  final String title;
+  final String imagePath;
+  final Color backgroundColor;
+  final Color textColor;
+  final bool isLeft;
+  final VoidCallback onTap;
+  final EdgeInsetsGeometry? imagePadding;
+  final double imageScale;
+  final EdgeInsetsGeometry? textPadding;
+
+  const HalfCircleButton({
+    super.key,
+    required this.title,
+    required this.imagePath,
+    required this.backgroundColor,
+    required this.textColor,
+    required this.isLeft,
+    required this.onTap,
+    this.imagePadding,
+    this.imageScale = 1.0,
+    this.textPadding,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     const double radius = 2000;
-
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -170,7 +178,6 @@ class ChatSelectionPage extends StatelessWidget {
           ),
           child: Stack(
             children: [
-              // Layer รูปภาพ
               Positioned.fill(
                 bottom: 50,
                 child: Padding(
@@ -181,36 +188,817 @@ class ChatSelectionPage extends StatelessWidget {
                       imagePath,
                       fit: BoxFit.contain,
                       alignment: Alignment.bottomCenter,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Icon(
-                          isLeft
-                              ? Icons.sentiment_dissatisfied
-                              : Icons.sentiment_satisfied_alt,
-                          size: 80,
-                          color: Colors.white.withOpacity(0.5),
-                        );
-                      },
+                      errorBuilder: (context, error, stackTrace) => Icon(
+                        isLeft
+                            ? Icons.sentiment_dissatisfied
+                            : Icons.sentiment_satisfied_alt,
+                        size: 80,
+                        color: Colors.white.withOpacity(0.5),
+                      ),
                     ),
                   ),
                 ),
               ),
-              // Layer ข้อความ
               Positioned(
-                bottom: 25,
+                bottom: 35,
                 left: 0,
                 right: 0,
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                child: Padding(
+                  padding: textPadding ?? EdgeInsets.zero,
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// 4. หน้าจอรอคู่สนทนา (WaitingChatPage) - [หยุดเวลาเมื่อมี Pop-up]
+// ---------------------------------------------------------
+class WaitingChatPage extends StatefulWidget {
+  const WaitingChatPage({super.key});
+
+  @override
+  State<WaitingChatPage> createState() => _WaitingChatPageState();
+}
+
+class _WaitingChatPageState extends State<WaitingChatPage>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 6),
+      vsync: this,
+    )..repeat();
+
+    // เริ่มนับเวลา 5 วินาที
+    _startTimer();
+  }
+
+  // [เพิ่ม] ฟังก์ชันเริ่มนับเวลา (แยกออกมาเพื่อให้เรียกใหม่ได้)
+  void _startTimer() {
+    _timer = Timer(const Duration(seconds: 5), () {
+      if (mounted) {
+        Get.off(() => const ChatPage());
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  // ฟังก์ชันแสดง Pop-up ยืนยันการออก
+  void _showExitDialog() {
+    // [สำคัญ] สั่งหยุดเวลาทันทีที่ Pop-up เด้ง
+    _timer?.cancel();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false, // ห้ามกดพื้นหลังเพื่อปิด (บังคับเลือก)
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: const Color(0xFFC3F3FF),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 50),
+            height: 220,
+            // width: 400,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  "คุณต้องการที่จะออกจากการจับคู่ใช่หรือไม่",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF4489D7),
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // --- ปุ่ม ยืนยัน (ออกจากการรอ) ---
+                    GestureDetector(
+                      onTap: () {
+                        // 1. ปิด Pop-up
+                        Get.back();
+                        // 2. กลับไปหน้าเลือกโหมด (ออกจริง)
+                        Get.back();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 30,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8AD4F5),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: const Text(
+                          "ยืนยัน",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+
+                    // --- ปุ่ม ยกเลิก (กลับมารอต่อ) ---
+                    GestureDetector(
+                      onTap: () {
+                        // 1. ปิด Pop-up
+                        Get.back();
+                        // 2. [สำคัญ] เริ่มนับเวลาใหม่ เพราะเราหยุดไปตอน Pop-up ขึ้น
+                        _startTimer();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 30,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8AD4F5),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: const Text(
+                          "ยกเลิก",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        _showExitDialog(); // กดปุ่ม Back ของเครื่อง -> หยุดเวลาแล้วโชว์ Pop-up
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF0F9FF),
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[700]),
+            onPressed: _showExitDialog, // กดลูกศร -> หยุดเวลาแล้วโชว์ Pop-up
+          ),
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'รอคู่สนทนาสักครู่',
+                style: TextStyle(
+                  color: Color(0xFF4489D7),
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: 450,
+                height: 450,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    _buildOneWayRipple(0.0),
+                    _buildOneWayRipple(0.33),
+                    _buildOneWayRipple(0.66),
+                    Container(
+                      width: 240,
+                      height: 240,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFFAEDEF4),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 30),
+                          child: Image.asset(
+                            'assets/images/sad.png',
+                            fit: BoxFit.contain,
+                            alignment: Alignment.bottomCenter,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 80),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOneWayRipple(double startDelay) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final double t = (_controller.value + startDelay) % 1.0;
+        final double currentSize = 240 + (180 * t);
+        final double opacity = 0.4 * (1.0 - t);
+        return Container(
+          width: currentSize,
+          height: currentSize,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFFAEDEF4).withOpacity(opacity),
+            border: Border.all(
+              color: Colors.white.withOpacity(opacity),
+              width: 1,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// 5. หน้าแชท (ChatPage)
+// ---------------------------------------------------------
+class ChatPage extends StatefulWidget {
+  const ChatPage({super.key});
+
+  @override
+  State<ChatPage> createState() => _ChatPageState();
+}
+
+class _ChatPageState extends State<ChatPage> {
+  final TextEditingController _textController = TextEditingController();
+
+  final List<Map<String, dynamic>> _messages = [
+    {'text': 'ฉันรู้สึกเสียใจที่ทำงานพลาด', 'isMe': true},
+    {'text': 'ฉันจัดการความรู้สึกนี้ยังไงดี', 'isMe': true},
+    {
+      'text':
+          'ความเสียใจจากการทำงานพลาดเป็นเรื่องปกติและไม่ได้หมายความว่าคุณไม่เก่งสิ่งสำคัญคือการยอมรับความรู้สึกโดยไม่โทษตัวเองแยกความผิดพลาดออกจากคุณค่าในตัวเอง แล้วนำบทเรียนไปปรับใช้พร้อมดูแลใจตัวเองเพื่อก้าวต่อไปอย่างเข้มแข็ง',
+      'isMe': false,
+    },
+  ];
+
+  void _sendMessage() {
+    if (_textController.text.trim().isEmpty) return;
+    setState(() {
+      _messages.insert(0, {'text': _textController.text, 'isMe': true});
+      _textController.clear();
+    });
+  }
+
+  void _endConversation() {
+    // [แก้ไข] เปลี่ยนจากกลับหน้าหลัก เป็นไปหน้า ConversationSummaryPage
+    Get.to(() => const ConversationSummaryPage());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const Color darkBlue = Color(0xFF1565C0);
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF0F9FF),
+      appBar: AppBar(
+        toolbarHeight: 80,
+        backgroundColor: const Color(0xFFD3ECF8),
+        elevation: 0,
+        leading: IconButton(
+          icon: Image.asset('assets/images/back.png', width: 23, height: 23),
+          onPressed: () => Get.back(),
+        ),
+        title: const Text(
+          "แชท",
+          style: TextStyle(
+            color: darkBlue,
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: false,
+        titleSpacing: -7,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 15),
+            child: UnconstrainedBox(
+              child: GestureDetector(
+                onTap: _endConversation,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 15,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFE082),
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    "จบการสนทนา",
+                    style: TextStyle(
+                      color: Color(0xFF6C6C6C),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Text(
+              "Today",
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 15),
+              itemCount: _messages.length,
+              itemBuilder: (context, index) {
+                final msg = _messages[index];
+                final isMe = msg['isMe'];
+                return Align(
+                  alignment: isMe
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
+                  child: Container(
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.75,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE0E0E0),
+                      borderRadius: BorderRadius.only(
+                        topLeft: const Radius.circular(20),
+                        topRight: const Radius.circular(20),
+                        bottomLeft: isMe
+                            ? const Radius.circular(20)
+                            : Radius.circular(0),
+                        bottomRight: isMe
+                            ? Radius.circular(0)
+                            : const Radius.circular(20),
+                      ),
+                    ),
+                    child: Text(
+                      msg['text'],
+                      style: TextStyle(
+                        color: Colors.grey[800],
+                        fontSize: 16,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+            child: Container(
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.black, width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  const Padding(
+                    padding: EdgeInsets.only(left: 15, right: 10),
+                    child: Icon(
+                      Icons.sentiment_satisfied_alt,
+                      color: Colors.grey,
+                      size: 26,
+                    ),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: _textController,
+                      decoration: const InputDecoration(
+                        hintText: 'ส่งข้อความ.......',
+                        hintStyle: TextStyle(color: Colors.grey),
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.only(top: 4),
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: _sendMessage,
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 15),
+                      child: Transform.rotate(
+                        angle: -0.5,
+                        child: Icon(
+                          Icons.send,
+                          color: Colors.grey[700],
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------
+// 6. หน้าสรุปการสนทนา (ConversationSummaryPage) - [เพิ่มระบบ Block]
+// ---------------------------------------------------------
+class ConversationSummaryPage extends StatefulWidget {
+  const ConversationSummaryPage({super.key});
+
+  @override
+  State<ConversationSummaryPage> createState() =>
+      _ConversationSummaryPageState();
+}
+
+class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
+  // สถานะติดตาม
+  bool isFollowed = false;
+  // สถานะบล็อก (ถ้า true ปุ่มจะหายไป)
+  bool isBlocked = false;
+
+  // คะแนนดาวเริ่มต้น
+  int currentRating = 3;
+
+  // ฟังก์ชันแสดง Pop-up ยืนยันการบล็อก
+  void _showBlockDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          backgroundColor: const Color(0xFFC3F3FF), // สีพื้นหลังฟ้าอ่อนแบบในรูป
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+            height: 220, // กำหนดความสูงให้พอดี
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  "คุณต้องการที่จะบล็อกใช่หรือไม่",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF537895), // สีน้ำเงินเข้มอมเทา
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 30),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // ปุ่ม ยืนยัน
+                    GestureDetector(
+                      onTap: () {
+                        // 1. ปิด Pop-up
+                        Get.back();
+                        // 2. อัปเดตสถานะเป็นบล็อก (ปุ่มจะหายไป)
+                        setState(() {
+                          isBlocked = true;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 30,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8AD4F5), // สีฟ้าเข้มขึ้น
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: const Text(
+                          "ยืนยัน",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    // ปุ่ม ยกเลิก
+                    GestureDetector(
+                      onTap: () {
+                        Get.back(); // ปิด Pop-up เฉยๆ
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 30,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8AD4F5), // สีฟ้าเข้มขึ้น
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        child: const Text(
+                          "ยกเลิก",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF0F9FF),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[700]),
+          onPressed: () => Get.back(),
+        ),
+      ),
+      body: Center(
+        child: Column(
+          children: [
+            const SizedBox(height: 50),
+            const Text(
+              "Jellyfish",
+              style: TextStyle(
+                color: Color(0xFF4489D7),
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // รูป Profile
+            Container(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 4),
+                color: Colors.white,
+                image: const DecorationImage(
+                  image: NetworkImage(
+                    'https://images.unsplash.com/photo-1548681528-6a5c45b66b42?auto=format&fit=crop&w=600&q=80',
+                  ),
+                  fit: BoxFit.cover,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+
+            // -----------------------------------------------------
+            // ส่วนปุ่ม ติดตาม / บล็อก (จะแสดงก็ต่อเมื่อ ยังไม่บล็อก)
+            // -----------------------------------------------------
+            if (!isBlocked) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // [1] ปุ่มติดตาม
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        isFollowed = !isFollowed;
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 25,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isFollowed
+                            ? const Color(0xFFE0E0E0)
+                            : const Color(0xFFD3ECF8),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: isFollowed
+                            ? [
+                                // [แก้ตรงนี้ 1] ใส่เงาสำหรับปุ่มสีเทา (ติดตามแล้ว)
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(
+                                    0.4,
+                                  ), // เงาสีดำจางๆ
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                            : [
+                                BoxShadow(
+                                  color: const Color(
+                                    0xFF4489D7,
+                                  ).withOpacity(0.4),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ],
+                      ),
+                      child: Text(
+                        isFollowed ? "ติดตามแล้ว" : "ติดตาม",
+                        style: TextStyle(
+                          color: isFollowed
+                              ? Colors.grey[600]
+                              : const Color(0xFF4489D7),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 15),
+
+                  // [2] ปุ่มบล็อก (กดแล้วเด้ง Pop-up)
+                  GestureDetector(
+                    onTap: _showBlockDialog, // เรียกฟังก์ชัน Pop-up
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 25,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.4),
+                            blurRadius: 4,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        "บล็อก",
+                        style: TextStyle(
+                          color: Color(0xFF4489D7),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 30), // ระยะห่างถ้าปุ่มยังอยู่
+            ] else ...[
+              // ถ้าบล็อกแล้ว อาจจะเว้นว่างไว้นิดนึง หรือใส่ข้อความบอกก็ได้
+              const SizedBox(height: 50),
+            ],
+
+            // -----------------------------------------------------
+            // ส่วนดาว (แสดงตลอด)
+            // -----------------------------------------------------
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(5, (index) {
+                return GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      currentRating = index + 1;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Icon(
+                      Icons.star_rounded,
+                      size: 55,
+                      color: index < currentRating
+                          ? const Color(0xFFFFE082)
+                          : const Color(0xFFE0E0E0),
+                    ),
+                  ),
+                );
+              }),
+            ),
+
+            const Spacer(),
+
+            // ปุ่ม บันทึก (แสดงตลอด)
+            GestureDetector(
+              onTap: () {
+                Get.offAll(() => const ChatSelectionPage());
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 40,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE082),
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 5,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Text(
+                  "บันทึก",
+                  style: TextStyle(
+                    color: Color(0xFF6C6C6C),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 300),
+          ],
         ),
       ),
     );

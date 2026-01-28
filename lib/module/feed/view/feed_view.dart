@@ -48,7 +48,13 @@ class FeedPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    Icon(Icons.photo, color: Colors.grey.shade400),
+                    Image.asset(
+                      'assets/images/Picture.png', // <-- ใส่ path รูปของคุณตรงนี้
+                      width: 40, // กำหนดขนาด (ปกติ Icon จะประมาณ 24)
+                      height: 35,
+                      fit: BoxFit.contain, // จัดวางรูปให้พอดี
+                      color: Colors.grey,
+                    ),
                   ],
                 ),
               ),
@@ -198,7 +204,7 @@ class _PostItemState extends State<PostItem> {
                           child: Text(
                             "ติดตาม",
                             style: TextStyle(
-                              color: Colors.blue.shade300,
+                              color: Color(0xFF8D8D8D),
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
                             ),
@@ -226,7 +232,9 @@ class _PostItemState extends State<PostItem> {
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(15),
                 image: const DecorationImage(
-                  image: NetworkImage('https://via.placeholder.com/300'),
+                  image: NetworkImage(
+                    'https://i.pinimg.com/736x/b7/ac/ba/b7acba5c729ea828c9ed398f21248681.jpg',
+                  ),
                   fit: BoxFit.cover,
                 ),
               ),

@@ -34,7 +34,7 @@ class MyApp extends StatelessWidget {
 
         // แบบที่ 1: เปลี่ยนฟอนต์ทั้งแอป (แนะนำ)
         // คุณสามารถเปลี่ยน .kanitTextTheme เป็น .promptTextTheme หรือ .robotoTextTheme ได้ตามใจชอบ
-        textTheme: GoogleFonts.promptTextTheme(Theme.of(context).textTheme),
+        textTheme: GoogleFonts.mitrTextTheme(Theme.of(context).textTheme),
 
         // ถ้าต้องการปรับสีหลักด้วย (Optional)
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
