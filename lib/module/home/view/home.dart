@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/home/view/test.dart';
+import 'package:flutter_application_1/module/home/view/widget/article/article_card.dart';
+import 'package:flutter_application_1/module/home/view/widget/article/article_detail.dart';
 import 'package:get/get.dart';
 
 class HomePage extends StatefulWidget {
@@ -14,6 +16,45 @@ class _HomePageState extends State<HomePage> {
   int _currentBannerIndex = 0;
   late PageController _pageController;
   Timer? _timer;
+
+  // ข้อมูลจำลอง (Mock Data)
+  final List<Map<String, dynamic>> clipList = [
+    {
+      "title": "Jellyfish",
+      "subtitle": "2 week",
+      "imagePath":
+          "https://i.pinimg.com/1200x/10/fd/6c/10fd6c2086373b9007700b8f997545f1.jpg",
+      "page": () => VideoApp(), // เก็บฟังก์ชันการเปลี่ยนหน้าไว้ที่นี่
+    },
+    {
+      "title": "starfish",
+      "subtitle": "1 week",
+      "imagePath":
+          "https://i.pinimg.com/736x/e0/e4/4d/e0e44d1c32bf9b484430e4cb74bf2719.jpg",
+      "page": () => PlayVideoFromNetwork(),
+    },
+    {
+      "title": "whale",
+      "subtitle": "1 day",
+      "imagePath":
+          "https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg",
+      "page": null, // อันนี้ยังไม่มีหน้าปลายทาง ใส่ null ไว้ก่อน
+    },
+    {
+      "title": "whale",
+      "subtitle": "1 day",
+      "imagePath":
+          "https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg",
+      "page": null, // อันนี้ยังไม่มีหน้าปลายทาง ใส่ null ไว้ก่อน
+    },
+    {
+      "title": "whale",
+      "subtitle": "1 day",
+      "imagePath":
+          "https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg",
+      "page": null, // อันนี้ยังไม่มีหน้าปลายทาง ใส่ null ไว้ก่อน
+    },
+  ];
 
   @override
   void initState() {
@@ -153,39 +194,36 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 15),
               SizedBox(
                 height: 160,
-                child: ListView(
+                child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   clipBehavior: Clip.none,
-                  children: [
-                    InkWell(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                  ), // เพิ่มระยะขอบซ้าย-ขวาของ List
+                  itemCount: clipList.length,
+                  // ตัวคั่นระหว่าง item (เว้นระยะห่าง 15 px)
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 5),
+                  // ตัวสร้าง Item
+                  itemBuilder: (context, index) {
+                    final item = clipList[index];
+
+                    return InkWell(
                       onTap: () {
-                        Get.to(() => VideoApp());
+                        // เช็คว่ามีหน้าปลายทางไหม ถ้ามีค่อยกดไป
+                        if (item['page'] != null) {
+                          Get.to(item['page']);
+                        } else {
+                          print("ยังไม่มีหน้าปลายทางสำหรับ ${item['title']}");
+                        }
                       },
                       child: _buildClipCard(
-                        title: 'Jellyfish',
-                        subtitle: '2 week',
-                        imagePath:
-                            'https://i.pinimg.com/1200x/10/fd/6c/10fd6c2086373b9007700b8f997545f1.jpg',
+                        title: item['title'],
+                        subtitle: item['subtitle'],
+                        imagePath: item['imagePath'],
                       ),
-                    ),
-                    InkWell(
-                      onTap: () {
-                        Get.to(() => PlayVideoFromNetwork());
-                      },
-                      child: _buildClipCard(
-                        title: 'starfish',
-                        subtitle: '1 week',
-                        imagePath:
-                            'https://i.pinimg.com/736x/e0/e4/4d/e0e44d1c32bf9b484430e4cb74bf2719.jpg',
-                      ),
-                    ),
-                    _buildClipCard(
-                      title: 'whale',
-                      subtitle: '1 day',
-                      imagePath:
-                          'https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg',
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
 
@@ -197,10 +235,10 @@ class _HomePageState extends State<HomePage> {
               Row(
                 children: [
                   Expanded(
-                    child: _buildArticleCard(
+                    child: ArticleCard(
                       title: 'วาฬ 52Hz\nไม่ได้อยู่คนเดียว',
                       subtitle: '1 Month Ago',
-                      imagePath: 'assets/images/s2.png',
+                      imagePath: 'assets/images/article1.png',
                       // [เพิ่ม] ใส่ onTap เพื่อลิ้งค์ไปหน้าเนื้อหา
                       onTap: () {
                         Navigator.push(
@@ -208,7 +246,7 @@ class _HomePageState extends State<HomePage> {
                           MaterialPageRoute(
                             builder: (context) => const ArticleDetailPage(
                               title: 'วาฬ 52Hz ไม่ได้อยู่คนเดียว',
-                              imagePath: 'assets/images/s2.png',
+                              imagePath: 'assets/images/article1.png',
                               content: """
 เคยถูกใช้เป็นภาพสะท้อนความเหงาที่รุนแรงที่สุดของมนุษย์ เรามักฉายภาพความกลัวการถูกทอดทิ้งและความรู้สึกแปลกแยกของตัวเองลงไปที่มัน จนกลายเป็นสัญลักษณ์ของการ "มีเสียงที่ไม่มีใครได้ยิน"
 
@@ -229,10 +267,10 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(width: 15),
                   Expanded(
-                    child: _buildArticleCard(
+                    child: ArticleCard(
                       title: 'อยู่คนเดียวก็มีความ\nสุขดีนะ',
                       subtitle: '3 Month Ago',
-                      imagePath: 'assets/images/s1.png',
+                      imagePath: 'assets/images/article2.png',
                       // [เพิ่ม] ใส่ onTap สำหรับการ์ดใบที่ 2
                       onTap: () {
                         Navigator.push(
@@ -240,7 +278,7 @@ class _HomePageState extends State<HomePage> {
                           MaterialPageRoute(
                             builder: (context) => const ArticleDetailPage(
                               title: 'อยู่คนเดียวก็มีความสุขดีนะ',
-                              imagePath: 'assets/images/s1.png',
+                              imagePath: 'assets/images/article2.png',
                               content:
                                   """การอยู่คนเดียวไม่ได้หมายความว่าต้องเหงาเสมอไป การได้ใช้เวลากับตัวเองคือโอกาสที่ดีในการทำความเข้าใจความต้องการของตัวเอง พัฒนาทักษะใหม่ๆ และเติมพลังให้กับจิตใจ
 
@@ -559,153 +597,6 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-
-  Widget _buildArticleCard({
-    required String title,
-    required String subtitle,
-    required String imagePath,
-    required VoidCallback onTap,
-  }) {
-    bool isNetworkImage = imagePath.startsWith('http');
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: isNetworkImage
-                    ? Image.network(
-                        imagePath,
-                        height: 110,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                    : Image.asset(
-                        imagePath,
-                        height: 110,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-              ),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Color(0xFF5A6B7C),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        height: 1.2,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(color: Colors.grey, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 } // <--- ปิด Class _HomePageState ตรงนี้
 
-// --- หน้าจอแสดงรายละเอียดบทความ (ย้ายออกมาข้างนอก) ---
-class ArticleDetailPage extends StatelessWidget {
-  final String title;
-  final String imagePath;
-  final String content;
-
-  const ArticleDetailPage({
-    super.key,
-    required this.title,
-    required this.imagePath,
-    required this.content,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    bool isNetworkImage = imagePath.startsWith('http');
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0F9FF),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.grey),
-                onPressed: () => Navigator.pop(context),
-              ),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: isNetworkImage
-                    ? Image.network(
-                        imagePath,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      )
-                    : Image.asset(
-                        imagePath,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-              ),
-              const SizedBox(height: 20),
-              Center(
-                child: Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                content,
-                style: const TextStyle(
-                  color: Color(0xFF4489D7),
-                  fontSize: 16,
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+// --- ห

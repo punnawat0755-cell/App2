@@ -157,7 +157,7 @@ class _PostItemState extends State<PostItem> {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ProfilePage(
+                      builder: (context) => FeedProfilePage(
                         name: widget.name,
                         avatarUrl: widget.avatarUrl,
                       ),
@@ -291,17 +291,21 @@ class _PostItemState extends State<PostItem> {
 // ---------------------------------------------------------
 //  Widget: ProfilePage
 // ---------------------------------------------------------
-class ProfilePage extends StatefulWidget {
+class FeedProfilePage extends StatefulWidget {
   final String name;
   final String avatarUrl;
 
-  const ProfilePage({super.key, required this.name, required this.avatarUrl});
+  const FeedProfilePage({
+    super.key,
+    required this.name,
+    required this.avatarUrl,
+  });
 
   @override
-  State<ProfilePage> createState() => _ProfilePageState();
+  State<FeedProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
+class _ProfilePageState extends State<FeedProfilePage> {
   bool isFollowing = false;
 
   @override
