@@ -5,7 +5,6 @@ import 'package:get/get.dart';
 // 1. Controller: จัดการข้อมูล
 // ==========================================
 class ProfileController extends GetxController {
-  // --- ส่วนเดิม ---
   var coins = 138.obs;
   var currentMonth = "มกราคม".obs;
   var selectedDate = 20.obs;
@@ -41,7 +40,6 @@ class ProfileController extends GetxController {
 
   String getWhaleImage(int day) {
     String? type = whaleMoods[day];
-    // * อย่าลืมเช็ค path รูปภาพในเครื่องนะครับ *
     if (type == 'whale_happy') return 'assets/images/whale_happy.png';
     if (type == 'whale_love') return 'assets/images/whale_love.png';
     if (type == 'whale_impassible') return 'assets/images/whale_impassible.png';
@@ -50,24 +48,18 @@ class ProfileController extends GetxController {
     return 'assets/images/whale_happy.png';
   }
 
-  // --- ส่วนที่เพิ่มใหม่ (สำหรับบันทึกอาการ) ---
-
-  // สถานะประจำเดือน (true = เป็น, false = ไม่เป็น)
   var isPeriodStatus = true.obs;
-
-  // รายการอาการที่เลือก
   var selectedSymptoms = <String>[].obs;
 
-  // ข้อมูลอาการและรูปภาพ (คุณต้องหารูปไอคอนมาใส่ใน assets นะครับ)
   final List<Map<String, String>> symptomsList = [
-    {'name': 'ปวดท้อง', 'img': 'assets/images/sym_pain.png'},
-    {'name': 'แปรปรวน', 'img': 'assets/images/sym_mood.png'},
-    {'name': 'ท้องอืด', 'img': 'assets/images/sym_bloat.png'},
-    {'name': 'ปวดหัวไมเกรน', 'img': 'assets/images/sym_headache.png'},
-    {'name': 'หงุดหงิด', 'img': 'assets/images/sym_angry.png'},
-    {'name': 'เป็นไข้', 'img': 'assets/images/sym_fever.png'},
-    {'name': 'หิวบ่อย', 'img': 'assets/images/sym_hungry.png'},
-    {'name': 'สิวขึ้น', 'img': 'assets/images/sym_acne.png'},
+    {'name': 'ปวดท้อง', 'img': 'assets/images/thunder 1.png'},
+    {'name': 'แปรปรวน', 'img': 'assets/images/thunder 2.png'},
+    {'name': 'ท้องอืด', 'img': 'assets/images/thunder 3.png'},
+    {'name': 'ปวดหัวไมเกรน', 'img': 'assets/images/thunder 4.png'},
+    {'name': 'หงุดหงิด', 'img': 'assets/images/thunder 5.png'},
+    {'name': 'เป็นไข้', 'img': 'assets/images/thunder 6.png'},
+    {'name': 'หิวบ่อย', 'img': 'assets/images/thunder 7.png'},
+    {'name': 'สิวขึ้น', 'img': 'assets/images/thunder 8.png'},
   ];
 
   void toggleSymptom(String name) {
@@ -97,9 +89,7 @@ class ProfilePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ---------------------------------------------------
-              // 1. ส่วนหัว: เหรียญ และ รูปโปรไฟล์
-              // ---------------------------------------------------
+              // 1. ส่วนหัว
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -154,9 +144,7 @@ class ProfilePage extends StatelessWidget {
 
               const SizedBox(height: 25),
 
-              // ---------------------------------------------------
               // 2. หัวข้อปฏิทิน
-              // ---------------------------------------------------
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -191,9 +179,7 @@ class ProfilePage extends StatelessWidget {
 
               const SizedBox(height: 15),
 
-              // ---------------------------------------------------
               // 3. ปฏิทิน
-              // ---------------------------------------------------
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -250,29 +236,30 @@ class ProfilePage extends StatelessWidget {
 
                           BorderRadius? periodRadius;
                           if (isPeriod) {
-                            if (day == controller.periodDays.first)
+                            if (day == controller.periodDays.first) {
                               periodRadius = const BorderRadius.horizontal(
                                 left: Radius.circular(20),
                               );
-                            else if (day == controller.periodDays.last)
+                            } else if (day == controller.periodDays.last) {
                               periodRadius = const BorderRadius.horizontal(
                                 right: Radius.circular(20),
                               );
-                            else
+                            } else {
                               periodRadius = BorderRadius.zero;
+                            }
                           }
 
                           return Column(
                             children: [
                               Container(
-                                width: 36,
+                                width: double.infinity,
                                 height: 36,
                                 alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: isSelected
-                                      ? const Color(0xFFFFD54F)
+                                      ? const Color(0xFFFFD348)
                                       : (isPeriod
-                                            ? const Color(0xFFFFCCBC)
+                                            ? const Color(0xFFFFBCB5)
                                             : Colors.transparent),
                                   shape: isSelected
                                       ? BoxShape.circle
@@ -300,7 +287,7 @@ class ProfilePage extends StatelessWidget {
                                   errorBuilder: (c, e, s) => const SizedBox(),
                                 )
                               else
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 33),
                             ],
                           );
                         });
@@ -312,160 +299,113 @@ class ProfilePage extends StatelessWidget {
 
               const SizedBox(height: 25),
 
-              // ===================================================
-              // ส่วนที่ 4: บันทึกอาการ (ปรับปรุงใหม่ตามรูป)
-              // ===================================================
+              // 4. บันทึกอาการ
               const Text(
                 "บันทึกอาการ",
                 style: TextStyle(
                   color: Color(0xFF4489D7),
-                  fontSize: 20,
+                  fontSize: 20, // ปรับขนาดตามภาพ
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 20),
 
-              // 4.1 ปุ่มเลือกสถานะประจำเดือน (ซ้าย/ขวา)
+              // ส่วนปุ่มที่แยกกัน มีเงา และสีตามภาพ
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // ปุ่ม: เป็นประจำเดือน
-                  InkWell(
-                    onTap: () => controller.isPeriodStatus.value = true,
-                    child: Obx(
-                      () => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: controller.isPeriodStatus.value
-                              ? const Color(0xFF90CAF9)
-                              : Colors.transparent, // ฟ้าเมื่อเลือก
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(20),
-                            bottomLeft: Radius.circular(20),
-                          ),
-                          border: Border.all(
-                            color: const Color(0xFF5D4037),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          "เป็นประจำเดือน",
-                          style: TextStyle(
-                            color: const Color(0xFF5D4037),
-                            fontWeight: controller.isPeriodStatus.value
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ),
+                  _buildStatusButton(
+                    controller,
+                    "เป็นประจำเดือน",
+                    const Color(0xFFA6E3F9), // สีฟ้าเมื่อเลือก
+                    true,
                   ),
-                  // ปุ่ม: ไม่เป็นประจำเดือน
-                  InkWell(
-                    onTap: () => controller.isPeriodStatus.value = false,
-                    child: Obx(
-                      () => Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: !controller.isPeriodStatus.value
-                              ? const Color(0xFFFFE082)
-                              : Colors.transparent, // เหลืองเมื่อเลือก
-                          borderRadius: const BorderRadius.only(
-                            topRight: Radius.circular(20),
-                            bottomRight: Radius.circular(20),
-                          ),
-                          border: Border.all(
-                            color: const Color(0xFF5D4037),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          "ไม่เป็นประจำเดือน",
-                          style: TextStyle(
-                            color: const Color(0xFF5D4037),
-                            fontWeight: !controller.isPeriodStatus.value
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ),
+                  _buildStatusButton(
+                    controller,
+                    "ไม่เป็นประจำเดือน",
+                    const Color(0xFFA6E3F9), // สีฟ้าเมื่อเลือก
+                    false,
                   ),
                 ],
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
 
-              // 4.2 ตารางไอคอนอาการป่วย (Grid)
+              // 4.2 ตารางไอคอนอาการป่วย (Grid/Wrap)
               Obx(
-                () => Wrap(
-                  spacing: 15,
-                  runSpacing: 15,
-                  alignment: WrapAlignment.center,
-                  children: controller.symptomsList.map((item) {
-                    bool isSelected = controller.selectedSymptoms.contains(
-                      item['name'],
-                    );
-                    return InkWell(
-                      onTap: () => controller.toggleSymptom(item['name']!),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 60,
-                            height: 60,
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFFFE082,
-                              ), // สีพื้นหลังไอคอนเหลืองอ่อน
-                              borderRadius: BorderRadius.circular(15),
-                              border: isSelected
-                                  ? Border.all(color: Colors.red, width: 2)
-                                  : Border.all(
-                                      color: Colors.black12,
-                                    ), // ขอบแดงถ้าเลือก
-                            ),
-                            child: Image.asset(
-                              item['img']!,
-                              fit: BoxFit.contain,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(
+                () => Center(
+                  // ครอบด้วย Center เพื่อให้ Wrap ทั้งแผงอยู่กลาง
+                  child: Wrap(
+                    spacing: 15, // ระยะห่างระหว่างไอคอนแนวนอน
+                    runSpacing: 20, // ระยะห่างระหว่างแถวแนวตั้ง
+                    alignment: WrapAlignment.center, // จัดไอคอนในแถวให้อยู่กลาง
+                    children: controller.symptomsList.map((item) {
+                      bool isSelected = controller.selectedSymptoms.contains(
+                        item['name'],
+                      );
+                      return InkWell(
+                        onTap: () => controller.toggleSymptom(item['name']!),
+                        child: SizedBox(
+                          width:
+                              75, // กำหนดความกว้างที่แน่นอนเพื่อให้ Center/Wrap คำนวณได้แม่นยำ
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 70,
+                                height: 70,
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFFFFDA7B,
+                                  ).withOpacity(0.8),
+                                  borderRadius: BorderRadius.circular(15),
+                                  border: isSelected
+                                      ? Border.all(color: Colors.red, width: 2)
+                                      : Border.all(color: Colors.black12),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.05),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Image.asset(
+                                  item['img']!,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (c, e, s) => const Icon(
                                     Icons.image_not_supported,
                                     color: Colors.brown,
                                   ),
-                            ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                item['name']!,
+                                textAlign: TextAlign
+                                    .center, // จัดตัวอักษรให้อยู่กลางใต้ไอคอน
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF5D4037),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 5),
-                          Text(
-                            item['name']!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: Color(0xFF5D4037),
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 30),
+              const SizedBox(height: 20),
 
-              // 4.3 ปุ่มบันทึก (ด้านล่างขวา)
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
                   onPressed: () {
-                    // Logic บันทึกข้อมูล
                     Get.snackbar(
                       "สำเร็จ",
                       "บันทึกข้อมูลอาการเรียบร้อย",
@@ -474,31 +414,82 @@ class ProfilePage extends StatelessWidget {
                     );
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C5282), // สีน้ำเงินเข้ม
+                    backgroundColor: const Color(0xFF2C5282),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 12,
+                      horizontal: 20,
+                      vertical: 6,
                     ),
                   ),
                   child: const Text(
                     "บันทึก",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 16,
+                      fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ),
-
               const SizedBox(height: 40),
             ],
           ),
         ),
       ),
     );
+  }
+
+  // ฟังก์ชันช่วยสร้างปุ่มที่มีเงาและขอบมนรอบด้าน
+  // ฟังก์ชันสร้างปุ่ม บันทึกอาการ (พื้นหลังขาวเมื่อไม่เลือก / ฟ้าเมื่อเลือก / ขอบชัดตลอด)
+  Widget _buildStatusButton(
+    ProfileController controller,
+    String title,
+    Color activeColor,
+    bool isPeriodTab,
+  ) {
+    return Obx(() {
+      // ตรวจสอบสถานะการเลือก
+      bool isSelected = controller.isPeriodStatus.value == isPeriodTab;
+
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => controller.isPeriodStatus.value = isPeriodTab,
+          borderRadius: BorderRadius.circular(15),
+          // เอฟเฟกต์ตอนกดให้เป็นสีฟ้าอ่อนๆ
+          splashColor: const Color(0xFFA6E3F9).withOpacity(0.3),
+          highlightColor: const Color(0xFFA6E3F9).withOpacity(0.1),
+          child: Ink(
+            width: Get.width * 0.42,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            decoration: BoxDecoration(
+              // เงื่อนไข: ถ้าเลือกใช้สีฟ้า (activeColor) ถ้าไม่เลือกใช้สีขาวสะอาด
+              color: isSelected ? activeColor : Colors.white,
+              borderRadius: BorderRadius.circular(15),
+              // ขอบสีเทาเข้มเพื่อให้เห็นทรงปุ่มชัดเจนตลอดเวลาตามรูป
+              border: Border.all(color: const Color(0xFF757575), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 4,
+                  offset: const Offset(0, 4), // เงาด้านล่างเพิ่มมิติ
+                ),
+              ],
+            ),
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Color(0xFF424242), // สีตัวอักษรเทาเข้มอ่านง่าย
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      );
+    });
   }
 }
