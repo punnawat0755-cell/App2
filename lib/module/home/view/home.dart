@@ -160,8 +160,8 @@ class _HomePageState extends State<HomePage> {
                   },
                   children: [
                     _buildDailyMissionBanner(),
-                    // _buildClownFishBanner(),
-                    // _buildLoveJobBanner(),
+                    _buildClownFishBanner(),
+                    _buildLoveJobBanner(),
                   ],
                 ),
               ),
