@@ -5,6 +5,7 @@ import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home.dart';
 import 'package:flutter_application_1/module/pet/view/pet_view.dart';
 import 'package:flutter_application_1/module/profile/view/profile_view.dart';
+import 'package:flutter_application_1/module/setting/view/setting.dart';
 
 class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key});
@@ -22,11 +23,13 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // เรียงลำดับตาม icon ใน Navigation Bar (0, 1, 2, 3, 4)
   // ---------------------------------------------------------
   final List<Widget> _pages = [
-    const ProfilePage(), // Index 0: หน้า Feed (ที่เราทำไว้)
-    const PetPage(),
-    const HomePage(),
+    // Index 0: หน้า Feed (ที่เราทำไว้)
+    const SettingPage(),
+    // const HomePage(),
     const FeedPage(),
+    const PetPage(),
     const ChatSelectionPage(),
+    const ProfilePage(),
   ];
 
   @override

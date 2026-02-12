@@ -142,11 +142,11 @@ class _HomePageState extends State<HomePage> {
                 'สวัสดี,$name',
                 style: const TextStyle(
                   color: Color(0xFF4489D7),
-                  fontSize: 26,
+                  fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              const SizedBox(height: 15),
+              const SizedBox(height: 10),
 
               // --- Banner Section ---
               SizedBox(

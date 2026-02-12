@@ -196,31 +196,31 @@ class PetPage extends StatelessWidget {
       child: Column(
         children: [
           // Row 1: Back + Name
-          Row(
-            children: [
-              InkWell(
-                onTap: () => Get.back(),
-                child: Image.asset(
-                  'assets/images/back2.png',
-                  width: 36,
-                  height: 28,
-                  fit: BoxFit.contain,
-                ),
-              ),
-              const SizedBox(width: 2),
-              Obx(
-                () => Text(
-                  "สวัสดี,${controller.username}",
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
+          // Row(
+          //   children: [
+          //     // InkWell(
+          //     //   onTap: () => Get.back(),
+          //     //   child: Image.asset(
+          //     //     'assets/images/back2.png',
+          //     //     width: 36,
+          //     //     height: 28,
+          //     //     fit: BoxFit.contain,
+          //     //   ),
+          //     // ),
+          //     const SizedBox(width: 10),
+          //     Obx(
+          //       () => Text(
+          //         "สวัสดี,${controller.username}",
+          //         style: const TextStyle(
+          //           color: Colors.white,
+          //           fontSize: 24,
+          //           fontWeight: FontWeight.bold,
+          //         ),
+          //       ),
+          //     ),
+          //   ],
+          // ),
+          const SizedBox(height: 20),
 
           // Row 2: Stats
           Row(

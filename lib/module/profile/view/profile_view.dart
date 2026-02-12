@@ -12,12 +12,9 @@ class ProfileController extends GetxController {
   var selectedYear = DateTime.now().year.obs;
   var selectedDate = 0.obs;
 
-  // ข้อมูลที่ "บันทึก" ลงเครื่องแล้วจริงๆ
+  final List<int> periodDays = [29, 30, 31];
   var dailyPeriodStatus = <String, bool>{}.obs;
   var dailySymptoms = <String, List<String>>{}.obs;
-
-  // ตัวแปรเก็บสถานะ "ชั่วคราว" ขณะกดปุ่ม (จะยังไม่ขึ้นสีแดงในปฏิทินจนกว่าจะกดบันทึก)
-  var tempPeriodStatus = false.obs;
 
   String get dateKey =>
       "${selectedYear.value}-${selectedMonth.value}-${selectedDate.value}";
@@ -49,8 +46,12 @@ class ProfileController extends GetxController {
     }
   }
 
-  // ดึงข้อมูลอาการ
+  bool getPeriodStatusForSelectedDay() => dailyPeriodStatus[dateKey] ?? true;
   List<String> getSymptomsForSelectedDay() => dailySymptoms[dateKey] ?? [];
+
+  void setPeriodStatus(bool status) {
+    if (selectedDate.value != 0) dailyPeriodStatus[dateKey] = status;
+  }
 
   void toggleSymptom(String symptomName) {
     if (selectedDate.value == 0) return;
@@ -61,24 +62,16 @@ class ProfileController extends GetxController {
     dailySymptoms[dateKey] = currentList;
   }
 
-  // แก้ไขฟังก์ชันบันทึก: ให้นำค่าจาก temp มาใส่ใน daily จริงๆ
   void saveDailyData() {
-    if (selectedDate.value == 0) return;
-
-    dailyPeriodStatus[dateKey] = tempPeriodStatus.value;
-
     Get.snackbar(
       "สำเร็จ",
       "บันทึกเรียบร้อย",
       backgroundColor: const Color(0xFF2C5282),
       colorText: Colors.white,
     );
-
-    if (tempPeriodStatus.value) {
-      showAdviceModal();
-    }
   }
 
+  // --- ฟังก์ชันแสดง Modal คำแนะนำ ---
   void showAdviceModal() {
     Get.dialog(
       Dialog(
@@ -92,21 +85,35 @@ class ProfileController extends GetxController {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
+              const Text(
                 "แนะนำวิธีการดูแลตัวเองช่วงเป็นประจำเดือน",
                 textAlign: TextAlign.center,
-                style: GoogleFonts.mitr(
-                  textStyle: const TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                style: TextStyle(
+                  color: Color(0xFF4489D7),
+                  fontFamily: 'Kanit',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 20),
-              _buildAdviceItem("-พักผ่อนและขยับกายเบาๆ"),
-              _buildAdviceItem("-รักษาความสะอาด เปลี่ยนผ้าอนามัยบ่อยๆ"),
-              _buildAdviceItem("-ดื่มน้ำอุ่นและเลี่ยงคาเฟอีน"),
+              _buildAdviceItem(
+                "-พักผ่อนและขยับกายเบาๆ: นอนหลับให้เพียงพอ และอาจโยคะหรือเดินเล่นเบาๆเพื่อช่วยให้ร่างกายหลั่งสารเอ็นดอร์ฟิน ลดความเครียด",
+              ),
+              _buildAdviceItem(
+                "-รักษาความสะอาด: เปลี่ยนผ้าอนามัยทุก 3-4 ชั่วโมง เพื่อป้องกันความอับชื้นและการสะสมของเชื้อแบคทีเรีย",
+              ),
+              _buildAdviceItem(
+                "-ดื่มน้ำอุ่นและเลี่ยงคาเฟอีน: น้ำอุ่นช่วยให้เลือดไหลเวียนดีขึ้น ส่วนการงดกาแฟหรือชาจะช่วยลดอาการคัดตึงหน้าอกและอาการหงุดหงิด",
+              ),
+              _buildAdviceItem(
+                "-เลือกอาหารย่อยง่าย: เน้นทานผัก ผลไม้ และอาหารที่มีธาตุเหล็ก (เช่น ตับ ไข่แดง) เพื่อทดแทนเลือดที่เสียไป และเลี่ยงอาหารรสจัดที่ทำให้ท้องอืด",
+              ),
+              _buildAdviceItem(
+                "-อาหารที่มีแมกนีเซียมสูง: เช่น กล้วย ถั่ว อัลมอนด์ หรือดาร์กช็อกโกแลต ช่วยลดอาการเกร็งของกล้ามเนื้อและบรรเทาอาการ ปวดท้องได้ดี",
+              ),
+              _buildAdviceItem(
+                "-ผลไม้รสเปรี้ยว: เช่น ส้ม มะนาว หรือเบอร์รี่ มีวิตามินซีสูง ช่วยให้ร่างกายดูดซึมธาตุเหล็กได้ดีขึ้น และช่วยลดอาการเหนื่อยล้า",
+              ),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () => Get.back(),
@@ -115,11 +122,16 @@ class ProfileController extends GetxController {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
                   ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 50,
+                    vertical: 10,
+                  ),
                 ),
                 child: const Text(
                   "ปิด",
                   style: TextStyle(
                     color: Colors.white,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -137,14 +149,49 @@ class ProfileController extends GetxController {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: const TextStyle(color: Color(0xFF4489D7), fontSize: 14),
+        style: const TextStyle(
+          color: Color(0xFF4489D7),
+          fontSize: 14,
+          height: 1.4,
+        ),
       ),
     );
   }
 
+  final Map<int, String> whaleMoods = {
+    1: 'whale_happy',
+    2: 'whale_cry',
+    12: 'whale_love',
+    19: 'whale_love',
+    20: 'whale_love',
+    30: 'whale_love',
+  };
+
   String getWhaleImage(int day) {
+    String? type = whaleMoods[day];
+    if (type == 'whale_love') return 'assets/images/whale_love.png';
+    if (type == 'whale_cry') return 'assets/images/whale_cry.png';
     return 'assets/images/whale_happy.png';
   }
+
+  String getDefaultSymptomImage(String symptomName) {
+    final symptom = symptomsList.firstWhere(
+      (e) => e['name'] == symptomName,
+      orElse: () => {},
+    );
+    return symptom['img'] ?? 'assets/images/thunder 1.png';
+  }
+
+  final List<Map<String, String>> symptomsList = [
+    {'name': 'ปวดท้อง', 'img': 'assets/images/thunder 1.png'},
+    {'name': 'แปรปรวน', 'img': 'assets/images/thunder 2.png'},
+    {'name': 'ท้องอืด', 'img': 'assets/images/thunder 3.png'},
+    {'name': 'ปวดหัวไมเกรน', 'img': 'assets/images/thunder 4.png'},
+    {'name': 'หงุดหงิด', 'img': 'assets/images/thunder 5.png'},
+    {'name': 'เป็นไข้', 'img': 'assets/images/thunder 6.png'},
+    {'name': 'หิวบ่อย', 'img': 'assets/images/thunder 7.png'},
+    {'name': 'สิวขึ้น', 'img': 'assets/images/thunder 8.png'},
+  ];
 }
 
 class ProfilePage extends StatelessWidget {
@@ -162,7 +209,7 @@ class ProfilePage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Coins & Header
+              // 1. ส่วนหัว
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -206,7 +253,7 @@ class ProfilePage extends StatelessWidget {
               ),
               const SizedBox(height: 25),
 
-              // 2. Month Selector
+              // 2. เลือกเดือน
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -215,8 +262,8 @@ class ProfilePage extends StatelessWidget {
                     style: GoogleFonts.mitr(
                       textStyle: const TextStyle(
                         color: Color(0xFF4489D7),
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
@@ -294,6 +341,8 @@ class ProfilePage extends StatelessWidget {
                             const SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: 7,
                               childAspectRatio: 0.65,
+                              mainAxisSpacing: 5,
+                              crossAxisSpacing: 0,
                             ),
                         itemBuilder: (context, index) {
                           int day = index - controller.firstDayOffset + 1;
@@ -309,9 +358,7 @@ class ProfilePage extends StatelessWidget {
                                 controller.today.value == day &&
                                 controller.selectedMonth.value ==
                                     DateTime.now().month;
-
-                            // เช็คสถานะที่บันทึกแล้วจริงๆ
-                            bool isSavedPeriod =
+                            bool isPeriodDay =
                                 controller.dailyPeriodStatus[dayKey] ?? false;
 
                             Color bgColor = Colors.transparent;
@@ -320,26 +367,19 @@ class ProfilePage extends StatelessWidget {
                             if (isSelected) {
                               bgColor = const Color(
                                 0xFFFFD348,
-                              ); // เลือกอยู่ -> สีเหลือง
-                            } else if (isSavedPeriod) {
+                              ); // สีเหลืองเมื่อจิ้ม
+                            } else if (isPeriodDay) {
                               bgColor = const Color(
                                 0xFFF05A42,
-                              ); // บันทึกแล้ว -> สีแดงเข้ม
+                              ); // สีแดงเมื่อบันทึกแล้ว
                               textColor = Colors.white;
                             } else if (isToday) {
-                              bgColor = const Color(
-                                0xFFCCCCCC,
-                              ); // วันนี้ -> สีเทา
+                              bgColor = const Color(0xFFCCCCCC);
                             }
 
                             return GestureDetector(
-                              onTap: () {
-                                controller.selectedDate.value = day;
-                                // เมื่อเปลี่ยนวัน ให้ดึงค่าที่เคยบันทึกไว้มาใส่ใน temp
-                                controller.tempPeriodStatus.value =
-                                    controller.dailyPeriodStatus[dayKey] ??
-                                    false;
-                              },
+                              onTap: () => controller.selectedDate.value = day,
+                              behavior: HitTestBehavior.opaque,
                               child: Column(
                                 children: [
                                   Container(
@@ -364,6 +404,9 @@ class ProfilePage extends StatelessWidget {
                                     controller.getWhaleImage(day),
                                     width: 32,
                                     height: 32,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (c, e, s) =>
+                                        const SizedBox(height: 32),
                                   ),
                                 ],
                               ),
@@ -383,22 +426,46 @@ class ProfilePage extends StatelessWidget {
                 style: GoogleFonts.mitr(
                   textStyle: const TextStyle(
                     color: Color(0xFF4489D7),
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
               const SizedBox(height: 20),
               Obx(() {
-                if (controller.selectedDate.value == 0)
-                  return const Center(child: Text("กรุณาเลือกวันที่ต้องการ"));
-
+                if (controller.selectedDate.value == 0) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFDA7B),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(
+                          0xFF757575,
+                        ), // สีเทาเข้มของเส้นขอบตามรูป
+                        width: 1.5, // ความหนาของเส้นขอบ
+                      ),
+                    ),
+                    child: const Text(
+                      "กรุณาเลือกวันที่ต้องการ",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF5D4037),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                }
                 return Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // ปุ่มสถานะ: กดแล้วเปลี่ยนเป็นฟ้า (temp)
                         _buildStatusButton(
                           controller,
                           "เป็นประจำเดือน",
@@ -415,13 +482,12 @@ class ProfilePage extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 30),
-                    // ... Wrap อาการ (ส่วนเดิม) ...
                     Wrap(
                       spacing: 15,
                       runSpacing: 20,
                       alignment: WrapAlignment.center,
                       children: controller.symptomsList.map((item) {
-                        bool isSymptomSelected = controller
+                        bool isSelected = controller
                             .getSymptomsForSelectedDay()
                             .contains(item['name']);
                         return GestureDetector(
@@ -433,14 +499,14 @@ class ProfilePage extends StatelessWidget {
                                 height: 70,
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: isSymptomSelected
+                                  color: isSelected
                                       ? const Color(0xFFA6E3F9)
                                       : const Color(
                                           0xFFFFDA7B,
                                         ).withOpacity(0.8),
                                   borderRadius: BorderRadius.circular(15),
                                   border: Border.all(
-                                    color: isSymptomSelected
+                                    color: isSelected
                                         ? const Color(0xFF4489D7)
                                         : Colors.black12,
                                     width: 1.5,
@@ -469,7 +535,11 @@ class ProfilePage extends StatelessWidget {
                     Align(
                       alignment: Alignment.centerRight,
                       child: ElevatedButton(
-                        onPressed: () => controller.saveDailyData(),
+                        onPressed: () {
+                          controller.saveDailyData();
+                          if (controller.getPeriodStatusForSelectedDay())
+                            controller.showAdviceModal();
+                        },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2C5282),
                           shape: RoundedRectangleBorder(
@@ -488,6 +558,7 @@ class ProfilePage extends StatelessWidget {
                   ],
                 );
               }),
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -499,30 +570,20 @@ class ProfilePage extends StatelessWidget {
     ProfileController controller,
     String title,
     Color activeColor,
-    bool isPeriodValue,
+    bool isPeriodTab,
   ) {
     return Obx(() {
-      // เช็คจาก temp เพื่อให้กดแล้วเปลี่ยนเป็นสีฟ้าทันที
-      bool isSelected = controller.tempPeriodStatus.value == isPeriodValue;
+      bool isSelected =
+          controller.getPeriodStatusForSelectedDay() == isPeriodTab;
       return GestureDetector(
-        onTap: () => controller.tempPeriodStatus.value = isPeriodValue,
+        onTap: () => controller.setPeriodStatus(isPeriodTab),
         child: Container(
           width: Get.width * 0.42,
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected ? activeColor : Colors.white,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-              color: isSelected ? activeColor : const Color(0xFF757575),
-              width: 1.5,
-            ),
-            boxShadow: const [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 4,
-                offset: Offset(0, 4),
-              ),
-            ],
+            border: Border.all(color: const Color(0xFF757575), width: 1.5),
           ),
           child: Text(
             title,

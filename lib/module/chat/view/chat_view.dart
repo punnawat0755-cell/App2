@@ -26,7 +26,7 @@ class ChatSelectionPage extends StatelessWidget {
     final controller = Get.put(ChatSelectionController());
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F9FF),
+      backgroundColor: const Color(0xFFFFFFFF),
       body: SafeArea(
         child: Stack(
           children: [
