@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/setting/view/edit.dart';
 import 'package:get/get.dart';
-import 'package:google_fonts/google_fonts.dart';
+// ลบ GoogleFonts ออกตามที่คุณต้องการใช้ font จาก main
 
 class SettingPage extends StatelessWidget {
   const SettingPage({super.key});
@@ -8,28 +9,26 @@ class SettingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFFFFFFF), // พื้นหลังสีฟ้าอ่อน
+      backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         titleSpacing: -8,
         leading: IconButton(
           icon: Image.asset(
-            'assets/images/back.png', // ใส่ path รูปภาพของคุณตรงนี้
-            width: 25, // กำหนดความกว้างตามความเหมาะสม
-            height: 25, // กำหนดความสูงตามความเหมาะสม
+            'assets/images/back.png',
+            width: 25,
+            height: 25,
             fit: BoxFit.contain,
           ),
           onPressed: () => Get.back(),
         ),
-        title: Text(
+        title: const Text(
           "การตั้งค่า",
-          style: GoogleFonts.mitr(
-            textStyle: const TextStyle(
-              color: Color(0xFF4489D7),
-              fontSize: 22,
-              fontWeight: FontWeight.w500,
-            ),
+          style: TextStyle(
+            color: Color(0xFF4489D7),
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
           ),
         ),
       ),
@@ -39,14 +38,12 @@ class SettingPage extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 40),
-              // --- โปรไฟล์แมวน้ำ ---
               Container(
                 width: 150,
                 height: 150,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
-                  // border: Border.all(color: Colors.white, width: 4),
-                  image: const DecorationImage(
+                  image: DecorationImage(
                     image: NetworkImage(
                       'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
                     ),
@@ -55,31 +52,35 @@ class SettingPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              Text(
-                "Seal",
-                style: GoogleFonts.mitr(
-                  textStyle: const TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontSize: 22,
-                    fontWeight: FontWeight.w500,
-                  ),
+              const Text(
+                "แมวน้ำ",
+                style: TextStyle(
+                  color: Color(0xFF4489D7),
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 30),
-              // --- รายการเมนูพร้อมกรอบชัด ---
+
+              // --- แยกการกดแต่ละปุ่มตรงนี้ ---
               _buildSettingItem(
-                Image.asset("assets/images/person.png"), // ใส่รูปแทน Icon
+                Image.asset("assets/images/person.png"),
                 "แก้ไขข้อมูล",
+                () => Get.to(
+                  () => const EditProfilePage(),
+                ), // เปลี่ยนจาก GetPage เป็น Get.to
               ),
               const SizedBox(height: 20),
               _buildSettingItem(
-                Image.asset("assets/images/lock.png"), // ใส่รูปแทน Icon
+                Image.asset("assets/images/lock.png"),
                 "ความเป็นส่วนตัว",
+                () => Get.toNamed('/privacy'), // เปลี่ยนเป็นหน้าความเป็นส่วนตัว
               ),
               const SizedBox(height: 20),
               _buildSettingItem(
-                Image.asset("assets/images/heart.png"), // ใส่รูปแทน Icon
+                Image.asset("assets/images/heart.png"),
                 "รายการโปรด",
+                () => Get.toNamed('/favorites'), // เปลี่ยนเป็นหน้ารายการโปรด
               ),
             ],
           ),
@@ -88,13 +89,12 @@ class SettingPage extends StatelessWidget {
     );
   }
 
-  // --- Widget สำหรับสร้างปุ่มรายการเมนู (ปิดปีกกาครบถ้วน) ---// แก้บรรทัดนี้
-  Widget _buildSettingItem(Widget leading, String title) {
+  // --- ปรับฟังก์ชันให้รับ onTap เข้ามา เพื่อให้กดได้ทั้งปุ่ม ---
+  Widget _buildSettingItem(Widget leading, String title, VoidCallback onTap) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFCEEFFE).withOpacity(0.8),
         borderRadius: BorderRadius.circular(25),
-        // เพิ่มเส้นขอบสีเทาเข้มเพื่อให้กรอบชัดตามรูป
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.18),
@@ -104,31 +104,29 @@ class SettingPage extends StatelessWidget {
         ],
       ),
       child: ListTile(
-        leading: SizedBox(
-          width: 50,
-          height: 50,
-          child: leading, // วาง Widget ที่ส่งมาจากด้านบนลงตรงนี้
-        ),
+        onTap:
+            onTap, // นำฟังก์ชันที่ส่งมามาใส่ตรงนี้ ทำให้กดได้ครอบคลุมทั้ง Container
+        leading: SizedBox(width: 50, height: 50, child: leading),
         title: Text(
           title,
-          style: GoogleFonts.mitr(
-            textStyle: const TextStyle(
-              color: Color(0xFF4489D7),
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
+          style: const TextStyle(
+            color: Color(0xFF4489D7),
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        trailing: const Icon(
-          Icons.arrow_forward_ios_rounded,
-          color: Color(0xFF757575),
-          size: 20,
+        trailing: Transform.flip(
+          flipX: true,
+          child: Image.asset(
+            'assets/images/back.png',
+            width: 20,
+            height: 20,
+            color: const Color(0xFF757575),
+            fit: BoxFit.contain,
+          ),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        onTap: () {
-          // ใส่ Logic หน้าถัดไป
-        },
       ),
     );
-  } // ปิดฟังก์ชัน _buildSettingItem
-} // ปิดคลาส SettingPage อย่างสมบูรณ์
+  }
+}

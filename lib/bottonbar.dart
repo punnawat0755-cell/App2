@@ -5,6 +5,7 @@ import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home.dart';
 import 'package:flutter_application_1/module/pet/view/pet_view.dart';
 import 'package:flutter_application_1/module/profile/view/profile_view.dart';
+import 'package:flutter_application_1/module/setting/view/edit.dart';
 import 'package:flutter_application_1/module/setting/view/setting.dart';
 
 class BottomNavBar extends StatefulWidget {
@@ -24,9 +25,10 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // ---------------------------------------------------------
   final List<Widget> _pages = [
     // Index 0: หน้า Feed (ที่เราทำไว้)
+    const EditProfilePage(),
     const SettingPage(),
     // const HomePage(),
-    const FeedPage(),
+    // const FeedPage(),
     const PetPage(),
     const ChatSelectionPage(),
     const ProfilePage(),

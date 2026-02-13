@@ -27,11 +27,11 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
+      // locale: const Locale('th', 'TH'),
       debugShowCheckedModeBanner: false,
       title: 'Supabase Flutter App',
       theme: ThemeData(
         useMaterial3: true,
-        
 
         // แบบที่ 1: เปลี่ยนฟอนต์ทั้งแอป (แนะนำ)
         // คุณสามารถเปลี่ยน .kanitTextTheme เป็น .promptTextTheme หรือ .robotoTextTheme ได้ตามใจชอบ
