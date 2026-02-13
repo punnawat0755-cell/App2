@@ -16,7 +16,7 @@ class PersonModel {
   });
 
   factory PersonModel.fromJson(Map<String, dynamic> json) {
-    Map<String, dynamic>? _asMap(dynamic value) {
+    Map<String, dynamic>? asMap(dynamic value) {
       if (value is Map<String, dynamic>) return value;
       if (value is Map) {
         return value.map((k, v) => MapEntry(k.toString(), v));
@@ -25,10 +25,10 @@ class PersonModel {
     }
 
     return PersonModel(
-      name: _asMap(json['name']),
-      position: _asMap(json['position']),
+      name: asMap(json['name']),
+      position: asMap(json['position']),
       personcode: (json['personcode'] ?? '').toString(),
-      department: _asMap(json['department']),
+      department: asMap(json['department']),
       email: (json['email'] ?? '').toString(),
       urlimage: json['urlimage']?.toString(),
     );

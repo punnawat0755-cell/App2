@@ -11,7 +11,8 @@ class Boxs {
       borderRadius: borderRadius ?? BorderRadius.circular(12),
       color: color ?? Colors.white,
       boxShadow: const [
-        BoxShadow(color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2)),
+        BoxShadow(
+            color: Color(0x14000000), blurRadius: 6, offset: Offset(0, 2)),
       ],
     );
   }
