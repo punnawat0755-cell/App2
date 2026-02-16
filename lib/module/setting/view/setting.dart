@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/setting/view/edit.dart';
+import 'package:flutter_application_1/module/setting/view/privacy.dart';
 import 'package:get/get.dart';
 // ลบ GoogleFonts ออกตามที่คุณต้องการใช้ font จาก main
 
@@ -74,13 +75,13 @@ class SettingPage extends StatelessWidget {
               _buildSettingItem(
                 Image.asset("assets/images/lock.png"),
                 "ความเป็นส่วนตัว",
-                () => Get.toNamed('/privacy'), // เปลี่ยนเป็นหน้าความเป็นส่วนตัว
+                () => Get.to(() => const PrivacyPage()),
               ),
               const SizedBox(height: 20),
               _buildSettingItem(
                 Image.asset("assets/images/heart.png"),
                 "รายการโปรด",
-                () => Get.toNamed('/favorites'), // เปลี่ยนเป็นหน้ารายการโปรด
+                () => Get.toNamed('/favorites'), 
               ),
             ],
           ),
@@ -93,13 +94,13 @@ class SettingPage extends StatelessWidget {
   Widget _buildSettingItem(Widget leading, String title, VoidCallback onTap) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFCEEFFE).withOpacity(0.8),
-        borderRadius: BorderRadius.circular(25),
+        color: const Color(0xFFD9EFFA).withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
-            blurRadius: 5,
-            offset: const Offset(0, 5),
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 4,
+            offset: const Offset(0, 4),
           ),
         ],
       ),

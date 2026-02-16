@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/setting/view/setting.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
@@ -27,13 +28,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _selectDate(BuildContext context) async {
+    print(
+      "ฟังก์ชัน _selectDate ถูกเรียกแล้ว!",
+    ); // ใส่เพื่อเช็คใน Debug Console ว่ากดติดไหม
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime(2004, 12, 17),
       firstDate: DateTime(1950),
       lastDate: DateTime.now(),
-      locale: const Locale('th', 'TH'),
+      // ลองคอมเมนต์บรรทัด locale ออกก่อนถ้ายังกดไม่ขึ้น
+      // locale: const Locale('th', 'TH'),
     );
+
     if (picked != null) {
       setState(() {
         birthday = DateFormat('dd/MM/yyyy').format(picked);
@@ -49,14 +55,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        titleSpacing: -8,
+        titleSpacing: -8, // ปรับให้ข้อความชิดปุ่ม Back มากขึ้น
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Color(0xFF6A99D3),
-            size: 28,
+          icon: Image.asset(
+            'assets/images/back.png',
+            width: 25,
+            height: 25,
+            fit: BoxFit.contain,
           ),
-          onPressed: () => Get.back(),
+          onPressed: () => Get.to(() => const SettingPage()),
         ),
         title: const Text(
           "แก้ไขข้อมูล",
@@ -73,6 +80,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           child: Column(
             children: [
               const SizedBox(height: 40),
+              // --- รูปโปรไฟล์พร้อมปุ่ม Refresh ---
               Center(
                 child: Stack(
                   children: [
@@ -95,15 +103,27 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       ),
                     ),
                     Positioned(
-                      bottom: 5,
-                      right: 5,
-                      child: CircleAvatar(
-                        backgroundColor: Colors.grey.withOpacity(0.9),
-                        radius: 18,
-                        child: const Icon(
-                          Icons.refresh,
-                          color: Colors.white,
-                          size: 20,
+                      bottom: 1,
+                      right: 3,
+                      child: GestureDetector(
+                        onTap: () {
+                          // ใส่ฟังก์ชันสำหรับเปลี่ยนรูปโปรไฟล์ที่นี่
+                        },
+                        child: CircleAvatar(
+                          backgroundColor: Colors.transparent,
+                          radius: 18,
+                          child: Image.asset(
+                            'assets/images/refresh.png', // ตรวจสอบว่าชื่อไฟล์ Refresh.png ตรงกับในเครื่อง
+                            width: 32,
+                            height: 32,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(
+                                  Icons.refresh,
+                                  color: Colors.grey,
+                                  size: 20,
+                                ), // ถ้าหาไฟล์รูปไม่เจอ ให้แสดงไอคอนสำรองแทน
+                          ),
                         ),
                       ),
                     ),
@@ -111,26 +131,26 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ),
               const SizedBox(height: 25),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    username,
-                    style: const TextStyle(
-                      color: Color(0xFF4489D7),
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
+              // --- แสดงชื่อผู้ใช้ตรงกลางหน้าจอ ---
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      username,
+                      style: const TextStyle(
+                        color: Color(0xFF4489D7),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  if (activeField == null) ...[
-                    const SizedBox(width: 10),
-                    // const Icon(Icons.edit, color: Colors.grey, size: 22),
                   ],
-                ],
+                ),
               ),
               const SizedBox(height: 30),
 
+              // --- 1. แถบชื่อผู้ใช้ ---
               _buildEditItem(
                 label: "ชื่อผู้ใช้ :",
                 fieldKey: "name",
@@ -162,6 +182,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
               const SizedBox(height: 20),
 
+              // --- 2. แถบเพศ ---
               _buildEditItem(
                 label: "เพศ :",
                 fieldKey: "gender",
@@ -188,22 +209,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
               const SizedBox(height: 20),
 
+              // --- 3. แถบวันเกิด (แก้ไขให้กดได้ทั้งช่อง) ---
               _buildEditItem(
                 label: "วันเกิด :",
                 fieldKey: "birth",
-                icon: Icons.calendar_month,
-                content: Text(
-                  birthday,
-                  style: const TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontSize: 18,
+                icon: Icons.calendar_month, // ใช้ไอคอนปฏิทินตามรูป
+                onIconTap: () => _selectDate(context),
+                content: GestureDetector(
+                  onTap: () =>
+                      _selectDate(context), // กดที่ตัวเลขวันที่เพื่อเปิดปฏิทิน
+                  child: Text(
+                    birthday,
+                    style: const TextStyle(
+                      color: Color(0xFF4489D7),
+                      fontSize: 18,
+                    ),
                   ),
                 ),
-                onIconTap: () => _selectDate(context),
               ),
 
               const SizedBox(height: 30),
 
+              // --- ปุ่มบันทึกข้อมูล ---
               if (activeField != null)
                 Align(
                   alignment: Alignment.centerRight,
@@ -264,10 +291,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     required String label,
     required String fieldKey,
     required Widget content,
-    IconData? icon,
+    IconData? icon, // ยังเก็บไว้เผื่อกรณีฉุกเฉิน
     VoidCallback? onIconTap,
   }) {
-    bool isEditing = activeField == fieldKey;
     return Container(
       height: 70,
       width: double.infinity,
@@ -288,7 +314,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Text(
             label,
             style: const TextStyle(
-              color: Color(0xFF6A99D3),
+              color: Color(0xFF4489D7),
               fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
@@ -297,11 +323,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Expanded(child: content),
           GestureDetector(
             onTap: onIconTap ?? () => setState(() => activeField = fieldKey),
-            child: Icon(
-              isEditing ? (icon ?? Icons.edit) : Icons.edit,
-              color: const Color(0xFF9E9E9E),
-              size: 25,
-            ),
+            child: fieldKey == "birth"
+                ? Image.asset(
+                    'assets/images/calendar.png', // รูปปฏิทิน
+                    width: 30,
+                    height: 30,
+                  )
+                : Image.asset(
+                    'assets/images/pen.png', // รูปดินสอ
+                    width: 25,
+                    height: 25,
+                  ),
           ),
         ],
       ),
@@ -315,7 +347,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFACE2E1) : Colors.white,
+          color: isSelected ? const Color(0xFFB5EFFF) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: Colors.grey.shade400, width: 0.8),
         ),
