@@ -46,20 +46,21 @@ class FavoritesPage extends StatelessWidget {
         leading: IconButton(
           icon: const Icon(
             Icons.arrow_back_ios_new,
-            color: Color(0xFF757575), // สีเทาเข้มตามรูป
+            color: Color(0xFF757575),
             size: 32,
           ),
           onPressed: () => Get.back(),
         ),
+        titleSpacing: -5,
         title: const Text(
           "รายการโปรด",
           style: TextStyle(
-            color: Color(0xFF4489D7), // สีน้ำเงินฟ้าตามรูป
+            color: Color(0xFF4489D7),
             fontSize: 22,
             fontWeight: FontWeight.bold,
           ),
         ),
-        centerTitle: false, // ชิดซ้ายตามสไตล์ในรูป
+        centerTitle: false,
       ),
       body: ListView.builder(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
@@ -67,7 +68,7 @@ class FavoritesPage extends StatelessWidget {
         itemBuilder: (context, index) {
           final item = favoriteItems[index];
 
-          // ตรวจสอบว่าต้องแสดง Header วันที่หรือไม่ (แสดงเมื่อเป็นรายการแรกของวันนั้นๆ)
+          // เช็คการแสดง Header วันที่
           bool showDateHeader = false;
           if (index == 0 ||
               favoriteItems[index]['date'] !=
@@ -78,62 +79,72 @@ class FavoritesPage extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 1. ส่วนแสดงวันที่ (Header)
               if (showDateHeader) ...[
-                const SizedBox(height: 25),
+                const SizedBox(height: 10),
                 Text(
                   item['date'],
                   style: const TextStyle(
-                    color: Color(0xFF6A99D3),
-                    fontSize: 20,
+                    color: Color(0xFF4489D7),
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: 10),
               ],
 
-              // ส่วนของเนื้อหารายการโปรด
+              // 2. ส่วนเนื้อหาแต่ละรายการ
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Column(
                   children: [
-                    // รูปภาพวงกลม
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundColor: Colors.grey[200],
-                      backgroundImage: NetworkImage(
-                        'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                      ),
-                    ),
-                    const SizedBox(width: 15),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // รูปภาพวงกลม
+                        CircleAvatar(
+                          radius: 25,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage: NetworkImage(
+                            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
 
-                    // ข้อความรายละเอียด
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            item['title'],
-                            style: const TextStyle(
-                              color: Color(0xFF757575),
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
+                        // ข้อความ (Title & Content)
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                item['title'],
+                                style: const TextStyle(
+                                  color: Color(0xFF757575),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                item['content'],
+                                style: const TextStyle(
+                                  color: Color(0xFF9E9E9E),
+                                  fontSize: 14,
+                                  height: 1.3,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            item['content'],
-                            style: const TextStyle(
-                              color: Color(0xFF9E9E9E),
-                              fontSize: 14,
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 15),
-                          // เส้นคั่นบางๆ
-                          const Divider(color: Color(0xFFEEEEEE), thickness: 1),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+
+                    // 3. เส้นคั่นที่ยาวเต็มขอบ
+                    const Divider(
+                      color: Color(0xFFD9D9D9),
+                      thickness: 1.2,
+                      height: 1,
                     ),
                   ],
                 ),
