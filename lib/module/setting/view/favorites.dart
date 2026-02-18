@@ -13,28 +13,32 @@ class FavoritesPage extends StatelessWidget {
         "title": "seal",
         "content":
             "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา 24 ชม. หรอกนะ การยอมรับความเปราะบางของตัวเอง คือก้าวแรกของการเยียวยาที่แท้จริง 🤍",
-        "image": "assets/images/seal1.png",
+        "image_url":
+            "https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg",
       },
       {
         "date": "January 25, 2026",
         "title": "seal2",
         "content":
             "คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น ดอกไม้ยังคงเป็นดอกไม้แม้ในวันที่ไม่มีใครชม คุณเองก็เช่นกัน 🌷",
-        "image": "assets/images/seal2.png",
+        "image_url":
+            "https://i.pinimg.com/736x/c5/47/82/c54782d0ca477283d800f5637a9efe67.jpg",
       },
       {
         "date": "January 23, 2026",
         "title": "seal",
         "content":
             "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา 24 ชม. หรอกนะ การยอมรับความเปราะบางของตัวเอง คือก้าวแรกของการเยียวยาที่แท้จริง 🤍",
-        "image": "assets/images/seal1.png",
+        "image_url":
+            "https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg",
       },
       {
         "date": "January 23, 2026",
         "title": "seal2",
         "content":
             "คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น ดอกไม้ยังคงเป็นดอกไม้แม้ในวันที่ไม่มีใครชม คุณเองก็เช่นกัน 🌷",
-        "image": "assets/images/seal2.png",
+        "image_url":
+            "https://i.pinimg.com/736x/c5/47/82/c54782d0ca477283d800f5637a9efe67.jpg",
       },
     ];
 
@@ -44,14 +48,15 @@ class FavoritesPage extends StatelessWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back_ios_new,
-            color: Color(0xFF757575),
-            size: 32,
+          icon: Image.asset(
+            'assets/images/back.png',
+            width: 25,
+            height: 25,
+            fit: BoxFit.contain,
           ),
           onPressed: () => Get.back(),
         ),
-        titleSpacing: -5,
+        titleSpacing: -8,
         title: const Text(
           "รายการโปรด",
           style: TextStyle(
@@ -103,10 +108,11 @@ class FavoritesPage extends StatelessWidget {
                       children: [
                         // รูปภาพวงกลม
                         CircleAvatar(
-                          radius: 25,
+                          radius: 25, // ขนาดตามที่เคยปรับไว้
                           backgroundColor: Colors.grey[200],
                           backgroundImage: NetworkImage(
-                            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                            item['image_url'] ??
+                                'https://via.placeholder.com/150', // ดึงรูปตามข้อมูลในลิสต์
                           ),
                         ),
                         const SizedBox(width: 10),

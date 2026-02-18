@@ -3,6 +3,7 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home.dart';
+import 'package:flutter_application_1/module/login/view/reset.dart';
 import 'package:flutter_application_1/module/pet/view/pet_view.dart';
 import 'package:flutter_application_1/module/profile/view/profile_view.dart';
 import 'package:flutter_application_1/module/setting/view/edit.dart';
@@ -27,6 +28,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // ---------------------------------------------------------
   final List<Widget> _pages = [
     // Index 0: หน้า Feed (ที่เราทำไว้)
+    const ResetPasswordPage(),
     const FavoritesPage(),
     const PrivacyPage(),
     const EditProfilePage(),
