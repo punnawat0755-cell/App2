@@ -56,6 +56,9 @@ class _LoginPageState extends State<LoginPage> {
         password: _passwordController.text.trim(),
       );
 
+
+      print('Login response: $response. User: ${response.user}, Session: ${response.session}');
+
       if (response.user == null) {
         throw const AuthException('เข้าสู่ระบบไม่สำเร็จ');
       }
@@ -64,10 +67,18 @@ class _LoginPageState extends State<LoginPage> {
       await supabase.rpc('touch_last_login');
 
       if (!mounted) return;
-      Navigator.pushReplacement(
+      // if(chkpdpa == false){
+      //   Navigator.pushReplacement(
+      //   context,
+      //   MaterialPageRoute(builder: (_) => const BottomNavBar()),
+      // );
+      // }else{
+           Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const BottomNavBar()),
       );
+      // }
+   
     } on AuthException catch (e) {
       if (!mounted) return;
       _showError(_prettyAuthMessage(e.message));
@@ -78,6 +89,8 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+
+ 
 
   @override
   void dispose() {

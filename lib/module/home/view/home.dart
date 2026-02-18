@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_card.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_detail.dart';
+import 'package:flutter_application_1/module/login/view/login.dart';
+import 'package:flutter_application_1/supabase_client.dart';
 import 'package:get/get.dart';
 
 class HomePage extends StatefulWidget {
@@ -78,6 +80,10 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
+   void logout() async {
+    await supabase.auth.signOut();
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -87,7 +93,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    const name = 'Seal';
+    final name = supabase.auth.currentUser?.userMetadata?['username'] ?? 'ผู้ใช้';
 
     return Scaffold(
       backgroundColor: const Color(0xFFE6F7FF),
@@ -101,9 +107,14 @@ class _HomePageState extends State<HomePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                    IconButton(onPressed: (){
+                      logout();
+                     Get.offAll(const LoginPage());
+                      }, icon: Icon(Icons.power_settings_new_sharp, color: Colors.grey)),
                   const SizedBox(width: 40),
                   Row(
                     children: [
+                    
                       Container(
                         width: 28,
                         height: 28,
@@ -136,6 +147,7 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
+              Text(supabase.auth.currentUser?.id ?? 'xxx'),
               const SizedBox(height: 5),
               Text(
                 'สวัสดี,$name',
