@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // เพิ่มตัวนี้เพื่อใช้งาน FilteringTextInputFormatter
 import 'package:get/get.dart';
 
 class ResetPasswordPage extends StatefulWidget {
@@ -14,8 +15,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // พื้นหลังสีฟ้าอ่อนตามรูป
-      backgroundColor: const Color(0xFFE3F4FD),
+      backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -23,11 +23,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           onTap: () => Get.back(),
           child: Padding(
             padding: const EdgeInsets.only(left: 15),
-            child: Image.asset(
-              "assets/images/back.png", // ใช้รูป back ที่คุณมี
-              width: 32,
-              height: 32,
-            ),
+            child: Image.asset("assets/images/back.png", width: 32, height: 32),
           ),
         ),
         titleSpacing: 0,
@@ -48,40 +44,46 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
             children: [
               const SizedBox(height: 40),
 
-              // --- 1. รูปกุญแจพร้อมวงกลมซ้อน (Icon Section) ---
+              // --- 1. รูปกุญแจพร้อมวงกลมซ้อน ---
               Center(
                 child: Container(
-                  // 1. วงนอกสุด (ใหญ่สุด)
-                  width: 280,
-                  height: 280,
+                  width: 290,
+                  height: 290,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(
-                      0xFFB3E5FC,
-                    ).withOpacity(0.2), // ปรับให้จางลงอีกนิดเพื่อให้ดูฟุ้ง
+                    color: const Color(0xFFB3E5FC).withOpacity(0.2),
                   ),
                   child: Center(
                     child: Container(
-                      // 2. วงกลาง
-                      width: 230,
-                      height: 230,
+                      width: 250,
+                      height: 250,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFFB3E5FC).withOpacity(0.4),
+                        color: const Color(0xFFB5EFFF).withOpacity(0.4),
                       ),
                       child: Center(
                         child: Container(
-                          // 3. วงในสุด (ที่ใส่ไอคอน)
-                          width: 180,
-                          height: 180,
-                          decoration: const BoxDecoration(
+                          width: 200,
+                          height: 200,
+                          decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Color(0xFFA1DFFB), // สีฟ้าทึบตามรูป
+                            color: const Color(0xFF8BE2FB),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 20,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
                           ),
-                          child: const Icon(
-                            Icons.lock_rounded,
-                            size: 100, // ขยายขนาดไอคอนให้รับกับวงกลมที่ใหญ่ขึ้น
-                            color: Color(0xFF4C91E2),
+                          child: Center(
+                            child: Image.asset(
+                              "assets/images/lockk.png",
+                              width: 100,
+                              height: 110,
+                              color: const Color(0xFF4C91E2),
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                       ),
@@ -120,41 +122,62 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                 ),
                 child: TextField(
                   controller: emailController,
-                  decoration: const InputDecoration(
+                  // จำกัดตัวอักษรที่พิมพ์ได้
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'[a-zA-Z0-9@._-]'),
+                    ),
+                  ],
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: const Color(0xFFF5F5F5),
                     hintText: "กรุณากรอกอีเมลของคุณ",
-                    hintStyle: TextStyle(
-                      color: Color(0xFFBDBDBD),
-                      fontSize: 15,
+                    // แสดง @gmail.com ต่อท้าย
+                    suffixText: "@gmail.com",
+                    suffixStyle: const TextStyle(
+                      color: Color(0xFF4489D7),
                       fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    hintStyle: const TextStyle(
+                      color: Color(0xFFAEAEAE),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide.none,
                     ),
                     prefixIcon: Padding(
-                      padding: EdgeInsets.only(
-                        left: 15,
-                        right: 8,
-                      ), // ปรับ right ให้ลดลง ข้อความจะยิ่งชิดไอคอน
-                      child: Icon(
-                        Icons.email_outlined,
-                        color: Color(0xFFBDBDBD),
+                      padding: const EdgeInsets.only(left: 15, right: 8),
+                      child: Image.asset(
+                        "assets/images/email.png",
+                        width: 35,
+                        height: 40,
                       ),
                     ),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 15),
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 15,
+                      horizontal: 10,
+                    ),
                   ),
                 ),
               ),
 
-              const SizedBox(height: 150), // เว้นระยะให้ปุ่มอยู่ด้านล่าง
+              const SizedBox(height: 150),
+
               // --- 4. ปุ่มส่งอีเมล ---
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
                   onPressed: () {
-                    // TODO: ฟังก์ชันส่งเมล
-                    print("Email: ${emailController.text}");
+                    // เวลาใช้งานจริง อย่าลืมบวก suffix เข้าไปด้วยนะครับ
+                    String finalEmail = "${emailController.text}@gmail.com";
+                    print("Sending to: $finalEmail");
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF64B5F6),
+                    backgroundColor: const Color(0xFF20C2FF),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
@@ -163,7 +186,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   ),
                   child: const Text(
                     "ส่งอีเมล",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
