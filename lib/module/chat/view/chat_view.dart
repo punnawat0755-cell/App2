@@ -1,24 +1,29 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:flutter_application_1/chat/userchat/bindings/chat_binding.dart';
 import 'package:flutter_application_1/chat/userchat/services/chat_user_service.dart';
 import 'package:flutter_application_1/module/login/view/login.dart';
-import 'package:flutter_application_1/supabase_client.dart';
+
+Color withAlpha(Color color, double opacity) {
+  final alpha = (opacity.clamp(0.0, 1.0) * 255).round();
+  return color.withAlpha(alpha);
+}
 
 class ChatSelectionController extends GetxController {
   void goToStartChat() {
-    final user = supabase.auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       Get.offAll(() => const LoginPage());
       return;
     }
     Get.to(
       () => WaitingChatPage(
-        currentUserId: user.id,
+        currentUserId: user.uid,
         role: MatchRole.seeker,
       ),
       binding: UserChatBinding(),
@@ -26,15 +31,15 @@ class ChatSelectionController extends GetxController {
   }
 
   void goToCounseling() {
-    final user = supabase.auth.currentUser;
+    final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       Get.offAll(() => const LoginPage());
       return;
     }
     Get.to(
       () => WaitingChatPage(
-        currentUserId: user.id,
-        role: MatchRole.counselor,
+        currentUserId: user.uid,
+        role: MatchRole.listener,
       ),
       binding: UserChatBinding(),
     );
@@ -190,7 +195,7 @@ class HalfCircleButton extends StatelessWidget {
                   ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
+                color: withAlpha(Colors.black, 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -213,7 +218,7 @@ class HalfCircleButton extends StatelessWidget {
                             ? Icons.sentiment_dissatisfied
                             : Icons.sentiment_satisfied_alt,
                         size: 80,
-                        color: Colors.white.withValues(alpha: 0.5),
+                        color: withAlpha(Colors.white, 0.5),
                       ),
                     ),
                   ),
@@ -265,6 +270,7 @@ class _WaitingChatPageState extends State<WaitingChatPage>
   StreamSubscription<String?>? _matchSub;
   Timer? _retryTimer;
   bool _isMatching = false;
+  bool _isLeavingQueue = false;
 
   bool _navigatingToChat = false;
   String _statusText = 'กำลังสุ่มคู่สนทนาอย่างต่อเนื่อง...';
@@ -282,20 +288,37 @@ class _WaitingChatPageState extends State<WaitingChatPage>
   }
 
   Future<void> _startMatching() async {
-    _matchSub =
-        _chatService.watchMatchedChatId(widget.currentUserId).listen((chatId) {
-      if (chatId == null || _navigatingToChat || !mounted) {
-        return;
-      }
+    await _chatService.enterRandomQueue(
+      widget.currentUserId,
+      role: widget.role,
+    );
 
-      _navigatingToChat = true;
-      Get.off(
-        () => ChatPage(
-          chatId: chatId,
-          currentUserId: widget.currentUserId,
-        ),
-      );
-    });
+    _matchSub =
+        _chatService.watchMatchedChatId(widget.currentUserId).listen(
+      (chatId) {
+        if (chatId == null || _navigatingToChat || !mounted) {
+          return;
+        }
+
+        _navigatingToChat = true;
+        Get.off(
+          () => ChatPage(
+            chatId: chatId,
+            currentUserId: widget.currentUserId,
+            role: widget.role, // 🟢 [อัปเดต] 2. ส่ง Role ของเราไปให้หน้าแชทรับทราบด้วย
+          ),
+          binding: UserChatBinding(),
+        );
+      },
+      onError: (e) {
+        debugPrint('watchMatchedChatId error: $e');
+        if (mounted) {
+          setState(() {
+            _statusText = 'ไม่สามารถเข้าถึงข้อมูลแชทได้';
+          });
+        }
+      },
+    );
 
     await _attemptMatchCycle();
     _retryTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
@@ -310,10 +333,6 @@ class _WaitingChatPageState extends State<WaitingChatPage>
 
     _isMatching = true;
     try {
-      await _chatService.enterRandomQueue(
-        widget.currentUserId,
-        role: widget.role,
-      );
       await _chatService.tryMatchWithWaitingUser(
         widget.currentUserId,
         role: widget.role,
@@ -325,7 +344,6 @@ class _WaitingChatPageState extends State<WaitingChatPage>
       }
     } catch (e) {
       debugPrint('Random match failed: $e');
-      // keep retrying continuously even when an intermittent error occurs
       if (mounted && _statusText != 'กำลังพยายามเชื่อมต่อใหม่...') {
         setState(() {
           _statusText = 'กำลังพยายามเชื่อมต่อใหม่...';
@@ -337,10 +355,28 @@ class _WaitingChatPageState extends State<WaitingChatPage>
   }
 
   Future<void> _leaveQueueAndBack() async {
-    await _chatService.leaveRandomQueue(widget.currentUserId);
+    if (_isLeavingQueue) return;
+    _isLeavingQueue = true;
+
+    // หยุดวงจรสุ่มทันทีเพื่อกันเด้งกลับเข้าคิวระหว่างกำลังออก
+    _retryTimer?.cancel();
+    _matchSub?.cancel();
+    _navigatingToChat = true;
+
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
     if (mounted) {
       Get.back();
     }
+
+    unawaited(
+      _chatService.leaveRandomQueue(widget.currentUserId).then((_) {
+        debugPrint('Left queue successfully');
+      }).catchError((e) {
+        debugPrint('Error leaving queue: $e');
+      }),
+    );
   }
 
   void _showExitDialog() {
@@ -372,10 +408,7 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     GestureDetector(
-                      onTap: () {
-                        Get.back();
-                        _leaveQueueAndBack();
-                      },
+                      onTap: _leaveQueueAndBack,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 26,
@@ -462,7 +495,7 @@ class _WaitingChatPageState extends State<WaitingChatPage>
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                widget.role == MatchRole.counselor
+                widget.role == MatchRole.listener
                     ? 'กำลังรอผู้ต้องการพูดคุย...'
                     : _statusText,
                 style: const TextStyle(
@@ -489,7 +522,7 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                         color: const Color(0xFFAEDEF4),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.1),
+                            color: withAlpha(Colors.black, 0.1),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -528,9 +561,9 @@ class _WaitingChatPageState extends State<WaitingChatPage>
           height: currentSize,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFFAEDEF4).withValues(alpha: opacity),
+            color: withAlpha(const Color(0xFFAEDEF4), opacity),
             border: Border.all(
-              color: Colors.white.withValues(alpha: opacity),
+              color: withAlpha(Colors.white, opacity),
               width: 1,
             ),
           ),
@@ -543,11 +576,13 @@ class _WaitingChatPageState extends State<WaitingChatPage>
 class ChatPage extends StatefulWidget {
   final String chatId;
   final String currentUserId;
+  final MatchRole role; // 🟢 [อัปเดต] 3. รับค่า role
 
   const ChatPage({
     super.key,
     required this.chatId,
     required this.currentUserId,
+    required this.role, // 🟢 [อัปเดต]
   });
 
   @override
@@ -556,13 +591,24 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _textController = TextEditingController();
+  final TextEditingController _comentController = TextEditingController();
+
   late final ChatUserService _chatService;
+
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _chatDocSub;
   StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _queueSub;
 
   String _recipientUserId = '';
   bool _endingConversation = false;
   bool _exitingByRemoteEnd = false;
+  bool _sendingMessage = false;
+
+  // feedback
+  bool _showFeedback = false;
+  bool _sendingFeedback = false;
+  int _ratng = 5;
+  bool _isStared = false;
+  int _sessionWordCount = 0;
 
   @override
   void initState() {
@@ -578,9 +624,7 @@ class _ChatPageState extends State<ChatPage> {
         .doc(widget.chatId)
         .snapshots()
         .listen((snap) {
-      if (!mounted || _endingConversation || _exitingByRemoteEnd) {
-        return;
-      }
+      if (!mounted || _endingConversation || _exitingByRemoteEnd) return;
 
       final data = snap.data();
       final randomState = (data?['randomState'] ?? '') as String;
@@ -594,14 +638,13 @@ class _ChatPageState extends State<ChatPage> {
         .doc(widget.currentUserId)
         .snapshots()
         .listen((snap) {
-      if (!mounted || _endingConversation || _exitingByRemoteEnd) {
-        return;
-      }
+      if (!mounted || _endingConversation || _exitingByRemoteEnd) return;
 
       final data = snap.data();
       final status = (data?['status'] ?? '') as String;
       final chatId = data?['chatId'];
       final hasChatId = chatId is String && chatId.isNotEmpty;
+
       if (status == 'idle' && !hasChatId) {
         _exitByPeerEnd();
       }
@@ -609,18 +652,21 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   void _exitByPeerEnd() {
-    if (!mounted || _exitingByRemoteEnd) {
-      return;
-    }
+    if (!mounted || _exitingByRemoteEnd) return;
+    _chatDocSub?.cancel();
+    _queueSub?.cancel();
+
     _exitingByRemoteEnd = true;
+
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('คู่สนทนาได้จบบทสนทนาแล้ว')),
     );
-    Future<void>.delayed(const Duration(milliseconds: 250), () {
-      if (mounted) {
-        Get.back();
-      }
-    });
+
+    if (mounted) {
+      setState(() {
+        _showFeedback = true;
+      });
+    }
   }
 
   Future<void> _resolveRecipientUserId() async {
@@ -628,6 +674,7 @@ class _ChatPageState extends State<ChatPage> {
         .collection('Chats')
         .doc(widget.chatId)
         .get();
+
     final users = (chatDoc.data()?['users'] as List<dynamic>? ?? [])
         .whereType<String>()
         .toList();
@@ -637,9 +684,7 @@ class _ChatPageState extends State<ChatPage> {
       orElse: () => '',
     );
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() {
       _recipientUserId = recipient;
@@ -647,45 +692,146 @@ class _ChatPageState extends State<ChatPage> {
   }
 
   Future<void> _sendMessage() async {
-    if (_textController.text.trim().isEmpty) {
-      return;
-    }
+    if (_sendingMessage || _textController.text.trim().isEmpty) return;
 
-    await _chatService.sendMessage(
-      widget.chatId,
-      widget.currentUserId,
-      _textController.text,
-      _textController,
-      _recipientUserId,
-    );
+    setState(() => _sendingMessage = true);
 
-    if (mounted) {
+    try {
+      final result = await _chatService.sendMessage(
+        widget.chatId,
+        widget.currentUserId,
+        _textController.text,
+        _textController,
+        _recipientUserId,
+      );
+
+      if (!mounted) return;
+
+      if (result.status == SendMessageStatus.blocked) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ข้อความไม่สุภาพ ระบบจึงลบข้อความให้แล้ว')),
+        );
+      }
+
       setState(() {});
+    } finally {
+      if (mounted) {
+        setState(() => _sendingMessage = false);
+      }
     }
   }
 
+  int _calculateWordCount(List<DocumentSnapshot> docs) {
+    int count = 0;
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final text = (data['text'] ?? '').toString();
+      if (text.trim().isNotEmpty) {
+        count += text.trim().split(RegExp(r'\s+')).length;
+      }
+    }
+    return count;
+  }
+
   Future<void> _endConversation() async {
-    if (_endingConversation) {
+    if (_endingConversation) return;
+
+    setState(() => _endingConversation = true);
+
+    try {
+      await _chatService.endRandomChat(
+        chatId: widget.chatId,
+        endedByUserId: widget.currentUserId,
+      );
+
+      _chatDocSub?.cancel();
+      _queueSub?.cancel();
+
+      if (mounted) {
+        setState(() {
+          _showFeedback = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('endRandomChat failed: $e');
+      if (mounted) setState(() => _endingConversation = false);
+    }
+  }
+
+  Future<void> _submitFeedback() async {
+    if (_sendingFeedback) return;
+
+    setState(() => _sendingFeedback = true);
+
+    try {
+      // นับคำ
+      final messagesSnap = await FirebaseFirestore.instance
+          .collection('Chats')
+          .doc(widget.chatId)
+          .collection('messages')
+          .get();
+
+      _sessionWordCount = _calculateWordCount(messagesSnap.docs);
+
+      // ดึง session id
+      final chatMeta = await FirebaseFirestore.instance
+          .collection('Chats')
+          .doc(widget.chatId)
+          .get();
+      final sessionId =
+          (chatMeta.data()?['sessionId'] as String?)?.trim().isNotEmpty == true
+              ? (chatMeta.data()?['sessionId'] as String)
+              : widget.chatId;
+
+      String myRoleStr = widget.role == MatchRole.seeker ? 'seeker' : 'listener';
+      String peerRoleStr = widget.role == MatchRole.seeker ? 'listener' : 'seeker';
+
+      await _chatService.submitFeedback(
+        sessionId: sessionId,
+        chatId: widget.chatId,
+        fromUserId: widget.currentUserId,
+        toUserId: _recipientUserId,
+        fromRole: myRoleStr,
+        toRole: peerRoleStr,
+        rating: _ratng,
+        comment: _comentController.text.trim(),
+        starred: _isStared,
+        wordCount: _sessionWordCount,
+      );
+
+      if (!mounted) return;
+      debugPrint('ส่งฟีดแบ็คสำเร็จผ่าน Firestore!');
+      _exitToPreMatchScreen();
+    } catch (e) {
+      debugPrint("Failed to submit feedback: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingFeedback = false);
+    }
+  }
+
+  void _exitToPreMatchScreen() {
+    _chatDocSub?.cancel();
+    _queueSub?.cancel();
+
+    if (!mounted) return;
+
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
       return;
     }
 
-    setState(() {
-      _endingConversation = true;
-    });
-
-    await _chatService.endRandomChat(
-      chatId: widget.chatId,
-      endedByUserId: widget.currentUserId,
-    );
-
-    if (mounted) {
-      Get.back();
-    }
+    Get.offAll(() => const ChatSelectionPage());
   }
 
   @override
   void dispose() {
     _textController.dispose();
+    _comentController.dispose();
     _chatDocSub?.cancel();
     _queueSub?.cancel();
     super.dispose();
@@ -693,10 +839,14 @@ class _ChatPageState extends State<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_showFeedback) {
+      return _buildFeedbackScreen();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFD3ECF8),
       appBar: AppBar(
-        toolbarHeight: 80,
+        toolbarHeight: 70,
         backgroundColor: const Color(0xFFD3ECF8),
         elevation: 0,
         leading: IconButton(
@@ -748,6 +898,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ],
       ),
+      
       body: Column(
         children: [
           Container(
@@ -768,14 +919,24 @@ class _ChatPageState extends State<ChatPage> {
                   .collection('Chats')
                   .doc(widget.chatId)
                   .collection('messages')
-                  .orderBy('timestamp')
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                final docs = snapshot.data?.docs ?? const [];
+                final docs = [...(snapshot.data?.docs ?? const [])]
+                  ..sort((a, b) {
+                    final ad = a.data() as Map<String, dynamic>;
+                    final bd = b.data() as Map<String, dynamic>;
+                    final at = (ad['localTimestamp'] ?? ad['timestamp']);
+                    final bt = (bd['localTimestamp'] ?? bd['timestamp']);
+                    final aMs =
+                        at is Timestamp ? at.millisecondsSinceEpoch : 0;
+                    final bMs =
+                        bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+                    return aMs.compareTo(bMs);
+                  });
                 if (docs.isEmpty) {
                   return const Center(
                     child: Text(
@@ -832,6 +993,7 @@ class _ChatPageState extends State<ChatPage> {
               },
             ),
           ),
+
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
             child: Container(
@@ -854,6 +1016,7 @@ class _ChatPageState extends State<ChatPage> {
                   Expanded(
                     child: TextField(
                       controller: _textController,
+                      enabled: !_sendingMessage,
                       onSubmitted: (_) => _sendMessage(),
                       decoration: const InputDecoration(
                         hintText: 'ส่งข้อความ.......',
@@ -864,14 +1027,16 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: _sendMessage,
+                    onTap: _sendingMessage ? null : _sendMessage,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 15),
                       child: Transform.rotate(
                         angle: -0.5,
-                        child: const Icon(
+                        child: Icon(
                           Icons.send,
-                          color: Color(0xFF6F6F6F),
+                          color: _sendingMessage
+                              ? const Color(0xFF9E9E9E)
+                              : const Color(0xFF6F6F6F),
                           size: 28,
                         ),
                       ),
@@ -882,6 +1047,87 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackScreen() {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('ให้คะแนนการสนทนา'),
+        automaticallyImplyLeading: false,
+      ),
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'ขอบคุณสำหรับที่แชทกับเรา',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4489D7),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                "โปรดให้คะแนนการสนทนา",
+                style: TextStyle(fontSize: 18, color: Color(0xFF4489D7)),
+              ),
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  5,
+                  (index) => IconButton(
+                    icon: Icon(
+                      index < _ratng ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 40,
+                    ),
+                    onPressed: () => setState(() => _ratng = index + 1),
+                  ),
+                ),
+              ),
+          
+              TextButton(
+                onPressed: _sendingFeedback ? null : _exitToPreMatchScreen,
+                child: const Text('ข้าม'),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _comentController,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  hintText: 'พิมพ์ความคิดเห็น (ถ้ามี)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Checkbox(
+                    value: _isStared,
+                    onChanged: (v) => setState(() => _isStared = v ?? false),
+                  ),
+                  const Text('ปักหมุดบทสนทนานี้'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _sendingFeedback ? null : _submitFeedback,
+                  child: Text(_sendingFeedback ? 'กำลังส่ง...' : 'ส่งฟีดแบ็ค'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

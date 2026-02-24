@@ -6,6 +6,8 @@ class ChatUserController extends GetxController {
   ChatUserController({ChatUserService? chatUserService})
       : userChatService = chatUserService ?? Get.find<ChatUserService>();
 
+      
+
   final ChatUserService userChatService;
 
   Stream<UserMessage?> getLatestMessageStream(String chatId) =>
@@ -16,4 +18,5 @@ class ChatUserController extends GetxController {
     String recipientUserId,
   ) =>
       userChatService.createChatRoom(currentUserId, recipientUserId);
+    
 }

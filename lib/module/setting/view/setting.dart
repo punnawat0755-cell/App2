@@ -92,12 +92,12 @@ class SettingPage extends StatelessWidget {
   Widget _buildSettingItem(Widget leading, String title) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFCEEFFE).withOpacity(0.8),
+        color: const Color(0xFFCEEFFE).withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(25),
         // เพิ่มเส้นขอบสีเทาเข้มเพื่อให้กรอบชัดตามรูป
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
+            color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 5,
             offset: const Offset(0, 5),
           ),

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/bottonbar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../supabase_client.dart';
+// สมมติว่าไฟล์นี้มีตัวแปร supabase global อยู่ ถ้าไม่มีให้ใช้ Supabase.instance.client แทน
 import 'register.dart';
+import 'pdpa_dialog.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,7 +20,10 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLoading = false;
   bool _hidePw = true;
 
-  // ---------- helpers (แทน ui_helpers.dart) ----------
+  // ประกาศ supabase client ให้อ่านง่ายขึ้น
+  final supabase = Supabase.instance.client;
+
+  // ---------- helpers ----------
   void _showError(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text), backgroundColor: Colors.red),
@@ -28,7 +32,6 @@ class _LoginPageState extends State<LoginPage> {
 
   String _prettyAuthMessage(String message) {
     final m = message.toLowerCase();
-
     if (m.contains('only request this after')) {
       return 'คุณกดขอทำรายการซ้ำเร็วเกินไป กรุณารอประมาณ 1 นาที แล้วลองใหม่';
     }
@@ -41,44 +44,91 @@ class _LoginPageState extends State<LoginPage> {
     if (m.contains('password should be at least')) {
       return 'รหัสผ่านสั้นเกินไป';
     }
-
     return message;
   }
   // -----------------------------------------------
 
+  // 📌 ฟังก์ชันจัดการหลัง Login (เช็ค PDPA) อยู่ใน _LoginPageState ถูกต้องแล้ว
+  Future<void> _handlePostLogin() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      debugPrint('--- 🔍 กำลังดึงข้อมูล PDPA ของ: ${user.id} ---');
+      
+      final response = await supabase
+          .from('profiles')
+          .select('pdpa_accepted_at')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      debugPrint('--- 📦 ข้อมูลที่ได้จาก DB: $response ---');
+
+      final hasAccepted = response != null && response['pdpa_accepted_at'] != null;
+
+      if (!mounted) return;
+
+      if (hasAccepted) {
+        debugPrint('--- ✅ ยอมรับแล้ว เข้าหน้า BottomNavBar ได้เลย ---');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const BottomNavBar()),
+        );
+      } else {
+        debugPrint('--- ⚠️ ยังไม่ยอมรับ กำลังเรียก Dialog ---');
+        
+        // เปิด Dialog และรอรับผลลัพธ์
+        final bool? isAccepted = await showDialog<bool>(
+          context: context,
+          barrierDismissible: false, 
+          builder: (context) => const PdpaDialog(),
+        );
+
+        if (!mounted) return;
+
+        if (isAccepted == true) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => const BottomNavBar()),
+          );
+        } else {
+          // ถ้ากดกากบาท (X) บังคับ Logout
+          await supabase.auth.signOut();
+          _showError('คุณต้องยอมรับเงื่อนไข PDPA เพื่อใช้งานแอป');
+        }
+      }
+    } catch (e) {
+      debugPrint('--- ❌ Error checking PDPA: $e ---');
+      if (mounted) {
+        _showError('ดึงข้อมูลระบบล้มเหลว: $e');
+      }
+    }
+  }
+
+  // 📌 ฟังก์ชัน Login หลัก
   Future<void> _login() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
     try {
       final response = await supabase.auth.signInWithPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+        email: _emailController.text,
+        password: _passwordController.text,
       );
-
-
-      print('Login response: $response. User: ${response.user}, Session: ${response.session}');
 
       if (response.user == null) {
         throw const AuthException('เข้าสู่ระบบไม่สำเร็จ');
       }
 
+      // เรียก RPC อัปเดตข้อมูลเบื้องต้น
       await supabase.rpc('ensure_my_profile');
       await supabase.rpc('touch_last_login');
 
       if (!mounted) return;
-      // if(chkpdpa == false){
-      //   Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(builder: (_) => const BottomNavBar()),
-      // );
-      // }else{
-           Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const BottomNavBar()),
-      );
-      // }
-   
+      
+      // 📌 เรียกฟังก์ชันเช็ค PDPA ทันทีที่ล็อกอินผ่าน
+      await _handlePostLogin();
+
     } on AuthException catch (e) {
       if (!mounted) return;
       _showError(_prettyAuthMessage(e.message));
@@ -90,8 +140,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
- 
-
   @override
   void dispose() {
     _emailController.dispose();
@@ -99,6 +147,7 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  // ---------------- UI Widgets ----------------
   Widget _pillField({
     required TextEditingController controller,
     required IconData icon,
@@ -218,7 +267,6 @@ class _LoginPageState extends State<LoginPage> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const SizedBox(height: 10),
-
                   SizedBox(
                     width: 92,
                     height: 92,
@@ -241,7 +289,6 @@ class _LoginPageState extends State<LoginPage> {
                       ],
                     ),
                   ),
-
                   const SizedBox(height: 10),
                   const Text(
                     'Login',
@@ -251,7 +298,6 @@ class _LoginPageState extends State<LoginPage> {
                       color: Color(0xFF1E88FF),
                     ),
                   ),
-
                   const SizedBox(height: 18),
                   _pillField(
                     controller: _emailController,
@@ -274,7 +320,6 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerRight,
@@ -292,14 +337,12 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 10),
                   _blueButton(
                     text: 'Login',
                     onPressed: _isLoading ? null : _login,
                     loading: _isLoading,
                   ),
-
                   const SizedBox(height: 22),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,

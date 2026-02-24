@@ -1,0 +1,65 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isRoomMember(roomId) {
+      return isSignedIn() &&
+        (request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.userA ||
+         request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.userB);
+    }
+
+    function isChatMember(chatId) {
+      return isSignedIn() &&
+        (request.auth.uid in get(/databases/$(database)/documents/Chats/$(chatId)).data.users);
+    }
+
+    // FCM token per Firebase user
+    match /Users/{userId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // Random matching queue
+    // NOTE: write เปิดให้ user ที่ล็อกอินทุกคนเพื่อให้ transaction จับคู่เขียนสถานะทั้ง 2 ฝั่งได้
+    match /RandomQueue/{userId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Random chat room and messages
+    match /Chats/{chatId} {
+      allow read, update, delete: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.users is list
+        && request.resource.data.users.size() == 2
+        && (request.auth.uid in request.resource.data.users);
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isSignedIn();
+        allow update, delete: if false;
+      }
+    }
+
+    // Feedback after chat session
+    match /ChatFeedback/{feedbackId} {
+      allow read, create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // Rule set ตามที่คุณส่งมา (รองรับ schema rooms/messages)
+    match /rooms/{roomId} {
+      allow read: if isRoomMember(roomId);
+      allow write: if isRoomMember(roomId);
+
+      match /messages/{messageId} {
+        allow read: if isRoomMember(roomId);
+        allow create: if isRoomMember(roomId);
+        allow update, delete: if false;
+      }
+    }
+  }
+}

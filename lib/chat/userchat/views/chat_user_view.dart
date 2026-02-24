@@ -34,6 +34,40 @@ class ChatUserView extends StatefulWidget {
 class _ChatUserViewState extends State<ChatUserView> {
   final TextEditingController _messageController = TextEditingController();
   final ChatUserService _chatService = ChatUserService();
+  bool _sendingMessage = false;
+
+  Future<void> _sendMessageText(String message) async {
+    if (_sendingMessage) return;
+    final text = message.trim();
+    if (text.isEmpty) return;
+
+    setState(() => _sendingMessage = true);
+    try {
+      final result = await _chatService.sendMessage(
+        widget.chatId,
+        widget.currentUserId,
+        message,
+        _messageController,
+        widget.recipientUserId,
+      );
+
+      if (!mounted) return;
+
+      if (result.status == SendMessageStatus.blocked) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ข้อความไม่สุภาพ ระบบจึงลบข้อความให้แล้ว')),
+        );
+      }
+
+      setState(() {});
+    } finally {
+      if (mounted) {
+        setState(() => _sendingMessage = false);
+      }
+    }
+  }
+
+  Future<void> _sendCurrentMessage() => _sendMessageText(_messageController.text);
 
   @override
   void dispose() {
@@ -349,20 +383,12 @@ class _ChatUserViewState extends State<ChatUserView> {
                     ),
                     child: TextFormField(
                       controller: _messageController,
+                      enabled: !_sendingMessage,
                       minLines: 1,
                       maxLines: 4,
                       textInputAction: TextInputAction.send,
                       onChanged: (_) => setState(() {}),
-                      onFieldSubmitted: (_) async {
-                        await _chatService.sendMessage(
-                          widget.chatId,
-                          widget.currentUserId,
-                          _messageController.text,
-                          _messageController,
-                          widget.recipientUserId,
-                        );
-                        setState(() {});
-                      },
+                      onFieldSubmitted: (_) => _sendCurrentMessage(),
                       decoration: InputDecoration(
                         hintText: 'พิมพ์ข้อความ...',
                         border: OutlineInputBorder(
@@ -383,22 +409,11 @@ class _ChatUserViewState extends State<ChatUserView> {
                   ),
                   child: IconButton(
                     onPressed: () async {
-                      if (_messageController.text.trim().isNotEmpty) {
-                        await _chatService.sendMessage(
-                          widget.chatId,
-                          widget.currentUserId,
-                          _messageController.text,
-                          _messageController,
-                          widget.recipientUserId,
-                        );
+                      if (_sendingMessage) return;
+                      if (_messageController.text.trim().isEmpty) {
+                        await _sendMessageText('👍');
                       } else {
-                        await _chatService.sendMessage(
-                          widget.chatId,
-                          widget.currentUserId,
-                          '👍',
-                          _messageController,
-                          widget.recipientUserId,
-                        );
+                        await _sendCurrentMessage();
                       }
                       setState(() {});
                     },

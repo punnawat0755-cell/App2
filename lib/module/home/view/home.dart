@@ -1,8 +1,11 @@
-import 'dart:async';
+﻿import 'dart:async';
+import 'dart:convert'; // [NEW] สำหรับแปลง JSON
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http; // [NEW] สำหรับยิง API ปกติ
+
+import 'package:flutter_application_1/module/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_card.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_detail.dart';
-import 'package:flutter_application_1/module/login/view/login.dart';
 import 'package:flutter_application_1/supabase_client.dart';
 import 'package:get/get.dart';
 
@@ -17,6 +20,10 @@ class _HomePageState extends State<HomePage> {
   int _currentBannerIndex = 0;
   late PageController _pageController;
   Timer? _timer;
+
+  // ====== Username from API ======
+  bool _isNameLoading = true;
+  String _displayName = 'ผู้ใช้';
 
   // ข้อมูลจำลอง (Mock Data)
   final List<Map<String, dynamic>> clipList = [
@@ -39,21 +46,21 @@ class _HomePageState extends State<HomePage> {
       "subtitle": "1 day",
       "imagePath":
           "https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg",
-      "page": null, // อันนี้ยังไม่มีหน้าปลายทาง ใส่ null ไว้ก่อน
+      "page": null,
     },
     {
       "title": "whale",
       "subtitle": "1 day",
       "imagePath":
           "https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg",
-      "page": null, // อันนี้ยังไม่มีหน้าปลายทาง ใส่ null ไว้ก่อน
+      "page": null,
     },
     {
       "title": "whale",
       "subtitle": "1 day",
       "imagePath":
           "https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg",
-      "page": null, // อันนี้ยังไม่มีหน้าปลายทาง ใส่ null ไว้ก่อน
+      "page": null,
     },
   ];
 
@@ -61,6 +68,9 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
+
+    // ====== Load username ======
+    _loadUsername();
 
     // ตั้งเวลาเลื่อนแบนเนอร์อัตโนมัติ
     _timer = Timer.periodic(const Duration(seconds: 6), (Timer timer) {
@@ -80,10 +90,6 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-   void logout() async {
-    await supabase.auth.signOut();
-  }
-
   @override
   void dispose() {
     _timer?.cancel();
@@ -91,10 +97,73 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  // [NEW] Load username from Supabase via REST API (HTTP GET)
+ 
+  Future<void> _loadUsername() async {
+    setState(() => _isNameLoading = true);
+
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      if (!mounted) return;
+      setState(() {
+        _displayName = 'ผู้ใช้';
+        _isNameLoading = false;
+      });
+      return;
+    }
+
+    // 1.  API Key 
+    const String apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmFnZGhqbGtsbXlzamp1dmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzQ0MjcsImV4cCI6MjA4Mzk1MDQyN30.pqinIw8uza_02BRRheQrBLNnRK0InCBBXG00HmB0Bys'; 
+    
+    // 2.  URL (ดึงตาราง profiles, เลือกคอลัมน์ username, กรองด้วย user.id)
+    final String apiUrl = 'https://dvbagdhjlklmysjjuvht.supabase.co/rest/v1/profiles?select=username&id=eq.${user.id}';
+
+    try {
+      // 3. ยิง HTTP GET Request เหมือนเรียก API ปกติ
+      final response = await http.get(
+        Uri.parse(apiUrl),
+        headers: {
+          'apikey': apiKey,
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        // 4. แปลง JSON Response
+        final List<dynamic> data = json.decode(response.body);
+        
+        if (data.isNotEmpty) {
+          final username = data[0]['username']?.toString().trim();
+          
+          if (!mounted) return;
+          setState(() {
+            _displayName = (username != null && username.isNotEmpty) ? username : 'ผู้ใช้';
+            _isNameLoading = false;
+          });
+        } else {
+          if (!mounted) return;
+          setState(() {
+            _displayName = 'ผู้ใช้';
+            _isNameLoading = false;
+          });
+        }
+      } else {
+        debugPrint('API Error: ${response.statusCode} - ${response.body}');
+        throw Exception('Failed to load profile');
+      }
+    } catch (e) {
+      debugPrint('Error fetching user from API: $e');
+      if (!mounted) return;
+      setState(() {
+        _displayName = 'ผู้ใช้';
+        _isNameLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final name = supabase.auth.currentUser?.userMetadata?['username'] ?? 'ผู้ใช้';
-
     return Scaffold(
       backgroundColor: const Color(0xFFE6F7FF),
       body: SafeArea(
@@ -107,14 +176,21 @@ class _HomePageState extends State<HomePage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                    IconButton(onPressed: (){
-                      logout();
-                     Get.offAll(const LoginPage());
-                      }, icon: Icon(Icons.power_settings_new_sharp, color: Colors.grey)),
-                  const SizedBox(width: 40),
+                  IconButton(
+                    onPressed: () async {
+                      await supabase.auth.signOut();
+                      if (!mounted) return;
+                      // หลัง logout ให้ reset ชื่อ
+                      setState(() {
+                        _displayName = 'ผู้ใช้';
+                        _isNameLoading = false;
+                      });
+                    },
+                    icon: const Icon(Icons.logout, color: Color(0xFF4489D7)),
+                    tooltip: 'Log out',
+                  ),
                   Row(
                     children: [
-                    
                       Container(
                         width: 28,
                         height: 28,
@@ -147,16 +223,18 @@ class _HomePageState extends State<HomePage> {
                   ),
                 ],
               ),
-              Text(supabase.auth.currentUser?.id ?? 'xxx'),
               const SizedBox(height: 5),
+
+              // ====== Greeting ======
               Text(
-                'สวัสดี,$name',
+                _isNameLoading ? 'สวัสดี, ...' : 'สวัสดี, $_displayName',
                 style: const TextStyle(
                   color: Color(0xFF4489D7),
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
                 ),
               ),
+
               const SizedBox(height: 10),
 
               // --- Banner Section ---
@@ -191,7 +269,7 @@ class _HomePageState extends State<HomePage> {
                     decoration: BoxDecoration(
                       color: _currentBannerIndex == index
                           ? const Color(0xFF4489D7)
-                          : Colors.blue.withOpacity(0.2),
+                          : Colors.blue.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   );
@@ -208,24 +286,18 @@ class _HomePageState extends State<HomePage> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   clipBehavior: Clip.none,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                  ), // เพิ่มระยะขอบซ้าย-ขวาของ List
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   itemCount: clipList.length,
-                  // ตัวคั่นระหว่าง item (เว้นระยะห่าง 15 px)
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(width: 5),
-                  // ตัวสร้าง Item
+                  separatorBuilder: (context, index) => const SizedBox(width: 5),
                   itemBuilder: (context, index) {
                     final item = clipList[index];
 
                     return InkWell(
                       onTap: () {
-                        // เช็คว่ามีหน้าปลายทางไหม ถ้ามีค่อยกดไป
                         if (item['page'] != null) {
                           Get.to(item['page']);
                         } else {
-                          print("ยังไม่มีหน้าปลายทางสำหรับ ${item['title']}");
+                          debugPrint("ยังไม่มีหน้าปลายทางสำหรับ ${item['title']}");
                         }
                       },
                       child: _buildClipCard(
@@ -250,7 +322,6 @@ class _HomePageState extends State<HomePage> {
                       title: 'วาฬ 52Hz\nไม่ได้อยู่คนเดียว',
                       subtitle: '1 Month Ago',
                       imagePath: 'assets/images/article1.png',
-                      // [เพิ่ม] ใส่ onTap เพื่อลิ้งค์ไปหน้าเนื้อหา
                       onTap: () {
                         Navigator.push(
                           context,
@@ -282,7 +353,6 @@ class _HomePageState extends State<HomePage> {
                       title: 'อยู่คนเดียวก็มีความ\nสุขดีนะ',
                       subtitle: '3 Month Ago',
                       imagePath: 'assets/images/article2.png',
-                      // [เพิ่ม] ใส่ onTap สำหรับการ์ดใบที่ 2
                       onTap: () {
                         Navigator.push(
                           context,
@@ -290,8 +360,7 @@ class _HomePageState extends State<HomePage> {
                             builder: (context) => const ArticleDetailPage(
                               title: 'อยู่คนเดียวก็มีความสุขดีนะ',
                               imagePath: 'assets/images/article2.png',
-                              content:
-                                  """การอยู่คนเดียวไม่ได้หมายความว่าต้องเหงาเสมอไป การได้ใช้เวลากับตัวเองคือโอกาสที่ดีในการทำความเข้าใจความต้องการของตัวเอง พัฒนาทักษะใหม่ๆ และเติมพลังให้กับจิตใจ
+                              content: """การอยู่คนเดียวไม่ได้หมายความว่าต้องเหงาเสมอไป การได้ใช้เวลากับตัวเองคือโอกาสที่ดีในการทำความเข้าใจความต้องการของตัวเอง พัฒนาทักษะใหม่ๆ และเติมพลังให้กับจิตใจ
 
 ความสุขไม่ได้ขึ้นอยู่กับจำนวนคนรอบข้าง แต่อยู่ที่ความพึงพอใจในตัวเองและการมองเห็นคุณค่าในสิ่งเล็กๆ น้อยๆ รอบตัว ลองหาเวลาวันละนิดเพื่อทำสิ่งที่ชอบ หรือแค่นั่งจิบกาแฟเงียบๆ ก็อาจเป็นช่วงเวลาที่มีคุณภาพที่สุดของวันได้""",
                             ),
@@ -314,92 +383,96 @@ class _HomePageState extends State<HomePage> {
   // WIDGETS
   // --------------------------------------------------------------------------
   Widget _buildDailyMissionBanner() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-      decoration: BoxDecoration(
-        color: const Color(0xFFB5EFFF),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.blue.withOpacity(0.5),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            right: -9,
-            bottom: 4,
-            child: Image.asset('assets/images/whale.png', height: 130),
-          ),
-          Positioned(
-            left: 10,
-            top: 20,
-            bottom: 20,
-            child: Image.asset(
-              'assets/images/list.png',
-              fit: BoxFit.contain,
-              height: 200,
-              width: 90,
+    return InkWell(
+      borderRadius: BorderRadius.circular(30),
+      onTap: () => Get.to(() => const DailyMoodPage()),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        decoration: BoxDecoration(
+          color: const Color(0xFFB5EFFF),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withValues(alpha: 0.5),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
-          ),
-          Positioned(
-            left: 105,
-            top: 18,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'ภารกิจรายวัน :',
-                  style: TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontWeight: FontWeight.w200,
-                    fontSize: 15,
-                  ),
-                ),
-                const Text(
-                  'ตอบคำถามเพื่อรับเพื่อนแก้เหงา',
-                  style: TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontSize: 15,
-                    fontWeight: FontWeight.w200,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Image.asset('assets/images/k1.png'),
-                    const SizedBox(width: 5),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'DAY',
-                          style: TextStyle(
-                            color: Color(0xFF4489D7),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 26,
-                          ),
-                        ),
-                        Text(
-                          '138',
-                          style: TextStyle(
-                            color: Color(0xFF4489D7),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 26,
-                            height: 0.9,
-                          ),
-                        ),
-                      ],
+          ],
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -9,
+              bottom: 4,
+              child: Image.asset('assets/images/whale.png', height: 130),
+            ),
+            Positioned(
+              left: 10,
+              top: 20,
+              bottom: 20,
+              child: Image.asset(
+                'assets/images/list.png',
+                fit: BoxFit.contain,
+                height: 200,
+                width: 90,
+              ),
+            ),
+            Positioned(
+              left: 105,
+              top: 18,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'ภารกิจรายวัน :',
+                    style: TextStyle(
+                      color: Color(0xFF4489D7),
+                      fontWeight: FontWeight.w200,
+                      fontSize: 15,
                     ),
-                  ],
-                ),
-              ],
+                  ),
+                  const Text(
+                    'ตอบคำถามเพื่อรับเพื่อนแก้เหงา',
+                    style: TextStyle(
+                      color: Color(0xFF4489D7),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w200,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Image.asset('assets/images/k1.png'),
+                      const SizedBox(width: 5),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'DAY',
+                            style: TextStyle(
+                              color: Color(0xFF4489D7),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 26,
+                            ),
+                          ),
+                          Text(
+                            '138',
+                            style: TextStyle(
+                              color: Color(0xFF4489D7),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 26,
+                              height: 0.9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -412,7 +485,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.orange.withOpacity(0.15),
+            color: Colors.orange.withValues(alpha: 0.15),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -440,7 +513,7 @@ class _HomePageState extends State<HomePage> {
                   height: 1.4,
                   shadows: [
                     Shadow(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       offset: const Offset(1, 1),
                       blurRadius: 0,
                     ),
@@ -462,7 +535,7 @@ class _HomePageState extends State<HomePage> {
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.blue.withOpacity(0.15),
+            color: Colors.blue.withValues(alpha: 0.15),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -536,7 +609,7 @@ class _HomePageState extends State<HomePage> {
     required String subtitle,
     required String imagePath,
   }) {
-    bool isNetworkImage = imagePath.startsWith('http');
+    final bool isNetworkImage = imagePath.startsWith('http');
 
     return Container(
       width: 110,
@@ -549,7 +622,7 @@ class _HomePageState extends State<HomePage> {
               : AssetImage(imagePath) as ImageProvider,
           fit: BoxFit.cover,
           onError: (exception, stackTrace) {
-            print("โหลดรูปไม่ได้: $imagePath");
+            debugPrint("โหลดรูปไม่ได้: $imagePath");
           },
         ),
       ),
@@ -568,7 +641,10 @@ class _HomePageState extends State<HomePage> {
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  colors: [Colors.black.withOpacity(0.6), Colors.transparent],
+                  colors: [
+                    Colors.black.withValues(alpha: 0.6),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),
@@ -599,7 +675,10 @@ class _HomePageState extends State<HomePage> {
                 ),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: Colors.white70, fontSize: 10),
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
@@ -608,6 +687,4 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
-} // <--- ปิด Class _HomePageState ตรงนี้
-
-// --- ห
+}

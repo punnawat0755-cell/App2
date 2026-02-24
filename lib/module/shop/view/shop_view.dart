@@ -86,7 +86,7 @@ class ShopPage extends StatelessWidget {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 4,
                               offset: const Offset(0, 4),
                             ),
@@ -283,7 +283,9 @@ class ShopPage extends StatelessWidget {
                     try {
                       controller.ownedItems.add(index);
                     } catch (e) {
-                      print("Error: Please add 'ownedItems' to Pet Controller");
+                      debugPrint(
+                        "Error: Please add 'ownedItems' to Pet Controller",
+                      );
                     }
                     Get.snackbar(
                       "สำเร็จ",
