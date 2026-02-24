@@ -14,6 +14,7 @@ class Pet extends GetxController {
   var level = 1.obs;
   var energyPercent = 50.obs; // ค่าพลังงานเริ่มต้น
   var username = "Seal".obs;
+  var showFrame = false.obs;
 
   // --- ตัวแปรระบบอาหาร (ปลาซ้าย) ---
   var foodCount = 3.obs;
@@ -25,6 +26,10 @@ class Pet extends GetxController {
   void onClose() {
     _timer?.cancel();
     super.onClose();
+  }
+
+  void toggleFrame() {
+    showFrame.value = !showFrame.value;
   }
 
   // -----------------------------------------------------------------------
@@ -52,7 +57,7 @@ class Pet extends GetxController {
     // ---------------------------------------------------
     energyPercent.value += 5;
     if (energyPercent.value > 100) {
-      energyPercent.value = 100; // ตันที่ 100
+      energyPercent.value = 100;
     }
     // ---------------------------------------------------
 
@@ -79,10 +84,6 @@ class Pet extends GetxController {
     if (coins.value >= cost) {
       // หักเหรียญ
       coins.value -= cost;
-
-      // ---------------------------------------------------
-      // [แก้ตรงนี้] เปลี่ยนจาก 5 เป็น 10
-      // ---------------------------------------------------
       energyPercent.value += 10; // <--- เพิ่มทีละ 10%
 
       if (energyPercent.value > 100) {
@@ -92,7 +93,7 @@ class Pet extends GetxController {
 
       Get.snackbar(
         "อร่อยจัง!",
-        "เปย์น้องด้วยปลาใหญ่! (+10 Energy)", // อย่าลืมแก้ข้อความตรงนี้ด้วยนะครับ
+        "เปย์น้องด้วยปลาใหญ่! (+10 Energy)",
         backgroundColor: Colors.amber,
         colorText: Colors.black,
         snackPosition: SnackPosition.TOP,
@@ -181,7 +182,108 @@ class PetPage extends StatelessWidget {
               ],
             ),
           ),
+          Obx(
+            () => controller.showFrame.value
+                ? _buildPhotoOverlay(controller)
+                : const SizedBox.shrink(),
+          ),
         ],
+      ),
+    );
+  }
+
+  // -----------------------------------------------------------
+  // Widget: Photo Overlay (กรอบรูปโพลารอยด์)
+  // -----------------------------------------------------------
+  Widget _buildPhotoOverlay(Pet controller) {
+    return Container(
+      color: Colors.black.withOpacity(0.5), // ทำพื้นหลังมืดจางๆ
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 1. ตัวกรอบโพลารอยด์สีขาว (เฉพาะรูปภาพ)
+            Container(
+              height: 380,
+              width: 380,
+              padding: const EdgeInsets.fromLTRB(5, 5, 5, 40),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4),
+                boxShadow: const [],
+              ),
+              child: AspectRatio(
+                aspectRatio: 1.4, // ปรับรูปให้เป็นแนวนอนเป๊ะๆ
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.white,
+                      width: 4,
+                    ), // ขอบขาวซ้อนในรูป
+                  ),
+                  child: Image.asset(
+                    'assets/images/backpet.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30), // ระยะห่างระหว่างกรอบรูปกับปุ่มด้านล่าง
+            // 2. แถวของปุ่มกดด้านล่าง (ปุ่มโปรไฟล์ + ปุ่มปิด)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // --- ปุ่มใช้เป็นรูปโปรไฟล์ ---
+                GestureDetector(
+                  onTap: () {
+                    print("Go to Profile Setup");
+                    // controller.toggleFrame(); // ปิดกรอบหลังจากกด
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 25,
+                      vertical: 15,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Color(0xFFD9D9D9), // สีขาวนวลตามรูป
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: const Text(
+                      "ใช้เป็นรูปโปรไฟล์",
+                      style: TextStyle(color: Color(0xFF6C6C6C), fontSize: 18),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(width: 15),
+
+                // --- ปุ่มกากบาท (X) ---
+                GestureDetector(
+                  onTap: () => controller.toggleFrame(),
+                  child: Container(
+                    width: 55,
+                    height: 55,
+                    decoration: const BoxDecoration(
+                      color: Colors.white, // พื้นหลังสีขาว
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text(
+                        "X",
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -189,15 +291,12 @@ class PetPage extends StatelessWidget {
   // -----------------------------------------------------------
   // Widget: Top Bar
   // -----------------------------------------------------------
-  // -----------------------------------------------------------
-  // Widget: Top Bar (แก้ไขให้มีปุ่มกล้องข้างหลอดพลังงาน)
-  // -----------------------------------------------------------
   Widget _buildTopBar(Pet controller) {
     const double boxHeight = 39.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         10,
-        20,
+        10,
         10,
         0,
       ), // ปรับ padding ขวาเล็กน้อย
@@ -355,7 +454,7 @@ class PetPage extends StatelessWidget {
                       GestureDetector(
                         onTap: () {
                           // ใส่ Action สำหรับการถ่ายรูปตรงนี้
-                          print("Camera Tapped");
+                          controller.toggleFrame();
                         },
                         child: Container(
                           width: 45,
@@ -377,7 +476,6 @@ class PetPage extends StatelessWidget {
                             'assets/images/camera.png',
                             width: 28,
                             height: 28,
-                          ),
                           ),
                         ),
                       ),

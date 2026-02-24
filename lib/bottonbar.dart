@@ -3,6 +3,9 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home.dart';
+import 'package:flutter_application_1/module/login/view/login.dart';
+import 'package:flutter_application_1/module/login/view/register.dart';
+import 'package:flutter_application_1/module/policy/view/policy.dart';
 import 'package:flutter_application_1/module/reset/view/newpassword.dart';
 import 'package:flutter_application_1/module/reset/view/reset.dart';
 import 'package:flutter_application_1/module/reset/view/resetsent.dart';
@@ -29,11 +32,13 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // เรียงลำดับตาม icon ใน Navigation Bar (0, 1, 2, 3, 4)
   // ---------------------------------------------------------
   final List<Widget> _pages = [
-    // Index 0: หน้า Feed (ที่เราทำไว้)
+    // const LoginPage(),
+    // const RegisterPage(),
+    const PrivacyPolicyPage(),
     const PetPage(),
     const NewPasswordPage(),
     const ResetSentPage(),
-    const ResetPasswordPage(),
+    // const ResetPasswordPage(),
     // const FavoritesPage(),
     // const PrivacyPage(),
     // const EditProfilePage(),
