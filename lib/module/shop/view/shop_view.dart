@@ -33,6 +33,7 @@ class ShopPage extends StatelessWidget {
       {'img': 'assets/images/s12.png', 'price': 95},
     ];
 
+
     return Scaffold(
       backgroundColor: const Color(0xFFE6F7FF),
       body: SafeArea(
@@ -155,6 +156,7 @@ class ShopPage extends StatelessWidget {
                 ),
               ),
 
+              
               // -------------------------------------------------------
               // 3. Grid สินค้า (Updated)
               // -------------------------------------------------------
