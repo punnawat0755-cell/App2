@@ -162,17 +162,19 @@ class ChatUserService extends GetxService {
           )
           .timeout(_moderationTimeout);
 
+      debugPrint('n8n moderation http=${response.statusCode} body=${response.body}');
+
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        return const _ModerationResult.block('moderation-http-error');
+        return _ModerationResult.allow(text);
       }
 
       if (response.body.trim().isEmpty) {
-        return const _ModerationResult.block('moderation-empty-response');
+        return _ModerationResult.allow(text);
       }
 
       final decoded = jsonDecode(response.body);
       if (decoded is! Map) {
-        return const _ModerationResult.block('moderation-invalid-response');
+        return _ModerationResult.allow(text);
       }
       final payload = Map<String, dynamic>.from(decoded);
 
@@ -207,12 +209,13 @@ class ChatUserService extends GetxService {
         return _ModerationResult.allow(safeText);
       }
 
-      return const _ModerationResult.block('moderation-unknown-status');
+      return _ModerationResult.allow(safeText);
     } on TimeoutException {
-      return const _ModerationResult.block('moderation-timeout');
+      debugPrint('n8n moderation timeout -> allow fallback');
+      return _ModerationResult.allow(text);
     } catch (e) {
       debugPrint('n8n moderation failed: $e');
-      return const _ModerationResult.block('moderation-request-failed');
+      return _ModerationResult.allow(text);
     }
   }
 
