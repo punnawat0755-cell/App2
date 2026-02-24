@@ -60,7 +60,6 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
     return StreamBuilder<AuthState>(
       stream: _stream,
       builder: (context, snapshot) {
-        // UX: กันกระพริบตอนเริ่ม
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),

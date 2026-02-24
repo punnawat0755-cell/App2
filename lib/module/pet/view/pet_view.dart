@@ -189,45 +189,28 @@ class PetPage extends StatelessWidget {
   // -----------------------------------------------------------
   // Widget: Top Bar
   // -----------------------------------------------------------
+  // -----------------------------------------------------------
+  // Widget: Top Bar (แก้ไขให้มีปุ่มกล้องข้างหลอดพลังงาน)
+  // -----------------------------------------------------------
   Widget _buildTopBar(Pet controller) {
     const double boxHeight = 39.0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 20, 20, 0),
+      padding: const EdgeInsets.fromLTRB(
+        10,
+        20,
+        10,
+        0,
+      ), // ปรับ padding ขวาเล็กน้อย
       child: Column(
         children: [
-          // Row 1: Back + Name
-          // Row(
-          //   children: [
-          //     // InkWell(
-          //     //   onTap: () => Get.back(),
-          //     //   child: Image.asset(
-          //     //     'assets/images/back2.png',
-          //     //     width: 36,
-          //     //     height: 28,
-          //     //     fit: BoxFit.contain,
-          //     //   ),
-          //     // ),
-          //     const SizedBox(width: 10),
-          //     Obx(
-          //       () => Text(
-          //         "สวัสดี,${controller.username}",
-          //         style: const TextStyle(
-          //           color: Colors.white,
-          //           fontSize: 24,
-          //           fontWeight: FontWeight.bold,
-          //         ),
-          //       ),
-          //     ),
-          //   ],
-          // ),
           const SizedBox(height: 20),
 
-          // Row 2: Stats
+          // Row: Stats
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Coin
+              // 1. ส่วนแสดง Coin
               Container(
                 height: boxHeight,
                 padding: const EdgeInsets.fromLTRB(5, 0, 15, 0),
@@ -266,7 +249,8 @@ class PetPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 15),
-              // Level & Energy
+
+              // 2. ส่วนแสดง Level, Energy Bar และปุ่มกล้อง
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -279,80 +263,125 @@ class PetPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 5),
-                  Container(
-                    width: 160,
-                    height: boxHeight,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black26,
-                          blurRadius: 4,
-                          offset: Offset(0, 2),
+                  Row(
+                    // ใช้ Row เพื่อวางหลอดพลังงานและปุ่มกล้องข้างกัน
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // หลอดพลังงาน (Energy Bar)
+                      Container(
+                        width: 160,
+                        height: boxHeight,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(30),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Colors.black26,
+                              blurRadius: 4,
+                              offset: Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: double.infinity,
-                          margin: const EdgeInsets.fromLTRB(
-                            15.0,
-                            8.0,
-                            9.0,
-                            8.0,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFE5B9),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Obx(() {
-                            double maxW = 160.0, left = 15.0, right = 9.0;
-                            double currentW =
-                                (maxW - left - right) *
-                                (controller.energyPercent.value / 100);
-                            return Container(
-                              width: currentW,
-                              height: double.infinity,
-                              margin: EdgeInsets.fromLTRB(left, 8.0, 0.0, 8.0),
+                        child: Stack(
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.fromLTRB(
+                                15.0,
+                                8.0,
+                                9.0,
+                                8.0,
+                              ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFD146),
+                                color: const Color(0xFFFFE5B9),
                                 borderRadius: BorderRadius.circular(30),
                               ),
-                            );
-                          }),
-                        ),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Padding(
-                            padding: const EdgeInsets.only(left: 1),
-                            child: Image.asset(
-                              'assets/images/t1.png',
-                              width: 34,
-                              height: 34,
-                              fit: BoxFit.contain,
                             ),
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.center,
-                          child: Obx(
-                            () => Text(
-                              " ${controller.energyPercent.value} %",
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF634917),
-                                fontSize: 16,
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Obx(() {
+                                double maxW = 160.0, left = 15.0, right = 9.0;
+                                double currentW =
+                                    (maxW - left - right) *
+                                    (controller.energyPercent.value / 100);
+                                return Container(
+                                  width: currentW,
+                                  height: double.infinity,
+                                  margin: EdgeInsets.fromLTRB(
+                                    left,
+                                    8.0,
+                                    0.0,
+                                    8.0,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFD146),
+                                    borderRadius: BorderRadius.circular(30),
+                                  ),
+                                );
+                              }),
+                            ),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: Padding(
+                                padding: const EdgeInsets.only(left: 1),
+                                child: Image.asset(
+                                  'assets/images/t1.png',
+                                  width: 34,
+                                  height: 34,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                             ),
+                            Align(
+                              alignment: Alignment.center,
+                              child: Obx(
+                                () => Text(
+                                  " ${controller.energyPercent.value} %",
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF634917),
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(
+                        width: 10,
+                      ), // เว้นระยะห่างระหว่างหลอดกับปุ่มกล้อง
+                      // ปุ่มกล้อง (Camera Button)
+                      GestureDetector(
+                        onTap: () {
+                          // ใส่ Action สำหรับการถ่ายรูปตรงนี้
+                          print("Camera Tapped");
+                        },
+                        child: Container(
+                          width: 45,
+                          height: 45,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(
+                              0.8,
+                            ), // ขาวขุ่นตามรูป
+                            shape: BoxShape.circle,
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Image.asset(
+                            'assets/images/camera.png',
+                            width: 28,
+                            height: 28,
+                          ),
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ],
               ),

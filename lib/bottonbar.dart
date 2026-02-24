@@ -30,6 +30,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // ---------------------------------------------------------
   final List<Widget> _pages = [
     // Index 0: หน้า Feed (ที่เราทำไว้)
+    const PetPage(),
     const NewPasswordPage(),
     const ResetSentPage(),
     const ResetPasswordPage(),
@@ -39,7 +40,6 @@ class _BottomNavBarState extends State<BottomNavBar> {
     // const SettingPage(),
     // const HomePage(),
     // const FeedPage(),
-    const PetPage(),
     const ChatSelectionPage(),
     // const ProfilePage(),
   ];
