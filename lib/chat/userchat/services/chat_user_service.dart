@@ -151,10 +151,12 @@ class ChatUserService extends GetxService {
             Uri.parse(_n8nModerationWebhook),
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode({
+              'action': 'content_moderate',
               'chatId': chatId,
               'senderId': senderId,
               'receiverId': receiverId,
               'message': text,
+              'text': text,
               'timestamp': DateTime.now().toUtc().toIso8601String(),
             }),
           )
@@ -175,11 +177,20 @@ class ChatUserService extends GetxService {
       final payload = Map<String, dynamic>.from(decoded);
 
       final status = (payload['status'] ?? '').toString().trim().toLowerCase();
+      final allowedRaw = payload['allowed'];
       final explicitProfanity = payload['isProfane'] == true;
       final cleanMessage =
           (payload['cleanMessage'] ?? payload['message'] ?? '')
               .toString()
               .trim();
+      final safeText = cleanMessage.isNotEmpty ? cleanMessage : text;
+
+      if (allowedRaw is bool) {
+        if (allowedRaw) {
+          return _ModerationResult.allow(safeText);
+        }
+        return const _ModerationResult.block('moderation-blocked');
+      }
 
       if (explicitProfanity ||
           status == 'block' ||
@@ -189,12 +200,10 @@ class ChatUserService extends GetxService {
       }
 
       if (status == 'mask') {
-        final masked = cleanMessage.isNotEmpty ? cleanMessage : text;
-        return _ModerationResult.allow(masked);
+        return _ModerationResult.allow(safeText);
       }
 
       if (status == 'allow' || status == 'allowed' || status == 'ok') {
-        final safeText = cleanMessage.isNotEmpty ? cleanMessage : text;
         return _ModerationResult.allow(safeText);
       }
 
