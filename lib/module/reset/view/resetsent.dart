@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_application_1/module/reset/view/newpassword.dart';
 import 'package:get/get.dart';
 
 class ResetSentPage extends StatefulWidget {
@@ -148,8 +149,33 @@ class _ResetSentPageState extends State<ResetSentPage> {
                 height: 55,
                 child: ElevatedButton(
                   onPressed: () {
+                    // 1. รวมรหัส OTP จาก Controller ทั้ง 6 ช่อง
                     String otp = _controllers.map((e) => e.text).join();
                     print("OTP Entered: $otp");
+
+                    // 2. ตรวจสอบว่ากรอกครบ 6 หลักหรือไม่
+                    if (otp.length == 6) {
+                      // 3. นำทางไปหน้าถัดไป (เช่นหน้า NewPasswordPage)
+                      Get.to(() => const NewPasswordPage());
+
+                      // ทดสอบเบื้องต้นด้วยการกลับไปหน้าแรก
+                      Get.back();
+                      Get.snackbar(
+                        "สำเร็จ",
+                        "รหัสถูกต้อง",
+                        backgroundColor: Colors.green,
+                        colorText: Colors.white,
+                      );
+                    } else {
+                      // แจ้งเตือนถ้ากรอกไม่ครบ
+                      Get.snackbar(
+                        "ข้อผิดพลาด",
+                        "กรุณากรอกรหัสให้ครบ 6 หลัก",
+                        backgroundColor: Colors.redAccent,
+                        colorText: Colors.white,
+                        snackPosition: SnackPosition.TOP,
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20C2FF),
@@ -165,7 +191,6 @@ class _ResetSentPageState extends State<ResetSentPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
             ],
           ),
         ),

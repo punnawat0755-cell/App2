@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // เพิ่มตัวนี้เพื่อใช้งาน FilteringTextInputFormatter
+import 'package:flutter_application_1/module/reset/view/resetsent.dart';
 import 'package:get/get.dart';
 
 class ResetPasswordPage extends StatefulWidget {
@@ -172,9 +173,28 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                 height: 55,
                 child: ElevatedButton(
                   onPressed: () {
-                    // เวลาใช้งานจริง อย่าลืมบวก suffix เข้าไปด้วยนะครับ
-                    String finalEmail = "${emailController.text}@gmail.com";
-                    print("Sending to: $finalEmail");
+                    // 1. ดึงค่าจาก TextField
+                    String emailPrefix = emailController.text.trim();
+                    String finalEmail = "$emailPrefix@gmail.com";
+
+                    // 2. ตรวจสอบว่าได้กรอกชื่ออีเมลหรือยัง
+                    if (emailPrefix.isNotEmpty) {
+                      print("Sending to: $finalEmail");
+
+                      // 3. ใช้ GetX เพื่อเปลี่ยนหน้าไปที่ ResetSentPage
+                      Get.to(() => const ResetSentPage());
+                    } else {
+                      // แจ้งเตือนจากด้านบน (ตามที่คุณต้องการ) ถ้ายังไม่ได้กรอกอีเมล
+                      Get.snackbar(
+                        "แจ้งเตือน",
+                        "กรุณากรอกชื่ออีเมลของคุณก่อนกดส่ง",
+                        snackPosition: SnackPosition.TOP, // เด้งจากข้างบน
+                        backgroundColor: Colors.orangeAccent,
+                        colorText: Colors.white,
+                        margin: const EdgeInsets.all(15),
+                        duration: const Duration(seconds: 2),
+                      );
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20C2FF),
