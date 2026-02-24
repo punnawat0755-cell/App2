@@ -40,7 +40,7 @@ class ChatUserService extends GetxService {
   static const String _queueCollection = 'RandomQueue';
   static const String _n8nModerationWebhook = String.fromEnvironment(
     'N8N_MODERATION_WEBHOOK',
-    defaultValue: 'https://n8n.tgstack.dev/webhook/HowAreYou',
+    defaultValue: 'http://n8n-main.n8n-prod.svc.cluster.local:5678',
   );
   static const Duration _moderationTimeout = Duration(seconds: 6);
 
@@ -162,7 +162,9 @@ class ChatUserService extends GetxService {
           )
           .timeout(_moderationTimeout);
 
-      debugPrint('n8n moderation http=${response.statusCode} body=${response.body}');
+      debugPrint(
+        'n8n moderation http=${response.statusCode} body=${response.body}',
+      );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         return _ModerationResult.allow(text);
@@ -176,8 +178,8 @@ class ChatUserService extends GetxService {
       if (decoded is! Map) {
         return _ModerationResult.allow(text);
       }
-      final payload = Map<String, dynamic>.from(decoded);
 
+      final payload = Map<String, dynamic>.from(decoded);
       final status = (payload['status'] ?? '').toString().trim().toLowerCase();
       final allowedRaw = payload['allowed'];
       final explicitProfanity = payload['isProfane'] == true;
@@ -186,6 +188,8 @@ class ChatUserService extends GetxService {
               .toString()
               .trim();
       final safeText = cleanMessage.isNotEmpty ? cleanMessage : text;
+
+      debugPrint('n8n moderation payload=$payload');
 
       if (allowedRaw is bool) {
         if (allowedRaw) {
@@ -201,11 +205,10 @@ class ChatUserService extends GetxService {
         return const _ModerationResult.block('moderation-blocked');
       }
 
-      if (status == 'mask') {
-        return _ModerationResult.allow(safeText);
-      }
-
-      if (status == 'allow' || status == 'allowed' || status == 'ok') {
+      if (status == 'mask' ||
+          status == 'allow' ||
+          status == 'allowed' ||
+          status == 'ok') {
         return _ModerationResult.allow(safeText);
       }
 
