@@ -709,7 +709,7 @@ class _ChatPageState extends State<ChatPage> {
 
       if (result.status == SendMessageStatus.blocked) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ข้อความไม่สุภาพ ระบบจึงลบข้อความให้แล้ว')),
+          const SnackBar(content: Text('ข้อความไม่สุภาพ ระบบบล็อกการส่งข้อความ')),
         );
       }
 

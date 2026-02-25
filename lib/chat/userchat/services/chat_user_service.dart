@@ -42,6 +42,10 @@ class ChatUserService extends GetxService {
     'N8N_MODERATION_WEBHOOK',
     defaultValue: 'http://n8n-main.n8n-prod.svc.cluster.local:5678',
   );
+  static const bool _moderationFailOpen = bool.fromEnvironment(
+    'N8N_MODERATION_FAIL_OPEN',
+    defaultValue: true,
+  );
   static const Duration _moderationTimeout = Duration(seconds: 6);
 
   // ----------------------------------------------------------------
@@ -167,32 +171,32 @@ class ChatUserService extends GetxService {
       );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        return _ModerationResult.allow(text);
+        return _fallbackOnModerationError(text, 'http-${response.statusCode}');
       }
 
       if (response.body.trim().isEmpty) {
-        return _ModerationResult.allow(text);
+        return _fallbackOnModerationError(text, 'empty-body');
       }
 
       final decoded = jsonDecode(response.body);
-      if (decoded is! Map) {
-        return _ModerationResult.allow(text);
+      final payload = _asMapPayload(decoded);
+      if (payload == null) {
+        return _fallbackOnModerationError(text, 'invalid-payload');
       }
 
-      final payload = Map<String, dynamic>.from(decoded);
       final status = (payload['status'] ?? '').toString().trim().toLowerCase();
-      final allowedRaw = payload['allowed'];
-      final explicitProfanity = payload['isProfane'] == true;
-      final cleanMessage =
-          (payload['cleanMessage'] ?? payload['message'] ?? '')
-              .toString()
-              .trim();
-      final safeText = cleanMessage.isNotEmpty ? cleanMessage : text;
+      final allowed = _readBool(payload, const ['allowed', 'allow']);
+      final explicitProfanity = _readBool(
+            payload,
+            const ['isProfane', 'profanity', 'containsProfanity'],
+          ) ==
+          true;
+      final safeText = _readSafeText(payload, text);
 
       debugPrint('n8n moderation payload=$payload');
 
-      if (allowedRaw is bool) {
-        if (allowedRaw) {
+      if (allowed != null) {
+        if (allowed) {
           return _ModerationResult.allow(safeText);
         }
         return const _ModerationResult.block('moderation-blocked');
@@ -206,20 +210,71 @@ class ChatUserService extends GetxService {
       }
 
       if (status == 'mask' ||
+          status == 'sanitize' ||
+          status == 'sanitized' ||
           status == 'allow' ||
           status == 'allowed' ||
           status == 'ok') {
         return _ModerationResult.allow(safeText);
       }
 
-      return _ModerationResult.allow(safeText);
+      return _fallbackOnModerationError(text, 'unknown-status:$status');
     } on TimeoutException {
-      debugPrint('n8n moderation timeout -> allow fallback');
-      return _ModerationResult.allow(text);
+      debugPrint('n8n moderation timeout');
+      return _fallbackOnModerationError(text, 'timeout');
     } catch (e) {
       debugPrint('n8n moderation failed: $e');
+      return _fallbackOnModerationError(text, 'exception');
+    }
+  }
+
+  _ModerationResult _fallbackOnModerationError(String text, String reason) {
+    if (_moderationFailOpen) {
       return _ModerationResult.allow(text);
     }
+    return _ModerationResult.block('moderation-unavailable:$reason');
+  }
+
+  Map<String, dynamic>? _asMapPayload(dynamic decoded) {
+    if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    if (decoded is List && decoded.isNotEmpty) {
+      final first = decoded.first;
+      if (first is Map) return Map<String, dynamic>.from(first);
+    }
+    return null;
+  }
+
+  bool? _readBool(Map<String, dynamic> payload, List<String> keys) {
+    for (final key in keys) {
+      final raw = payload[key];
+      if (raw is bool) return raw;
+      if (raw is num) return raw != 0;
+      if (raw is String) {
+        final value = raw.trim().toLowerCase();
+        if (value == 'true' || value == '1' || value == 'yes') return true;
+        if (value == 'false' || value == '0' || value == 'no') return false;
+      }
+    }
+    return null;
+  }
+
+  String _readSafeText(Map<String, dynamic> payload, String fallback) {
+    const keys = [
+      'cleanMessage',
+      'sanitizedText',
+      'safeText',
+      'maskedText',
+      'message',
+      'text',
+    ];
+
+    for (final key in keys) {
+      final raw = payload[key];
+      if (raw is String && raw.trim().isNotEmpty) {
+        return raw.trim();
+      }
+    }
+    return fallback;
   }
 
   Future<void> deleteMessage(String chatId, String messageId) async {

@@ -36,6 +36,11 @@ class _ChatUserViewState extends State<ChatUserView> {
   final ChatUserService _chatService = ChatUserService();
   bool _sendingMessage = false;
 
+  Timestamp? _messageTimestamp(Map<String, dynamic> data) {
+    final ts = data['localTimestamp'] ?? data['timestamp'];
+    return ts is Timestamp ? ts : null;
+  }
+
   Future<void> _sendMessageText(String message) async {
     if (_sendingMessage) return;
     final text = message.trim();
@@ -55,7 +60,7 @@ class _ChatUserViewState extends State<ChatUserView> {
 
       if (result.status == SendMessageStatus.blocked) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ข้อความไม่สุภาพ ระบบจึงลบข้อความให้แล้ว')),
+          const SnackBar(content: Text('ข้อความไม่สุภาพ ระบบบล็อกการส่งข้อความ')),
         );
       }
 
@@ -202,7 +207,6 @@ class _ChatUserViewState extends State<ChatUserView> {
                   .collection('Chats')
                   .doc(widget.chatId)
                   .collection('messages')
-                  .orderBy('timestamp')
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
@@ -215,14 +219,22 @@ class _ChatUserViewState extends State<ChatUserView> {
                   return const Center(child: Text('No messages yet'));
                 }
 
-                final messages = snapshot.data!.docs;
+                final messages = [...snapshot.data!.docs]..sort((a, b) {
+                    final ad = a.data() as Map<String, dynamic>;
+                    final bd = b.data() as Map<String, dynamic>;
+                    final at = _messageTimestamp(ad);
+                    final bt = _messageTimestamp(bd);
+                    final aMs = at?.millisecondsSinceEpoch ?? 0;
+                    final bMs = bt?.millisecondsSinceEpoch ?? 0;
+                    return aMs.compareTo(bMs);
+                  });
                 _markAsRead(messages);
 
                 final groupedMessages = <String, List<QueryDocumentSnapshot>>{};
                 for (final message in messages) {
                   final data = message.data() as Map<String, dynamic>;
-                  final timestamp = data['timestamp'];
-                  if (timestamp is! Timestamp) {
+                  final timestamp = _messageTimestamp(data);
+                  if (timestamp == null) {
                     continue;
                   }
                   final date = timestamp.toDate();
@@ -271,8 +283,8 @@ class _ChatUserViewState extends State<ChatUserView> {
                           final isMe = senderId == widget.currentUserId;
                           final isRead = (data['isRead'] ?? false) as bool;
 
-                          final timestamp = data['timestamp'];
-                          final timeText = timestamp is Timestamp
+                          final timestamp = _messageTimestamp(data);
+                          final timeText = timestamp != null
                               ? DateFormat('HH:mm').format(timestamp.toDate())
                               : '--:--';
 
