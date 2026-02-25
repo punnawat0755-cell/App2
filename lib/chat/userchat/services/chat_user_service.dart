@@ -40,7 +40,7 @@ class ChatUserService extends GetxService {
   static const String _queueCollection = 'RandomQueue';
   static const String _n8nModerationWebhook = String.fromEnvironment(
     'N8N_MODERATION_WEBHOOK',
-    defaultValue: 'http://n8n-main.n8n-prod.svc.cluster.local:5678',
+    defaultValue: 'https://n8n.tgstack.dev/webhook/HowAreYou',
   );
   static const bool _moderationFailOpen = bool.fromEnvironment(
     'N8N_MODERATION_FAIL_OPEN',
