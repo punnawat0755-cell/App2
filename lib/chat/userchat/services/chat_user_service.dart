@@ -10,8 +10,10 @@ import 'package:http/io_client.dart';
 
 import 'package:flutter_application_1/chat/userchat/models/usermessage.model.dart';
 
+/// สถานะผลลัพธ์หลังการพยายามส่งข้อความจาก UI
 enum SendMessageStatus { sent, blocked, skipped }
 
+/// รูปแบบผลลัพธ์ที่ service ส่งกลับให้ UI
 class SendMessageResult {
   const SendMessageResult({
     required this.status,
@@ -22,7 +24,8 @@ class SendMessageResult {
   final String? reason;
 }
 
-// ✅ แก้ Enum ให้ตรงกับที่ Controller ส่งมา
+/// บทบาทผู้ใช้ในระบบจับคู่
+/// - `counselor` map เป็น `listener` เพื่อรองรับชื่อบทบาทเดิม
 enum MatchRole {
   seeker('seeker'),
   listener('listener'), // ใน DB ใช้คำว่า listener
@@ -36,33 +39,139 @@ enum MatchRole {
 }
 
 class ChatUserService extends GetxService {
+  // Dependencies หลักของ service
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   late final http.Client _httpClient;
 
+  // Firestore collections
   static const String _chatCollection = 'Chats';
   static const String _queueCollection = 'RandomQueue';
+
+  // Config ของการเรียก n8n moderation
   static const String _n8nModerationWebhook = String.fromEnvironment(
     'N8N_MODERATION_WEBHOOK',
     defaultValue: 'https://n8n.tgstack.dev/webhook/HowAreYou',
   );
+  // true = ถ้า n8n ล่มให้ปล่อยผ่าน (ยกเว้น local fallback พบคำหยาบ)
   static const bool _moderationFailOpen = bool.fromEnvironment(
     'N8N_MODERATION_FAIL_OPEN',
     defaultValue: true,
   );
+  // true = ยอมรับ cert ที่ไม่สมบูรณ์สำหรับ host ที่ whitelist ไว้
   static const bool _allowBadCertificate = bool.fromEnvironment(
     'N8N_ALLOW_BAD_CERT',
     defaultValue: true,
   );
+  // รายชื่อ host ที่อนุญาต bad certificate
   static const String _allowBadCertificateHosts = String.fromEnvironment(
     'N8N_ALLOW_BAD_CERT_HOSTS',
     defaultValue: 'n8n.tgstack.dev',
   );
+  // timeout ตอนเรียก webhook moderation
   static const Duration _moderationTimeout = Duration(seconds: 6);
+  // คลังคำหยาบฝั่งแอป ใช้เมื่อ n8n ไม่พร้อมใช้งาน
+  static const List<String> _localProfanityTokens = [
+    // TH
+    'เหี้ย',
+    'ไอ้เหี้ย',
+    'อีเหี้ย',
+    'ควย',
+    'ไอ้ควย',
+    'อีควย',
+    'หี',
+    'หำ',
+    'กระหรี่',
+    'อีกะหรี่',
+    'สัส',
+    'ไอ้สัส',
+    'อีสัส',
+    'ไอสัส',
+    'ไอสาด',
+    'สัตว์',
+    'สัด',
+    'ส้นตีน',
+    'ตีน',
+    'ตรีน',
+    'ตายห่า',
+    'ห่า',
+    'ห่าน',
+    'หน้าหี',
+    'หน้าควย',
+    'เสือก',
+    'กู',
+    'เย็ด',
+    'เย็ดแม่',
+    'เย็ดพ่อ',
+    'แม่ง',
+    'มรึง',
+    'มึง',
+    'ควาย',
+    'ไอ้ควาย',
+    'อีควาย',
+    'ควายเอ๊ย',
+    'โง่สัส',
+    'ค-ว-ย',
+    'ห-ี',
+    'เ-ห-ี้-ย',
+    // EN
+    'fuck',
+    'f*ck',
+    'fuk',
+    'fuc',
+    'fucking',
+    'fk',
+    'wtf',
+    'shit',
+    'sh1t',
+    'bullshit',
+    'dipshit',
+    'bitch',
+    'b1tch',
+    'son of bitch',
+    'son of a bitch',
+    'asshole',
+    'ass hole',
+    'arsehole',
+    'jackass',
+    'bastard',
+    'motherfucker',
+    'mother fucker',
+    'mf',
+    'mfer',
+    'dick',
+    'd1ck',
+    'cock',
+    'prick',
+    'pussy',
+    'pussyhole',
+    'cunt',
+    'slut',
+    'whore',
+    'hoe',
+    'retard',
+    'idiot',
+    'stupid',
+    'kys',
+    'kill yourself',
+    'nigga',
+    'nigger',
+    'faggot',
+    'tranny',
+    'rape',
+    'raped',
+    'rapist',
+    'porn',
+    'xxx',
+    'blowjob',
+    'handjob',
+  ];
 
+  /// Constructor: สร้าง http client ตาม config ปัจจุบัน
   ChatUserService() {
     _httpClient = _buildHttpClient();
   }
 
+  /// Dispose http client เมื่อ service ถูกปิด
   @override
   void onClose() {
     _httpClient.close();
@@ -73,6 +182,8 @@ class ChatUserService extends GetxService {
   // 1. Firebase Basic Chat Operations (รับ-ส่งข้อความ)
   // ----------------------------------------------------------------
 
+  /// ดึง stream ของข้อความล่าสุดในห้องแชท
+  /// ใช้สำหรับแสดง preview ในหน้า list หรือสถานะล่าสุด
   Stream<UserMessage?> getLatestMessageStream(String chatId) {
     return _firestore
         .collection(_chatCollection)
@@ -96,6 +207,8 @@ class ChatUserService extends GetxService {
     });
   }
 
+  /// สร้าง/อัปเดตห้องแชท 1:1
+  /// ใช้การ sort id เพื่อให้คู่เดิมได้ room id เดิมทุกครั้ง
   Future<String> createChatRoom(
     String currentUserId,
     String recipientUserId,
@@ -111,6 +224,8 @@ class ChatUserService extends GetxService {
     return chatRoomId;
   }
 
+  /// ส่งข้อความเข้าแชท
+  /// ลำดับ: trim -> moderate -> เขียน Firestore -> clear input
   Future<SendMessageResult> sendMessage(
     String chatId,
     String currentUserId,
@@ -159,6 +274,7 @@ class ChatUserService extends GetxService {
     return const SendMessageResult(status: SendMessageStatus.sent);
   }
 
+  /// เรียก n8n เพื่อตรวจ moderation และตีความผลลัพธ์ให้เป็น allow/block
   Future<_ModerationResult> _moderateMessage({
     required String chatId,
     required String senderId,
@@ -251,13 +367,44 @@ class ChatUserService extends GetxService {
     }
   }
 
+  /// fallback เมื่อ n8n ไม่พร้อมใช้งาน
+  /// - ถ้า local ตรวจเจอคำหยาบ => block
+  /// - ถ้าไม่เจอ => allow/block ตาม `_moderationFailOpen`
   _ModerationResult _fallbackOnModerationError(String text, String reason) {
+    final blockedByLocal = _containsLocalProfanity(text);
+    debugPrint(
+      'n8n moderation fallback(local) reason=$reason blocked=$blockedByLocal',
+    );
+
+    if (blockedByLocal) {
+      return const _ModerationResult.block('moderation-blocked-local-fallback');
+    }
+
+    // n8n unavailable but local fallback found no profanity => allow sending.
     if (_moderationFailOpen) {
       return _ModerationResult.allow(text);
     }
     return _ModerationResult.block('moderation-unavailable:$reason');
   }
 
+  /// ตรวจคำหยาบจากข้อความฝั่งแอป
+  /// ตรวจทั้งข้อความเดิมและข้อความที่ลบช่องว่าง/สัญลักษณ์แล้ว
+  bool _containsLocalProfanity(String input) {
+    final lowered = input.toLowerCase();
+    final compact = lowered
+        .replaceAll(RegExp(r'\s+'), '')
+        .replaceAll(RegExp(r'[^a-zA-Z0-9\u0E00-\u0E7F]'), '');
+
+    for (final token in _localProfanityTokens) {
+      final t = token.toLowerCase();
+      if (lowered.contains(t) || compact.contains(t.replaceAll(' ', ''))) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// แปลง decoded json ให้เป็น Map<String, dynamic> ที่อ่านต่อได้
   Map<String, dynamic>? _asMapPayload(dynamic decoded) {
     if (decoded is Map) return Map<String, dynamic>.from(decoded);
     if (decoded is List && decoded.isNotEmpty) {
@@ -267,6 +414,8 @@ class ChatUserService extends GetxService {
     return null;
   }
 
+  /// parse response body จาก n8n
+  /// รองรับทั้ง JSON object/list และ plain text สั้นๆ เช่น allow/block
   Map<String, dynamic>? _parseModerationPayload(String body) {
     final trimmed = body.trim();
 
@@ -298,6 +447,8 @@ class ChatUserService extends GetxService {
     return null;
   }
 
+  /// สร้าง HTTP client สำหรับเรียก webhook moderation
+  /// รองรับ bad cert เฉพาะ host ที่ whitelist
   http.Client _buildHttpClient() {
     if (!_allowBadCertificate) {
       return http.Client();
@@ -331,6 +482,9 @@ class ChatUserService extends GetxService {
     return IOClient(ioClient);
   }
 
+  /// อ่านค่าบูลีนจาก payload
+  /// - เช็ค top-level ก่อน
+  /// - ถ้าไม่เจอ ค่อยไล่ recursive ลงไปใน object/list
   bool? _readBool(Map<String, dynamic> payload, List<String> keys) {
     final keySet = keys.map((e) => e.toLowerCase()).toSet();
     // Priority 1: respect top-level field first (the direct webhook contract).
@@ -345,6 +499,8 @@ class ChatUserService extends GetxService {
     return _readBoolRecursive(payload, keySet);
   }
 
+  /// helper recursive สำหรับค้นค่า bool ในโครงสร้าง nested
+  /// ถ้าพบทั้ง true/false ให้ false ชนะ (strict mode)
   bool? _readBoolRecursive(dynamic node, Set<String> keys) {
     bool foundTrue = false;
 
@@ -384,6 +540,8 @@ class ChatUserService extends GetxService {
     return foundTrue ? true : null;
   }
 
+  /// แปลง dynamic เป็น bool
+  /// รองรับ bool/num/string (`true`, `1`, `yes`, ...)
   bool? _parseDynamicBool(dynamic raw) {
     if (raw is bool) return raw;
     if (raw is num) return raw != 0;
@@ -395,6 +553,8 @@ class ChatUserService extends GetxService {
     return null;
   }
 
+  /// อ่านข้อความที่ผ่านการ sanitize จาก payload
+  /// ถ้าไม่มี field ที่รองรับ จะใช้ fallback (ข้อความเดิม)
   String _readSafeText(Map<String, dynamic> payload, String fallback) {
     const keys = [
       'cleanMessage',
@@ -414,6 +574,7 @@ class ChatUserService extends GetxService {
     return fallback;
   }
 
+  /// ลบข้อความเดียวในห้องแชท
   Future<void> deleteMessage(String chatId, String messageId) async {
     await _firestore
         .collection(_chatCollection)
@@ -427,6 +588,7 @@ class ChatUserService extends GetxService {
   // 2. Queue Management (ใช้ Firestore เพื่อความเร็ว Realtime)
   // ----------------------------------------------------------------
 
+  /// ให้ user เข้าคิวสุ่มหาคู่โดยระบุบทบาท
   Future<void> enterRandomQueue(
     String userId, {
     required MatchRole role,
@@ -449,6 +611,7 @@ class ChatUserService extends GetxService {
     // (Optional) อาจจะเรียก Supabase RPC เพื่อบันทึก Log การเข้าคิวได้
   }
 
+  /// ให้ user ออกจากคิว และรีเซ็ตสถานะเป็น idle
   Future<void> leaveRandomQueue(String userId) async {
     await _firestore.collection(_queueCollection).doc(userId).set({
       'status': 'idle',
@@ -459,6 +622,7 @@ class ChatUserService extends GetxService {
     }, SetOptions(merge: true));
   }
 
+  /// helper: คืนค่า chatId เมื่อสถานะ queue เป็น matched เท่านั้น
   String? _extractChatId(Map<String, dynamic>? data) {
     if (data == null) return null;
     final status = (data['status'] ?? '') as String;
@@ -467,6 +631,7 @@ class ChatUserService extends GetxService {
     return chatId is String && chatId.isNotEmpty ? chatId : null;
   }
 
+  /// stream ติดตามการ match ของ user ปัจจุบัน
   Stream<String?> watchMatchedChatId(String userId) {
     return _firestore
         .collection(_queueCollection)
@@ -479,6 +644,8 @@ class ChatUserService extends GetxService {
   // 3. Matching Logic (Logic หลัก)
   // ----------------------------------------------------------------
 
+  /// พยายามจับคู่กับผู้ใช้ที่กำลังรอในคิว
+  /// ใช้ transaction กัน race condition ระหว่างการจับคู่พร้อมกันหลายเครื่อง
   Future<String?> tryMatchWithWaitingUser(
     String userId, {
     required MatchRole role,
@@ -591,6 +758,9 @@ class ChatUserService extends GetxService {
   // 4. End Chat & Feedback (การจบแชทและการให้คะแนน)
   // ----------------------------------------------------------------
 
+  /// จบแชทสุ่ม:
+  /// 1) mark ห้องเป็น ended
+  /// 2) เคลียร์ queue ของผู้ใช้ทั้งสองคน
   Future<void> endRandomChat({
     required String chatId,
     required String endedByUserId,
@@ -631,7 +801,7 @@ class ChatUserService extends GetxService {
     // หรือปล่อยให้เป็นหน้าที่ของ Admin script ก็ได้
   }
 
-  // บันทึก Feedback ลง Firestore
+  /// บันทึก feedback ของ session ลง Firestore
   Future<void> submitFeedback({
     required String sessionId,
     required String chatId,
@@ -664,13 +834,14 @@ class ChatUserService extends GetxService {
   // Helper Methods
   // ----------------------------------------------------------------
 
+  /// สร้าง chat id แบบสุ่มโดยอิง timestamp เพื่อโอกาสชนต่ำ
   String _newRandomChatId() {
     final ts = DateTime.now().millisecondsSinceEpoch;
     final rand = (ts ^ (ts >> 7)).toRadixString(36);
     return 'random_${ts}_$rand';
   }
 
-  // ฟังก์ชันลบข้อความ (เรียกใช้เมื่อต้องการล้างข้อมูลห้องแชทจริงๆ)
+  /// ลบข้อความทั้งหมดในห้องแชท และลบ document ห้องทิ้งท้าย
   Future<void> deleteAllMessages(String chatId) async {
     const batchSize = 350;
     while (true) {
@@ -694,6 +865,10 @@ class ChatUserService extends GetxService {
   }
 }
 
+/// ผลลัพธ์ภายในของ moderation pipeline
+/// - allow: อนุญาตให้ส่งหรือไม่
+/// - safeText: ข้อความที่ sanitize แล้ว (ถ้ามี)
+/// - reason: รหัสสาเหตุเวลา block
 class _ModerationResult {
   const _ModerationResult({
     required this.allow,
