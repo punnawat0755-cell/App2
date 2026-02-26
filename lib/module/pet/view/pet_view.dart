@@ -14,7 +14,6 @@ class Pet extends GetxController {
   var level = 1.obs;
   var energyPercent = 50.obs; // ค่าพลังงานเริ่มต้น
   var username = "Seal".obs;
-  var showFrame = false.obs;
 
   // --- ตัวแปรระบบอาหาร (ปลาซ้าย) ---
   var foodCount = 3.obs;
@@ -26,10 +25,6 @@ class Pet extends GetxController {
   void onClose() {
     _timer?.cancel();
     super.onClose();
-  }
-
-  void toggleFrame() {
-    showFrame.value = !showFrame.value;
   }
 
   // -----------------------------------------------------------------------
@@ -57,7 +52,7 @@ class Pet extends GetxController {
     // ---------------------------------------------------
     energyPercent.value += 5;
     if (energyPercent.value > 100) {
-      energyPercent.value = 100;
+      energyPercent.value = 100; // ตันที่ 100
     }
     // ---------------------------------------------------
 
@@ -84,6 +79,10 @@ class Pet extends GetxController {
     if (coins.value >= cost) {
       // หักเหรียญ
       coins.value -= cost;
+
+      // ---------------------------------------------------
+      // [แก้ตรงนี้] เปลี่ยนจาก 5 เป็น 10
+      // ---------------------------------------------------
       energyPercent.value += 10; // <--- เพิ่มทีละ 10%
 
       if (energyPercent.value > 100) {
@@ -93,7 +92,7 @@ class Pet extends GetxController {
 
       Get.snackbar(
         "อร่อยจัง!",
-        "เปย์น้องด้วยปลาใหญ่! (+10 Energy)",
+        "เปย์น้องด้วยปลาใหญ่! (+10 Energy)", // อย่าลืมแก้ข้อความตรงนี้ด้วยนะครับ
         backgroundColor: Colors.amber,
         colorText: Colors.black,
         snackPosition: SnackPosition.TOP,
@@ -182,108 +181,7 @@ class PetPage extends StatelessWidget {
               ],
             ),
           ),
-          Obx(
-            () => controller.showFrame.value
-                ? _buildPhotoOverlay(controller)
-                : const SizedBox.shrink(),
-          ),
         ],
-      ),
-    );
-  }
-
-  // -----------------------------------------------------------
-  // Widget: Photo Overlay (กรอบรูปโพลารอยด์)
-  // -----------------------------------------------------------
-  Widget _buildPhotoOverlay(Pet controller) {
-    return Container(
-      color: Colors.black.withOpacity(0.5), // ทำพื้นหลังมืดจางๆ
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 1. ตัวกรอบโพลารอยด์สีขาว (เฉพาะรูปภาพ)
-            Container(
-              height: 380,
-              width: 380,
-              padding: const EdgeInsets.fromLTRB(5, 5, 5, 40),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(4),
-                boxShadow: const [],
-              ),
-              child: AspectRatio(
-                aspectRatio: 1.4, // ปรับรูปให้เป็นแนวนอนเป๊ะๆ
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: Colors.white,
-                      width: 4,
-                    ), // ขอบขาวซ้อนในรูป
-                  ),
-                  child: Image.asset(
-                    'assets/images/backpet.png',
-                    fit: BoxFit.cover,
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30), // ระยะห่างระหว่างกรอบรูปกับปุ่มด้านล่าง
-            // 2. แถวของปุ่มกดด้านล่าง (ปุ่มโปรไฟล์ + ปุ่มปิด)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // --- ปุ่มใช้เป็นรูปโปรไฟล์ ---
-                GestureDetector(
-                  onTap: () {
-                    print("Go to Profile Setup");
-                    // controller.toggleFrame(); // ปิดกรอบหลังจากกด
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 25,
-                      vertical: 15,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Color(0xFFD9D9D9), // สีขาวนวลตามรูป
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const Text(
-                      "ใช้เป็นรูปโปรไฟล์",
-                      style: TextStyle(color: Color(0xFF6C6C6C), fontSize: 18),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(width: 15),
-
-                // --- ปุ่มกากบาท (X) ---
-                GestureDetector(
-                  onTap: () => controller.toggleFrame(),
-                  child: Container(
-                    width: 55,
-                    height: 55,
-                    decoration: const BoxDecoration(
-                      color: Colors.white, // พื้นหลังสีขาว
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Text(
-                        "X",
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontSize: 26,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -294,22 +192,42 @@ class PetPage extends StatelessWidget {
   Widget _buildTopBar(Pet controller) {
     const double boxHeight = 39.0;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        10,
-        10,
-        10,
-        0,
-      ), // ปรับ padding ขวาเล็กน้อย
+      padding: const EdgeInsets.fromLTRB(10, 20, 20, 0),
       child: Column(
         children: [
+          // Row 1: Back + Name
+          // Row(
+          //   children: [
+          //     // InkWell(
+          //     //   onTap: () => Get.back(),
+          //     //   child: Image.asset(
+          //     //     'assets/images/back2.png',
+          //     //     width: 36,
+          //     //     height: 28,
+          //     //     fit: BoxFit.contain,
+          //     //   ),
+          //     // ),
+          //     const SizedBox(width: 10),
+          //     Obx(
+          //       () => Text(
+          //         "สวัสดี,${controller.username}",
+          //         style: const TextStyle(
+          //           color: Colors.white,
+          //           fontSize: 24,
+          //           fontWeight: FontWeight.bold,
+          //         ),
+          //       ),
+          //     ),
+          //   ],
+          // ),
           const SizedBox(height: 20),
 
-          // Row: Stats
+          // Row 2: Stats
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // 1. ส่วนแสดง Coin
+              // Coin
               Container(
                 height: boxHeight,
                 padding: const EdgeInsets.fromLTRB(5, 0, 15, 0),
@@ -348,8 +266,7 @@ class PetPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 15),
-
-              // 2. ส่วนแสดง Level, Energy Bar และปุ่มกล้อง
+              // Level & Energy
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -362,124 +279,79 @@ class PetPage extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 5),
-                  Row(
-                    // ใช้ Row เพื่อวางหลอดพลังงานและปุ่มกล้องข้างกัน
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      // หลอดพลังงาน (Energy Bar)
-                      Container(
-                        width: 160,
-                        height: boxHeight,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 4,
-                              offset: Offset(0, 2),
-                            ),
-                          ],
+                  Container(
+                    width: 160,
+                    height: boxHeight,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Colors.black26,
+                          blurRadius: 4,
+                          offset: Offset(0, 2),
                         ),
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.fromLTRB(
-                                15.0,
-                                8.0,
-                                9.0,
-                                8.0,
-                              ),
+                      ],
+                    ),
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.fromLTRB(
+                            15.0,
+                            8.0,
+                            9.0,
+                            8.0,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFE5B9),
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Obx(() {
+                            double maxW = 160.0, left = 15.0, right = 9.0;
+                            double currentW = (maxW - left - right) *
+                                (controller.energyPercent.value / 100);
+                            return Container(
+                              width: currentW,
+                              height: double.infinity,
+                              margin: EdgeInsets.fromLTRB(left, 8.0, 0.0, 8.0),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFE5B9),
+                                color: const Color(0xFFFFD146),
                                 borderRadius: BorderRadius.circular(30),
                               ),
-                            ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Obx(() {
-                                double maxW = 160.0, left = 15.0, right = 9.0;
-                                double currentW =
-                                    (maxW - left - right) *
-                                    (controller.energyPercent.value / 100);
-                                return Container(
-                                  width: currentW,
-                                  height: double.infinity,
-                                  margin: EdgeInsets.fromLTRB(
-                                    left,
-                                    8.0,
-                                    0.0,
-                                    8.0,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFFFD146),
-                                    borderRadius: BorderRadius.circular(30),
-                                  ),
-                                );
-                              }),
-                            ),
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: Padding(
-                                padding: const EdgeInsets.only(left: 1),
-                                child: Image.asset(
-                                  'assets/images/t1.png',
-                                  width: 34,
-                                  height: 34,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-                            Align(
-                              alignment: Alignment.center,
-                              child: Obx(
-                                () => Text(
-                                  " ${controller.energyPercent.value} %",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF634917),
-                                    fontSize: 16,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                            );
+                          }),
                         ),
-                      ),
-                      const SizedBox(
-                        width: 10,
-                      ), // เว้นระยะห่างระหว่างหลอดกับปุ่มกล้อง
-                      // ปุ่มกล้อง (Camera Button)
-                      GestureDetector(
-                        onTap: () {
-                          // ใส่ Action สำหรับการถ่ายรูปตรงนี้
-                          controller.toggleFrame();
-                        },
-                        child: Container(
-                          width: 45,
-                          height: 45,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(
-                              0.8,
-                            ), // ขาวขุ่นตามรูป
-                            shape: BoxShape.circle,
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Colors.black26,
-                                blurRadius: 4,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Image.asset(
-                            'assets/images/camera.png',
-                            width: 28,
-                            height: 28,
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 1),
+                            child: Image.asset(
+                              'assets/images/t1.png',
+                              width: 34,
+                              height: 34,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        Align(
+                          alignment: Alignment.center,
+                          child: Obx(
+                            () => Text(
+                              " ${controller.energyPercent.value} %",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF634917),
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -624,7 +496,7 @@ class PetPage extends StatelessWidget {
                 borderRadius: BorderRadius.circular(30),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),

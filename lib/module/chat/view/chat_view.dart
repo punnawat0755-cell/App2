@@ -1,23 +1,51 @@
-import 'package:flutter/material.dart';
-import 'package:get/get.dart';
 import 'dart:async';
 
-// ---------------------------------------------------------
-// 1. Controller (Logic)
-// ---------------------------------------------------------
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
+import 'package:flutter_application_1/chat/userchat/bindings/chat_binding.dart';
+import 'package:flutter_application_1/chat/userchat/services/chat_user_service.dart';
+import 'package:flutter_application_1/module/login/view/login.dart';
+
+Color withAlpha(Color color, double opacity) {
+  final alpha = (opacity.clamp(0.0, 1.0) * 255).round();
+  return color.withAlpha(alpha);
+}
+
 class ChatSelectionController extends GetxController {
   void goToStartChat() {
-    Get.to(() => const WaitingChatPage());
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Get.offAll(() => const LoginPage());
+      return;
+    }
+    Get.to(
+      () => WaitingChatPage(
+        currentUserId: user.uid,
+        role: MatchRole.seeker,
+      ),
+      binding: UserChatBinding(),
+    );
   }
 
   void goToCounseling() {
-    // ฟังก์ชันสำหรับปุ่มขวา
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Get.offAll(() => const LoginPage());
+      return;
+    }
+    Get.to(
+      () => WaitingChatPage(
+        currentUserId: user.uid,
+        role: MatchRole.listener,
+      ),
+      binding: UserChatBinding(),
+    );
   }
 }
 
-// ---------------------------------------------------------
-// 2. Main Page (View) - หน้าเลือกโหมด
-// ---------------------------------------------------------
 class ChatSelectionPage extends StatelessWidget {
   const ChatSelectionPage({super.key});
 
@@ -96,9 +124,6 @@ class ChatSelectionPage extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------
-// 3. Custom Widgets (Components)
-// ---------------------------------------------------------
 class _ProfileHeader extends StatelessWidget {
   const _ProfileHeader();
 
@@ -170,7 +195,7 @@ class HalfCircleButton extends StatelessWidget {
                   ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.05),
+                color: withAlpha(Colors.black, 0.05),
                 blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
@@ -193,7 +218,7 @@ class HalfCircleButton extends StatelessWidget {
                             ? Icons.sentiment_dissatisfied
                             : Icons.sentiment_satisfied_alt,
                         size: 80,
-                        color: Colors.white.withOpacity(0.5),
+                        color: withAlpha(Colors.white, 0.5),
                       ),
                     ),
                   ),
@@ -224,11 +249,15 @@ class HalfCircleButton extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------
-// 4. หน้าจอรอคู่สนทนา (WaitingChatPage) - [หยุดเวลาเมื่อมี Pop-up]
-// ---------------------------------------------------------
 class WaitingChatPage extends StatefulWidget {
-  const WaitingChatPage({super.key});
+  final String currentUserId;
+  final MatchRole role;
+
+  const WaitingChatPage({
+    super.key,
+    required this.currentUserId,
+    required this.role,
+  });
 
   @override
   State<WaitingChatPage> createState() => _WaitingChatPageState();
@@ -237,59 +266,136 @@ class WaitingChatPage extends StatefulWidget {
 class _WaitingChatPageState extends State<WaitingChatPage>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  Timer? _timer;
+  late final ChatUserService _chatService;
+  StreamSubscription<String?>? _matchSub;
+  Timer? _retryTimer;
+  bool _isMatching = false;
+  bool _isLeavingQueue = false;
+
+  bool _navigatingToChat = false;
+  String _statusText = 'กำลังสุ่มคู่สนทนาอย่างต่อเนื่อง...';
 
   @override
   void initState() {
     super.initState();
+    _chatService = Get.find<ChatUserService>();
     _controller = AnimationController(
       duration: const Duration(seconds: 6),
       vsync: this,
     )..repeat();
 
-    // เริ่มนับเวลา 5 วินาที
-    _startTimer();
+    _startMatching();
   }
 
-  // [เพิ่ม] ฟังก์ชันเริ่มนับเวลา (แยกออกมาเพื่อให้เรียกใหม่ได้)
-  void _startTimer() {
-    _timer = Timer(const Duration(seconds: 5), () {
-      if (mounted) {
-        Get.off(() => const ChatPage());
-      }
+  Future<void> _startMatching() async {
+    await _chatService.enterRandomQueue(
+      widget.currentUserId,
+      role: widget.role,
+    );
+
+    _matchSub =
+        _chatService.watchMatchedChatId(widget.currentUserId).listen(
+      (chatId) {
+        if (chatId == null || _navigatingToChat || !mounted) {
+          return;
+        }
+
+        _navigatingToChat = true;
+        Get.off(
+          () => ChatPage(
+            chatId: chatId,
+            currentUserId: widget.currentUserId,
+            role: widget.role, // 🟢 [อัปเดต] 2. ส่ง Role ของเราไปให้หน้าแชทรับทราบด้วย
+          ),
+          binding: UserChatBinding(),
+        );
+      },
+      onError: (e) {
+        debugPrint('watchMatchedChatId error: $e');
+        if (mounted) {
+          setState(() {
+            _statusText = 'ไม่สามารถเข้าถึงข้อมูลแชทได้';
+          });
+        }
+      },
+    );
+
+    await _attemptMatchCycle();
+    _retryTimer = Timer.periodic(const Duration(seconds: 3), (_) async {
+      await _attemptMatchCycle();
     });
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _timer?.cancel();
-    super.dispose();
+  Future<void> _attemptMatchCycle() async {
+    if (_navigatingToChat || _isMatching) {
+      return;
+    }
+
+    _isMatching = true;
+    try {
+      await _chatService.tryMatchWithWaitingUser(
+        widget.currentUserId,
+        role: widget.role,
+      );
+      if (mounted && _statusText != 'กำลังสุ่มคู่สนทนาอย่างต่อเนื่อง...') {
+        setState(() {
+          _statusText = 'กำลังสุ่มคู่สนทนาอย่างต่อเนื่อง...';
+        });
+      }
+    } catch (e) {
+      debugPrint('Random match failed: $e');
+      if (mounted && _statusText != 'กำลังพยายามเชื่อมต่อใหม่...') {
+        setState(() {
+          _statusText = 'กำลังพยายามเชื่อมต่อใหม่...';
+        });
+      }
+    } finally {
+      _isMatching = false;
+    }
   }
 
-  // ฟังก์ชันแสดง Pop-up ยืนยันการออก
-  void _showExitDialog() {
-    // [สำคัญ] สั่งหยุดเวลาทันทีที่ Pop-up เด้ง
-    _timer?.cancel();
+  Future<void> _leaveQueueAndBack() async {
+    if (_isLeavingQueue) return;
+    _isLeavingQueue = true;
 
-    showDialog(
+    // หยุดวงจรสุ่มทันทีเพื่อกันเด้งกลับเข้าคิวระหว่างกำลังออก
+    _retryTimer?.cancel();
+    _matchSub?.cancel();
+    _navigatingToChat = true;
+
+    if (Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
+    if (mounted) {
+      Get.back();
+    }
+
+    unawaited(
+      _chatService.leaveRandomQueue(widget.currentUserId).then((_) {
+        debugPrint('Left queue successfully');
+      }).catchError((e) {
+        debugPrint('Error leaving queue: $e');
+      }),
+    );
+  }
+
+  void _showExitDialog() {
+    showDialog<void>(
       context: context,
-      barrierDismissible: false, // ห้ามกดพื้นหลังเพื่อปิด (บังคับเลือก)
-      builder: (BuildContext context) {
+      barrierDismissible: false,
+      builder: (context) {
         return Dialog(
           backgroundColor: const Color(0xFFC3F3FF),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
           child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 50),
-            height: 220,
-            // width: 400,
+            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 40),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  "คุณต้องการที่จะออกจากการจับคู่ใช่หรือไม่",
+                  'คุณต้องการออกจากการสุ่มคู่ใช่หรือไม่',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Color(0xFF4489D7),
@@ -297,21 +403,15 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 30),
+                const SizedBox(height: 26),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // --- ปุ่ม ยืนยัน (ออกจากการรอ) ---
                     GestureDetector(
-                      onTap: () {
-                        // 1. ปิด Pop-up
-                        Get.back();
-                        // 2. กลับไปหน้าเลือกโหมด (ออกจริง)
-                        Get.back();
-                      },
+                      onTap: _leaveQueueAndBack,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
+                          horizontal: 26,
                           vertical: 10,
                         ),
                         decoration: BoxDecoration(
@@ -319,28 +419,20 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                           borderRadius: BorderRadius.circular(30),
                         ),
                         child: const Text(
-                          "ยืนยัน",
+                          'ยืนยัน',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 20),
-
-                    // --- ปุ่ม ยกเลิก (กลับมารอต่อ) ---
+                    const SizedBox(width: 14),
                     GestureDetector(
-                      onTap: () {
-                        // 1. ปิด Pop-up
-                        Get.back();
-                        // 2. [สำคัญ] เริ่มนับเวลาใหม่ เพราะเราหยุดไปตอน Pop-up ขึ้น
-                        _startTimer();
-                      },
+                      onTap: Get.back,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
+                          horizontal: 26,
                           vertical: 10,
                         ),
                         decoration: BoxDecoration(
@@ -348,11 +440,10 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                           borderRadius: BorderRadius.circular(30),
                         ),
                         child: const Text(
-                          "ยกเลิก",
+                          'ยกเลิก',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
                           ),
                         ),
                       ),
@@ -368,12 +459,26 @@ class _WaitingChatPageState extends State<WaitingChatPage>
   }
 
   @override
+  void dispose() {
+    _controller.dispose();
+    _matchSub?.cancel();
+    _retryTimer?.cancel();
+
+    if (!_navigatingToChat) {
+      unawaited(_chatService.leaveRandomQueue(widget.currentUserId));
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
-        if (didPop) return;
-        _showExitDialog(); // กดปุ่ม Back ของเครื่อง -> หยุดเวลาแล้วโชว์ Pop-up
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        _showExitDialog();
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF0F9FF),
@@ -382,25 +487,27 @@ class _WaitingChatPageState extends State<WaitingChatPage>
           elevation: 0,
           leading: IconButton(
             icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[700]),
-            onPressed: _showExitDialog, // กดลูกศร -> หยุดเวลาแล้วโชว์ Pop-up
+            onPressed: _showExitDialog,
           ),
         ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                'รอคู่สนทนาสักครู่',
-                style: TextStyle(
+              Text(
+                widget.role == MatchRole.listener
+                    ? 'กำลังรอผู้ต้องการพูดคุย...'
+                    : _statusText,
+                style: const TextStyle(
                   color: Color(0xFF4489D7),
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               SizedBox(
-                width: 450,
-                height: 450,
+                width: 420,
+                height: 420,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -408,14 +515,14 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                     _buildOneWayRipple(0.33),
                     _buildOneWayRipple(0.66),
                     Container(
-                      width: 240,
-                      height: 240,
+                      width: 220,
+                      height: 220,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: const Color(0xFFAEDEF4),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: withAlpha(Colors.black, 0.1),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -423,7 +530,7 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                       ),
                       child: ClipOval(
                         child: Padding(
-                          padding: const EdgeInsets.only(top: 30),
+                          padding: const EdgeInsets.only(top: 28),
                           child: Image.asset(
                             'assets/images/sad.png',
                             fit: BoxFit.contain,
@@ -435,7 +542,6 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                   ],
                 ),
               ),
-              const SizedBox(height: 80),
             ],
           ),
         ),
@@ -447,17 +553,17 @@ class _WaitingChatPageState extends State<WaitingChatPage>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        final double t = (_controller.value + startDelay) % 1.0;
-        final double currentSize = 240 + (180 * t);
-        final double opacity = 0.4 * (1.0 - t);
+        final t = (_controller.value + startDelay) % 1.0;
+        final currentSize = 220 + (180 * t);
+        final opacity = 0.38 * (1.0 - t);
         return Container(
           width: currentSize,
           height: currentSize,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFFAEDEF4).withOpacity(opacity),
+            color: withAlpha(const Color(0xFFAEDEF4), opacity),
             border: Border.all(
-              color: Colors.white.withOpacity(opacity),
+              color: withAlpha(Colors.white, opacity),
               width: 1,
             ),
           ),
@@ -467,11 +573,17 @@ class _WaitingChatPageState extends State<WaitingChatPage>
   }
 }
 
-// ---------------------------------------------------------
-// 5. หน้าแชท (ChatPage)
-// ---------------------------------------------------------
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
+  final String chatId;
+  final String currentUserId;
+  final MatchRole role; // 🟢 [อัปเดต] 3. รับค่า role
+
+  const ChatPage({
+    super.key,
+    required this.chatId,
+    required this.currentUserId,
+    required this.role, // 🟢 [อัปเดต]
+  });
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -479,79 +591,302 @@ class ChatPage extends StatefulWidget {
 
 class _ChatPageState extends State<ChatPage> {
   final TextEditingController _textController = TextEditingController();
+  final TextEditingController _comentController = TextEditingController();
 
-  final List<Map<String, dynamic>> _messages = [
-    {'text': 'ฉันรู้สึกเสียใจที่ทำงานพลาด', 'isMe': true},
-    {'text': 'ฉันจัดการความรู้สึกนี้ยังไงดี', 'isMe': true},
-    {
-      'text':
-          'ความเสียใจจากการทำงานพลาดเป็นเรื่องปกติและไม่ได้หมายความว่าคุณไม่เก่งสิ่งสำคัญคือการยอมรับความรู้สึกโดยไม่โทษตัวเองแยกความผิดพลาดออกจากคุณค่าในตัวเอง แล้วนำบทเรียนไปปรับใช้พร้อมดูแลใจตัวเองเพื่อก้าวต่อไปอย่างเข้มแข็ง',
-      'isMe': false,
-    },
-  ];
+  late final ChatUserService _chatService;
 
-  void _sendMessage() {
-    if (_textController.text.trim().isEmpty) return;
-    setState(() {
-      _messages.insert(0, {'text': _textController.text, 'isMe': true});
-      _textController.clear();
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _chatDocSub;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _queueSub;
+
+  String _recipientUserId = '';
+  bool _endingConversation = false;
+  bool _exitingByRemoteEnd = false;
+  bool _sendingMessage = false;
+
+  // feedback
+  bool _showFeedback = false;
+  bool _sendingFeedback = false;
+  int _ratng = 5;
+  bool _isStared = false;
+  int _sessionWordCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _chatService = Get.find<ChatUserService>();
+    _resolveRecipientUserId();
+    _watchChatEndedByPeer();
+  }
+
+  void _watchChatEndedByPeer() {
+    _chatDocSub = FirebaseFirestore.instance
+        .collection('Chats')
+        .doc(widget.chatId)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted || _endingConversation || _exitingByRemoteEnd) return;
+
+      final data = snap.data();
+      final randomState = (data?['randomState'] ?? '') as String;
+      if (!snap.exists || randomState == 'ended') {
+        _exitByPeerEnd();
+      }
+    });
+
+    _queueSub = FirebaseFirestore.instance
+        .collection('RandomQueue')
+        .doc(widget.currentUserId)
+        .snapshots()
+        .listen((snap) {
+      if (!mounted || _endingConversation || _exitingByRemoteEnd) return;
+
+      final data = snap.data();
+      final status = (data?['status'] ?? '') as String;
+      final chatId = data?['chatId'];
+      final hasChatId = chatId is String && chatId.isNotEmpty;
+
+      if (status == 'idle' && !hasChatId) {
+        _exitByPeerEnd();
+      }
     });
   }
 
-  void _endConversation() {
-    // [แก้ไข] เปลี่ยนจากกลับหน้าหลัก เป็นไปหน้า ConversationSummaryPage
-    Get.to(() => const ConversationSummaryPage());
+  void _exitByPeerEnd() {
+    if (!mounted || _exitingByRemoteEnd) return;
+    _chatDocSub?.cancel();
+    _queueSub?.cancel();
+
+    _exitingByRemoteEnd = true;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('คู่สนทนาได้จบบทสนทนาแล้ว')),
+    );
+
+    if (mounted) {
+      setState(() {
+        _showFeedback = true;
+      });
+    }
+  }
+
+  Future<void> _resolveRecipientUserId() async {
+    final chatDoc = await FirebaseFirestore.instance
+        .collection('Chats')
+        .doc(widget.chatId)
+        .get();
+
+    final users = (chatDoc.data()?['users'] as List<dynamic>? ?? [])
+        .whereType<String>()
+        .toList();
+
+    final recipient = users.firstWhere(
+      (id) => id != widget.currentUserId,
+      orElse: () => '',
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _recipientUserId = recipient;
+    });
+  }
+
+  Future<void> _sendMessage() async {
+    if (_sendingMessage || _textController.text.trim().isEmpty) return;
+
+    setState(() => _sendingMessage = true);
+
+    try {
+      final result = await _chatService.sendMessage(
+        widget.chatId,
+        widget.currentUserId,
+        _textController.text,
+        _textController,
+        _recipientUserId,
+      );
+
+      if (!mounted) return;
+
+      if (result.status == SendMessageStatus.blocked) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ข้อความไม่สุภาพ ระบบบล็อกการส่งข้อความ')),
+        );
+      }
+
+      setState(() {});
+    } finally {
+      if (mounted) {
+        setState(() => _sendingMessage = false);
+      }
+    }
+  }
+
+  int _calculateWordCount(List<DocumentSnapshot> docs) {
+    int count = 0;
+    for (final doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final text = (data['text'] ?? '').toString();
+      if (text.trim().isNotEmpty) {
+        count += text.trim().split(RegExp(r'\s+')).length;
+      }
+    }
+    return count;
+  }
+
+  Future<void> _endConversation() async {
+    if (_endingConversation) return;
+
+    setState(() => _endingConversation = true);
+
+    try {
+      await _chatService.endRandomChat(
+        chatId: widget.chatId,
+        endedByUserId: widget.currentUserId,
+      );
+
+      _chatDocSub?.cancel();
+      _queueSub?.cancel();
+
+      if (mounted) {
+        setState(() {
+          _showFeedback = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('endRandomChat failed: $e');
+      if (mounted) setState(() => _endingConversation = false);
+    }
+  }
+
+  Future<void> _submitFeedback() async {
+    if (_sendingFeedback) return;
+
+    setState(() => _sendingFeedback = true);
+
+    try {
+      // นับคำ
+      final messagesSnap = await FirebaseFirestore.instance
+          .collection('Chats')
+          .doc(widget.chatId)
+          .collection('messages')
+          .get();
+
+      _sessionWordCount = _calculateWordCount(messagesSnap.docs);
+
+      // ดึง session id
+      final chatMeta = await FirebaseFirestore.instance
+          .collection('Chats')
+          .doc(widget.chatId)
+          .get();
+      final sessionId =
+          (chatMeta.data()?['sessionId'] as String?)?.trim().isNotEmpty == true
+              ? (chatMeta.data()?['sessionId'] as String)
+              : widget.chatId;
+
+      String myRoleStr = widget.role == MatchRole.seeker ? 'seeker' : 'listener';
+      String peerRoleStr = widget.role == MatchRole.seeker ? 'listener' : 'seeker';
+
+      await _chatService.submitFeedback(
+        sessionId: sessionId,
+        chatId: widget.chatId,
+        fromUserId: widget.currentUserId,
+        toUserId: _recipientUserId,
+        fromRole: myRoleStr,
+        toRole: peerRoleStr,
+        rating: _ratng,
+        comment: _comentController.text.trim(),
+        starred: _isStared,
+        wordCount: _sessionWordCount,
+      );
+
+      if (!mounted) return;
+      debugPrint('ส่งฟีดแบ็คสำเร็จผ่าน Firestore!');
+      _exitToPreMatchScreen();
+    } catch (e) {
+      debugPrint("Failed to submit feedback: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sendingFeedback = false);
+    }
+  }
+
+  void _exitToPreMatchScreen() {
+    _chatDocSub?.cancel();
+    _queueSub?.cancel();
+
+    if (!mounted) return;
+
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    Get.offAll(() => const ChatSelectionPage());
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    _comentController.dispose();
+    _chatDocSub?.cancel();
+    _queueSub?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    const Color darkBlue = Color(0xFF1565C0);
+    if (_showFeedback) {
+      return _buildFeedbackScreen();
+    }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F9FF),
+      backgroundColor: const Color(0xFFD3ECF8),
       appBar: AppBar(
-        toolbarHeight: 80,
+        toolbarHeight: 70,
         backgroundColor: const Color(0xFFD3ECF8),
         elevation: 0,
         leading: IconButton(
-          icon: Image.asset('assets/images/back.png', width: 23, height: 23),
+          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF6D6D6D)),
           onPressed: () => Get.back(),
         ),
         title: const Text(
-          "แชท",
+          'แชท',
           style: TextStyle(
-            color: darkBlue,
-            fontSize: 24,
+            color: Color(0xFF1D4F86),
+            fontSize: 36,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: false,
-        titleSpacing: -7,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 15),
             child: UnconstrainedBox(
               child: GestureDetector(
-                onTap: _endConversation,
+                onTap: _endingConversation ? null : _endConversation,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
-                    vertical: 15,
+                    vertical: 11,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFE082),
+                    color: const Color(0xFFFFDE70),
                     borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 4,
+                        color: Colors.black.withValues(alpha: 0.08),
+                        blurRadius: 5,
                         offset: const Offset(0, 2),
                       ),
                     ],
                   ),
-                  child: const Text(
-                    "จบการสนทนา",
-                    style: TextStyle(
+                  child: Text(
+                    _endingConversation ? 'กำลังจบ...' : 'จบการสนทนา',
+                    style: const TextStyle(
                       color: Color(0xFF6C6C6C),
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
@@ -563,6 +898,7 @@ class _ChatPageState extends State<ChatPage> {
           ),
         ],
       ),
+      
       body: Column(
         children: [
           Container(
@@ -573,64 +909,99 @@ class _ChatPageState extends State<ChatPage> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: Text(
-              "Today",
+              'Today',
               style: TextStyle(color: Colors.grey[600], fontSize: 12),
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final isMe = msg['isMe'];
-                return Align(
-                  alignment: isMe
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0E0E0),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: isMe
-                            ? const Radius.circular(20)
-                            : Radius.circular(0),
-                        bottomRight: isMe
-                            ? Radius.circular(0)
-                            : const Radius.circular(20),
-                      ),
-                    ),
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('Chats')
+                  .doc(widget.chatId)
+                  .collection('messages')
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final docs = [...(snapshot.data?.docs ?? const [])]
+                  ..sort((a, b) {
+                    final ad = a.data() as Map<String, dynamic>;
+                    final bd = b.data() as Map<String, dynamic>;
+                    final at = (ad['localTimestamp'] ?? ad['timestamp']);
+                    final bt = (bd['localTimestamp'] ?? bd['timestamp']);
+                    final aMs =
+                        at is Timestamp ? at.millisecondsSinceEpoch : 0;
+                    final bMs =
+                        bt is Timestamp ? bt.millisecondsSinceEpoch : 0;
+                    return aMs.compareTo(bMs);
+                  });
+                if (docs.isEmpty) {
+                  return const Center(
                     child: Text(
-                      msg['text'],
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 16,
-                        height: 1.4,
-                      ),
+                      'จับคู่สำเร็จแล้ว เริ่มพิมพ์ได้เลย',
+                      style: TextStyle(color: Color(0xFF6D6D6D)),
                     ),
-                  ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 15),
+                  itemCount: docs.length,
+                  itemBuilder: (context, index) {
+                    final data = docs[index].data() as Map<String, dynamic>;
+                    final text = (data['text'] ?? '') as String;
+                    final senderId = (data['senderId'] ?? '') as String;
+                    final isMe = senderId == widget.currentUserId;
+
+                    return Align(
+                      alignment:
+                          isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.72,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE2DFE0),
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(20),
+                            topRight: const Radius.circular(20),
+                            bottomLeft:
+                                isMe ? const Radius.circular(20) : Radius.zero,
+                            bottomRight:
+                                isMe ? Radius.zero : const Radius.circular(20),
+                          ),
+                        ),
+                        child: Text(
+                          text,
+                          style: TextStyle(
+                            color: Colors.grey[800],
+                            fontSize: 15,
+                            height: 1.35,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
           ),
+
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
             child: Container(
               height: 50,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.black, width: 1.5),
+                border: Border.all(color: Colors.black.withValues(alpha: 0.6)),
               ),
               child: Row(
                 children: [
@@ -638,30 +1009,34 @@ class _ChatPageState extends State<ChatPage> {
                     padding: EdgeInsets.only(left: 15, right: 10),
                     child: Icon(
                       Icons.sentiment_satisfied_alt,
-                      color: Colors.grey,
-                      size: 26,
+                      color: Color(0xFF6F6F6F),
+                      size: 27,
                     ),
                   ),
                   Expanded(
                     child: TextField(
                       controller: _textController,
+                      enabled: !_sendingMessage,
+                      onSubmitted: (_) => _sendMessage(),
                       decoration: const InputDecoration(
                         hintText: 'ส่งข้อความ.......',
-                        hintStyle: TextStyle(color: Colors.grey),
+                        hintStyle: TextStyle(color: Color(0xFF6F6F6F)),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.only(top: 4),
                       ),
                     ),
                   ),
                   GestureDetector(
-                    onTap: _sendMessage,
+                    onTap: _sendingMessage ? null : _sendMessage,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 15),
                       child: Transform.rotate(
                         angle: -0.5,
                         child: Icon(
                           Icons.send,
-                          color: Colors.grey[700],
+                          color: _sendingMessage
+                              ? const Color(0xFF9E9E9E)
+                              : const Color(0xFF6F6F6F),
                           size: 28,
                         ),
                       ),
@@ -675,330 +1050,83 @@ class _ChatPageState extends State<ChatPage> {
       ),
     );
   }
-}
 
-// ---------------------------------------------------------
-// 6. หน้าสรุปการสนทนา (ConversationSummaryPage) - [เพิ่มระบบ Block]
-// ---------------------------------------------------------
-class ConversationSummaryPage extends StatefulWidget {
-  const ConversationSummaryPage({super.key});
-
-  @override
-  State<ConversationSummaryPage> createState() =>
-      _ConversationSummaryPageState();
-}
-
-class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
-  // สถานะติดตาม
-  bool isFollowed = false;
-  // สถานะบล็อก (ถ้า true ปุ่มจะหายไป)
-  bool isBlocked = false;
-
-  // คะแนนดาวเริ่มต้น
-  int currentRating = 3;
-
-  // ฟังก์ชันแสดง Pop-up ยืนยันการบล็อก
-  void _showBlockDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: const Color(0xFFC3F3FF), // สีพื้นหลังฟ้าอ่อนแบบในรูป
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-            height: 220, // กำหนดความสูงให้พอดี
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  "คุณต้องการที่จะบล็อกใช่หรือไม่",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF537895), // สีน้ำเงินเข้มอมเทา
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // ปุ่ม ยืนยัน
-                    GestureDetector(
-                      onTap: () {
-                        // 1. ปิด Pop-up
-                        Get.back();
-                        // 2. อัปเดตสถานะเป็นบล็อก (ปุ่มจะหายไป)
-                        setState(() {
-                          isBlocked = true;
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF8AD4F5), // สีฟ้าเข้มขึ้น
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: const Text(
-                          "ยืนยัน",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    // ปุ่ม ยกเลิก
-                    GestureDetector(
-                      onTap: () {
-                        Get.back(); // ปิด Pop-up เฉยๆ
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF8AD4F5), // สีฟ้าเข้มขึ้น
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: const Text(
-                          "ยกเลิก",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildFeedbackScreen() {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F9FF),
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[700]),
-          onPressed: () => Get.back(),
-        ),
+        title: const Text('ให้คะแนนการสนทนา'),
+        automaticallyImplyLeading: false,
       ),
-      body: Center(
-        child: Column(
-          children: [
-            const SizedBox(height: 50),
-            const Text(
-              "Jellyfish",
-              style: TextStyle(
-                color: Color(0xFF4489D7),
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // รูป Profile
-            Container(
-              width: 150,
-              height: 150,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-                color: Colors.white,
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://images.unsplash.com/photo-1548681528-6a5c45b66b42?auto=format&fit=crop&w=600&q=80',
-                  ),
-                  fit: BoxFit.cover,
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(30),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'ขอบคุณสำหรับที่แชทกับเรา',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4489D7),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
               ),
-            ),
-            const SizedBox(height: 30),
-
-            // -----------------------------------------------------
-            // ส่วนปุ่ม ติดตาม / บล็อก (จะแสดงก็ต่อเมื่อ ยังไม่บล็อก)
-            // -----------------------------------------------------
-            if (!isBlocked) ...[
+              const SizedBox(height: 20),
+              const Text(
+                "โปรดให้คะแนนการสนทนา",
+                style: TextStyle(fontSize: 18, color: Color(0xFF4489D7)),
+              ),
+              const SizedBox(height: 30),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(
+                  5,
+                  (index) => IconButton(
+                    icon: Icon(
+                      index < _ratng ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                      size: 40,
+                    ),
+                    onPressed: () => setState(() => _ratng = index + 1),
+                  ),
+                ),
+              ),
+          
+              TextButton(
+                onPressed: _sendingFeedback ? null : _exitToPreMatchScreen,
+                child: const Text('ข้าม'),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: _comentController,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  hintText: 'พิมพ์ความคิดเห็น (ถ้ามี)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // [1] ปุ่มติดตาม
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        isFollowed = !isFollowed;
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 25,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isFollowed
-                            ? const Color(0xFFE0E0E0)
-                            : const Color(0xFFD3ECF8),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: isFollowed
-                            ? [
-                                // [แก้ตรงนี้ 1] ใส่เงาสำหรับปุ่มสีเทา (ติดตามแล้ว)
-                                BoxShadow(
-                                  color: Colors.black.withOpacity(
-                                    0.4,
-                                  ), // เงาสีดำจางๆ
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ]
-                            : [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF4489D7,
-                                  ).withOpacity(0.4),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                      ),
-                      child: Text(
-                        isFollowed ? "ติดตามแล้ว" : "ติดตาม",
-                        style: TextStyle(
-                          color: isFollowed
-                              ? Colors.grey[600]
-                              : const Color(0xFF4489D7),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
+                  Checkbox(
+                    value: _isStared,
+                    onChanged: (v) => setState(() => _isStared = v ?? false),
                   ),
-                  const SizedBox(width: 15),
-
-                  // [2] ปุ่มบล็อก (กดแล้วเด้ง Pop-up)
-                  GestureDetector(
-                    onTap: _showBlockDialog, // เรียกฟังก์ชัน Pop-up
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 25,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.4),
-                            blurRadius: 4,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: const Text(
-                        "บล็อก",
-                        style: TextStyle(
-                          color: Color(0xFF4489D7),
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ),
+                  const Text('ปักหมุดบทสนทนานี้'),
                 ],
               ),
-              const SizedBox(height: 30), // ระยะห่างถ้าปุ่มยังอยู่
-            ] else ...[
-              // ถ้าบล็อกแล้ว อาจจะเว้นว่างไว้นิดนึง หรือใส่ข้อความบอกก็ได้
-              const SizedBox(height: 50),
-            ],
-
-            // -----------------------------------------------------
-            // ส่วนดาว (แสดงตลอด)
-            // -----------------------------------------------------
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) {
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      currentRating = index + 1;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: Icon(
-                      Icons.star_rounded,
-                      size: 55,
-                      color: index < currentRating
-                          ? const Color(0xFFFFE082)
-                          : const Color(0xFFE0E0E0),
-                    ),
-                  ),
-                );
-              }),
-            ),
-
-            const Spacer(),
-
-            // ปุ่ม บันทึก (แสดงตลอด)
-            GestureDetector(
-              onTap: () {
-                Get.offAll(() => const ChatSelectionPage());
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 40,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFE082),
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 5,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: const Text(
-                  "บันทึก",
-                  style: TextStyle(
-                    color: Color(0xFF6C6C6C),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _sendingFeedback ? null : _submitFeedback,
+                  child: Text(_sendingFeedback ? 'กำลังส่ง...' : 'ส่งฟีดแบ็ค'),
                 ),
               ),
-            ),
-            const SizedBox(height: 300),
-          ],
+            ],
+          ),
         ),
       ),
     );

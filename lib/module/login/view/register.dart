@@ -160,46 +160,51 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   // ---------- UI ----------
-  static const _bg = Color(0xFFE9F7FF);
-  static const _blue = Color(0xFF1E88FF);
+  static const _mainBlue = Color(0xFF4A89D8);
+  static const _lightBlue = Color(0xFF64BFFF);
+  static const _fieldGrey = Color(0xFFF3F3F3);
 
-  Widget _label(String text) {
+  Widget _buildInputLabel(String label, {bool isRequired = false}) {
     return Padding(
-      padding: const EdgeInsets.only(left: 6, bottom: 6),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: Colors.black.withValues(alpha: 0.35),
+      padding: const EdgeInsets.only(bottom: 8, top: 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text.rich(
+          TextSpan(
+            text: label,
+            style: const TextStyle(
+              color: Colors.grey,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+            children: [
+              if (isRequired)
+                const TextSpan(
+                  text: '*',
+                  style: TextStyle(color: Colors.red),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _pillField({
+  Widget _buildTextField({
     required TextEditingController controller,
     required String hint,
     TextInputType? keyboardType,
+    IconData? suffixIcon,
+    Widget? suffix,
     bool readOnly = false,
     bool obscure = false,
     VoidCallback? onTap,
-    Widget? suffix,
   }) {
     return Container(
-      height: 44,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-            color: Colors.black.withValues(alpha: 0.06),
-          ),
-        ],
+        color: _fieldGrey,
+        borderRadius: BorderRadius.circular(25),
       ),
-      alignment: Alignment.center,
       child: TextField(
         controller: controller,
         keyboardType: keyboardType,
@@ -208,27 +213,10 @@ class _RegisterPageState extends State<RegisterPage> {
         onTap: onTap,
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(
-            color: Colors.black.withValues(alpha: 0.22),
-            fontWeight: FontWeight.w700,
-            fontSize: 12.5,
-          ),
-          suffixIcon: suffix,
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
-            borderSide: BorderSide.none,
-          ),
+          hintStyle: const TextStyle(color: Colors.black54),
+          suffixIcon: suffix ?? (suffixIcon != null ? Icon(suffixIcon, color: Colors.grey) : null),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
       ),
     );
@@ -241,30 +229,21 @@ class _RegisterPageState extends State<RegisterPage> {
       child: GestureDetector(
         onTap: () => setState(() => _sex = value),
         child: Container(
-          height: 34,
+          height: 44,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFF79D7FF) : Colors.white,
-            borderRadius: BorderRadius.circular(999),
+            color: selected ? const Color(0xFFC7E9FF) : Colors.white,
+            borderRadius: BorderRadius.circular(15),
             border: Border.all(
-              color: selected ? Colors.transparent : Colors.black.withValues(alpha: 0.10),
+              color: selected ? _lightBlue : Colors.grey.shade400,
+              width: 1.5,
             ),
-            boxShadow: selected
-                ? [
-                    BoxShadow(
-                      blurRadius: 14,
-                      offset: const Offset(0, 8),
-                      color: Colors.black.withValues(alpha: 0.08),
-                    )
-                  ]
-                : [],
           ),
           child: Text(
             value,
             style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-              color: selected ? const Color(0xFF0D47A1) : Colors.black.withValues(alpha: 0.35),
+              color: selected ? _mainBlue : Colors.grey,
+              fontWeight: FontWeight.bold,
             ),
           ),
         ),
@@ -272,53 +251,37 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Widget _blueButton({
+  Widget _primaryButton({
     required String text,
     required VoidCallback? onPressed,
     required bool loading,
   }) {
     return SizedBox(
-      height: 46,
+      height: 55,
       width: double.infinity,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          gradient: const LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [Color(0xFF22C6FF), Color(0xFF1E88FF)],
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _lightBlue,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-              color: Colors.black.withValues(alpha: 0.10),
-            ),
-          ],
+          elevation: 0,
         ),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-          ),
-          child: loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(color: Colors.white),
-                )
-              : Text(
-                  text,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13.5,
-                    letterSpacing: 0.2,
-                  ),
+        child: loading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(color: Colors.white),
+              )
+            : Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
-        ),
+              ),
       ),
     );
   }
@@ -326,50 +289,40 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 380),
+            constraints: const BoxConstraints(maxWidth: 420),
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 18),
+              padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
               child: Column(
                 children: [
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 10),
                   const Text(
-                    'Create New\nAccount',
-                    textAlign: TextAlign.center,
+                    'สร้างบัญชีใหม่',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: _blue,
-                      height: 1.15,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: _mainBlue,
                     ),
                   ),
-                  const SizedBox(height: 18),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Name')),
-                  _pillField(controller: _usernameController, hint: ''),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Birthday')),
-                  _pillField(
+                  const SizedBox(height: 30),
+                  _buildInputLabel('ชื่อผู้ใช้งาน', isRequired: true),
+                  _buildTextField(controller: _usernameController, hint: 'แมวน้ำ'),
+                  _buildInputLabel('วันเกิด', isRequired: true),
+                  _buildTextField(
                     controller: _birthdayController,
-                    hint: '',
+                    hint: '17/12/2004',
                     readOnly: true,
                     onTap: _pickBirthday,
+                    suffixIcon: Icons.calendar_today_outlined,
                     suffix: IconButton(
                       onPressed: _pickBirthday,
-                      icon: Icon(
-                        Icons.calendar_today_outlined,
-                        size: 18,
-                        color: Colors.black.withValues(alpha: 0.25),
-                      ),
+                      icon: const Icon(Icons.calendar_today_outlined, color: Colors.grey),
                     ),
                   ),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Sex')),
+                  _buildInputLabel('เพศ', isRequired: true),
                   Row(
                     children: [
                       _sexButton('Male'),
@@ -379,26 +332,20 @@ class _RegisterPageState extends State<RegisterPage> {
                       _sexButton('None'),
                     ],
                   ),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Email')),
-                  _pillField(
+                  _buildInputLabel('อีเมล'),
+                  _buildTextField(
                     controller: _emailController,
                     hint: '',
                     keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Number Phone')),
-                  _pillField(
+                  _buildInputLabel('เบอร์โทรศัพท์'),
+                  _buildTextField(
                     controller: _phoneController,
                     hint: '',
                     keyboardType: TextInputType.phone,
                   ),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Password')),
-                  _pillField(
+                  _buildInputLabel('รหัสผ่าน', isRequired: true),
+                  _buildTextField(
                     controller: _passwordController,
                     hint: '',
                     obscure: _hidePw,
@@ -406,52 +353,43 @@ class _RegisterPageState extends State<RegisterPage> {
                       onPressed: () => setState(() => _hidePw = !_hidePw),
                       icon: Icon(
                         _hidePw ? Icons.visibility : Icons.visibility_off,
-                        size: 20,
-                        color: Colors.black.withValues(alpha: 0.25),
+                        color: Colors.grey,
                       ),
                     ),
                   ),
-
-                  const SizedBox(height: 18),
-                  _blueButton(
-                    text: 'Sign Up',
+                  const SizedBox(height: 40),
+                  _primaryButton(
+                    text: 'ลงทะเบียน',
                     onPressed: _isLoading ? null : _register,
                     loading: _isLoading,
                   ),
-
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        'already have an account? ',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black.withValues(alpha: 0.28),
-                        ),
+                      const Text(
+                        'มีบัญชีอยู่แล้ว? ',
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
                       ),
                       TextButton(
                         onPressed: () => Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(builder: (_) => const LoginPage()),
                         ),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
                         child: const Text(
-                          'Login',
+                          'เข้าสู่ระบบ',
                           style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w900,
-                            color: _blue,
+                            color: _lightBlue,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            decoration: TextDecoration.underline,
+                            decorationColor: _lightBlue,
                           ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:flutter_application_1/module/feed/view/feed_view.dart';
+import 'package:flutter_application_1/module/home/view/home.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
-import 'package:flutter_application_1/module/login/view/login.dart';
-import 'package:flutter_application_1/module/login/view/singup.dart';
-import 'package:flutter_application_1/module/reset/view/newpassword.dart';
-import 'package:flutter_application_1/module/reset/view/resetsent.dart';
 import 'package:flutter_application_1/module/pet/view/pet_view.dart';
+import 'package:flutter_application_1/module/profile/view/profile_view.dart';
 
 class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key});
@@ -18,38 +17,19 @@ class _BottomNavBarState extends State<BottomNavBar> {
   int _page = 0;
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
 
-  // ---------------------------------------------------------
-  // 1. กำหนดรายการหน้าจอ (Pages) ที่นี่
-  // เรียงลำดับตาม icon ใน Navigation Bar (0, 1, 2, 3, 4)
-  // ---------------------------------------------------------
   final List<Widget> _pages = [
-    // const LoginPage(),
-    const Signup(),
-    const LoginPage(),
-    // const RegisterPage(),
-    // const SplashScreenpage(),
-    // const PrivacyPolicyPage(),
-    const PetPage(),
-    const NewPasswordPage(),
-    const ResetSentPage(),
-    // const ResetPasswordPage(),
-    // const FavoritesPage(),
-    // const PrivacyPage(),
-    // const EditProfilePage(),
-    // const SettingPage(),
-    // const HomePage(),
-    // const FeedPage(),
+    const HomePage(),
+    const FeedPage(),
     const ChatSelectionPage(),
-    // const ProfilePage(),
+    const PetPage(),
+    const ProfilePage(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true, // ให้เนื้อหาไหลไปอยู่ใต้ Nav Bar
-      // 2. ส่วน Body จะเปลี่ยนไปตามค่า _page ที่เลือก
+      extendBody: true,
       body: _pages[_page],
-
       bottomNavigationBar: CurvedNavigationBar(
         key: _bottomNavigationKey,
         index: 0,
@@ -76,7 +56,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
         animationDuration: const Duration(milliseconds: 300),
         onTap: (index) {
           setState(() {
-            _page = index; // อัปเดต index เพื่อเปลี่ยนหน้า
+            _page = index;
           });
         },
         letIndexChange: (index) => true,

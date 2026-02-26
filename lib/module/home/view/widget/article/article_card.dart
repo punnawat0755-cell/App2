@@ -27,7 +27,7 @@ class ArticleCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -51,7 +51,8 @@ class ArticleCard extends StatelessWidget {
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 110,
                           color: Colors.grey[200],
-                          child: const Icon(Icons.broken_image, color: Colors.grey),
+                          child: const Icon(Icons.broken_image,
+                              color: Colors.grey),
                         ),
                       )
                     : Image.asset(
@@ -62,12 +63,13 @@ class ArticleCard extends StatelessWidget {
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 110,
                           color: Colors.grey[200],
-                          child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                          child: const Icon(Icons.image_not_supported,
+                              color: Colors.grey),
                         ),
                       ),
               ),
               const SizedBox(height: 12),
-              
+
               // ส่วนข้อความ
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),

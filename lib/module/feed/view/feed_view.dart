@@ -343,7 +343,6 @@ class _ProfilePageState extends State<FeedProfilePage> {
                         ),
                       ),
                       const SizedBox(width: 8),
-
                       GestureDetector(
                         onTap: () {
                           setState(() {
@@ -380,10 +379,8 @@ class _ProfilePageState extends State<FeedProfilePage> {
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
             Divider(thickness: 1, color: Colors.grey.shade200),
-
             PostItem(
               name: widget.name,
               avatarUrl: widget.avatarUrl,
@@ -394,7 +391,6 @@ class _ProfilePageState extends State<FeedProfilePage> {
               showFollowButton: false,
             ),
             Divider(thickness: 1, color: Colors.grey.shade200),
-
             PostItem(
               name: widget.name,
               avatarUrl: widget.avatarUrl,
@@ -405,7 +401,6 @@ class _ProfilePageState extends State<FeedProfilePage> {
               showFollowButton: false,
             ),
             Divider(thickness: 1, color: Colors.grey.shade200),
-
             PostItem(
               name: widget.name,
               avatarUrl: widget.avatarUrl,
@@ -416,7 +411,6 @@ class _ProfilePageState extends State<FeedProfilePage> {
               showFollowButton: false,
             ),
             Divider(thickness: 1, color: Colors.grey.shade200),
-
             PostItem(
               name: widget.name,
               avatarUrl: widget.avatarUrl,

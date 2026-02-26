@@ -302,7 +302,7 @@ class ProfilePage extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFCEEFFE).withOpacity(0.5),
+                  color: const Color(0xFFCEEFFE).withAlpha(128),
                   borderRadius: BorderRadius.circular(25),
                   border: Border.all(
                     color: const Color(0xFF90CAF9),
@@ -339,23 +339,23 @@ class ProfilePage extends StatelessWidget {
                             controller.daysInMonth + controller.firstDayOffset,
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 7,
-                              childAspectRatio: 0.65,
-                              mainAxisSpacing: 5,
-                              crossAxisSpacing: 0,
-                            ),
+                          crossAxisCount: 7,
+                          childAspectRatio: 0.65,
+                          mainAxisSpacing: 5,
+                          crossAxisSpacing: 0,
+                        ),
                         itemBuilder: (context, index) {
                           int day = index - controller.firstDayOffset + 1;
-                          if (day < 1 || day > controller.daysInMonth)
+                          if (day < 1 || day > controller.daysInMonth) {
                             return const SizedBox();
+                          }
 
                           return Obx(() {
                             String dayKey =
                                 "${controller.selectedYear.value}-${controller.selectedMonth.value}-$day";
                             bool isSelected =
                                 controller.selectedDate.value == day;
-                            bool isToday =
-                                controller.today.value == day &&
+                            bool isToday = controller.today.value == day &&
                                 controller.selectedMonth.value ==
                                     DateTime.now().month;
                             bool isPeriodDay =
@@ -503,7 +503,7 @@ class ProfilePage extends StatelessWidget {
                                       ? const Color(0xFFA6E3F9)
                                       : const Color(
                                           0xFFFFDA7B,
-                                        ).withOpacity(0.8),
+                                        ).withAlpha(204),
                                   borderRadius: BorderRadius.circular(15),
                                   border: Border.all(
                                     color: isSelected
@@ -537,8 +537,9 @@ class ProfilePage extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: () {
                           controller.saveDailyData();
-                          if (controller.getPeriodStatusForSelectedDay())
+                          if (controller.getPeriodStatusForSelectedDay()) {
                             controller.showAdviceModal();
+                          }
                         },
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2C5282),
