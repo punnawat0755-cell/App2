@@ -11,6 +11,7 @@ import 'services/notification_service.dart';
 import 'package:flutter_application_1/supabase_client.dart'; 
 import 'bottonbar.dart';
 import 'module/login/view/login.dart';
+import 'module/login/view/logo.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -81,14 +82,7 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
       stream: _authStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          // ✅ แก้ไข: ใช้ตัวแปร 'supabase' เช็ค Session
-          final currentSession = supabase.auth.currentSession;
-          if (currentSession != null) {
-            return const BottomNavBar();
-          }
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const SplashScreenpage();
         }
 
         final session = snapshot.data?.session;
