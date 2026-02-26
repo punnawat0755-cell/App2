@@ -4,7 +4,10 @@ import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home.dart';
 import 'package:flutter_application_1/module/login/view/login.dart';
+import 'package:flutter_application_1/module/login/view/login2.dart';
+import 'package:flutter_application_1/module/login/view/logo.dart';
 import 'package:flutter_application_1/module/login/view/register.dart';
+import 'package:flutter_application_1/module/login/view/singup.dart';
 import 'package:flutter_application_1/module/policy/view/policy.dart';
 import 'package:flutter_application_1/module/reset/view/newpassword.dart';
 import 'package:flutter_application_1/module/reset/view/reset.dart';
@@ -33,8 +36,11 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // ---------------------------------------------------------
   final List<Widget> _pages = [
     // const LoginPage(),
+    const Signup(),
+    const LoginPagetwo(),
     // const RegisterPage(),
-    const PrivacyPolicyPage(),
+    // const SplashScreenpage(),
+    // const PrivacyPolicyPage(),
     const PetPage(),
     const NewPasswordPage(),
     const ResetSentPage(),
