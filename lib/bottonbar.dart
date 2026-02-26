@@ -9,6 +9,7 @@ import 'package:flutter_application_1/module/login/view/logo.dart';
 import 'package:flutter_application_1/module/login/view/register.dart';
 import 'package:flutter_application_1/module/login/view/singup.dart';
 import 'package:flutter_application_1/module/policy/view/policy.dart';
+import 'package:flutter_application_1/module/pulse/view/pulsecheck.dart';
 import 'package:flutter_application_1/module/reset/view/newpassword.dart';
 import 'package:flutter_application_1/module/reset/view/reset.dart';
 import 'package:flutter_application_1/module/reset/view/resetsent.dart';
@@ -36,6 +37,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // ---------------------------------------------------------
   final List<Widget> _pages = [
     // const LoginPage(),
+    const Pulsecheck(),
     const Signup(),
     const LoginPagetwo(),
     // const RegisterPage(),
