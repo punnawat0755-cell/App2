@@ -1,10 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 import 'package:flutter_application_1/chat/userchat/models/usermessage.model.dart';
 
@@ -35,6 +37,7 @@ enum MatchRole {
 
 class ChatUserService extends GetxService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  late final http.Client _httpClient;
 
   static const String _chatCollection = 'Chats';
   static const String _queueCollection = 'RandomQueue';
@@ -46,7 +49,25 @@ class ChatUserService extends GetxService {
     'N8N_MODERATION_FAIL_OPEN',
     defaultValue: true,
   );
+  static const bool _allowBadCertificate = bool.fromEnvironment(
+    'N8N_ALLOW_BAD_CERT',
+    defaultValue: true,
+  );
+  static const String _allowBadCertificateHosts = String.fromEnvironment(
+    'N8N_ALLOW_BAD_CERT_HOSTS',
+    defaultValue: 'n8n.tgstack.dev',
+  );
   static const Duration _moderationTimeout = Duration(seconds: 6);
+
+  ChatUserService() {
+    _httpClient = _buildHttpClient();
+  }
+
+  @override
+  void onClose() {
+    _httpClient.close();
+    super.onClose();
+  }
 
   // ----------------------------------------------------------------
   // 1. Firebase Basic Chat Operations (รับ-ส่งข้อความ)
@@ -110,7 +131,6 @@ class ChatUserService extends GetxService {
     );
 
     if (!moderation.allow) {
-      messageController.clear();
       return SendMessageResult(
         status: SendMessageStatus.blocked,
         reason: moderation.reason,
@@ -148,11 +168,15 @@ class ChatUserService extends GetxService {
     if (_n8nModerationWebhook.trim().isEmpty) {
       return _ModerationResult.allow(text);
     }
+    final webhookUri = Uri.tryParse(_n8nModerationWebhook);
+    debugPrint(
+      'n8n moderation request url=$_n8nModerationWebhook host=${webhookUri?.host ?? '-'}',
+    );
 
     try {
-      final response = await http
+      final response = await _httpClient
           .post(
-            Uri.parse(_n8nModerationWebhook),
+            webhookUri ?? Uri.parse(_n8nModerationWebhook),
             headers: const {'Content-Type': 'application/json'},
             body: jsonEncode({
               'action': 'content_moderate',
@@ -178,8 +202,7 @@ class ChatUserService extends GetxService {
         return _fallbackOnModerationError(text, 'empty-body');
       }
 
-      final decoded = jsonDecode(response.body);
-      final payload = _asMapPayload(decoded);
+      final payload = _parseModerationPayload(response.body);
       if (payload == null) {
         return _fallbackOnModerationError(text, 'invalid-payload');
       }
@@ -199,14 +222,14 @@ class ChatUserService extends GetxService {
         if (allowed) {
           return _ModerationResult.allow(safeText);
         }
-        return const _ModerationResult.block('moderation-blocked');
+        return const _ModerationResult.block('moderation-blocked-by-n8n');
       }
 
       if (explicitProfanity ||
           status == 'block' ||
           status == 'blocked' ||
           status == 'reject') {
-        return const _ModerationResult.block('moderation-blocked');
+        return const _ModerationResult.block('moderation-blocked-by-n8n');
       }
 
       if (status == 'mask' ||
@@ -244,16 +267,130 @@ class ChatUserService extends GetxService {
     return null;
   }
 
-  bool? _readBool(Map<String, dynamic> payload, List<String> keys) {
-    for (final key in keys) {
-      final raw = payload[key];
-      if (raw is bool) return raw;
-      if (raw is num) return raw != 0;
-      if (raw is String) {
-        final value = raw.trim().toLowerCase();
-        if (value == 'true' || value == '1' || value == 'yes') return true;
-        if (value == 'false' || value == '0' || value == 'no') return false;
+  Map<String, dynamic>? _parseModerationPayload(String body) {
+    final trimmed = body.trim();
+
+    try {
+      final decoded = jsonDecode(trimmed);
+      final payload = _asMapPayload(decoded);
+      if (payload != null) {
+        return payload;
       }
+    } catch (_) {
+      // fallback to lightweight parser for plain-text webhook responses
+    }
+
+    final normalized = trimmed.toLowerCase();
+    if (normalized == 'ok' ||
+        normalized == 'allow' ||
+        normalized == 'allowed' ||
+        normalized == 'true' ||
+        normalized == 'pass') {
+      return {'allowed': true};
+    }
+    if (normalized == 'block' ||
+        normalized == 'blocked' ||
+        normalized == 'false' ||
+        normalized == 'reject') {
+      return {'allowed': false};
+    }
+
+    return null;
+  }
+
+  http.Client _buildHttpClient() {
+    if (!_allowBadCertificate) {
+      return http.Client();
+    }
+
+    final configuredHosts = _allowBadCertificateHosts
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+    final webhookHost = Uri.tryParse(_n8nModerationWebhook)?.host.toLowerCase();
+    if (webhookHost != null && webhookHost.isNotEmpty) {
+      configuredHosts.add(webhookHost);
+    }
+
+    final ioClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) {
+        final isAllowed = configuredHosts.contains(host.toLowerCase());
+        if (isAllowed) {
+          debugPrint(
+            'n8n moderation warning: accepting untrusted cert from $host:$port',
+          );
+        } else {
+          debugPrint(
+            'n8n moderation blocked untrusted cert from non-allowed host $host:$port',
+          );
+        }
+        return isAllowed;
+      };
+
+    return IOClient(ioClient);
+  }
+
+  bool? _readBool(Map<String, dynamic> payload, List<String> keys) {
+    final keySet = keys.map((e) => e.toLowerCase()).toSet();
+    // Priority 1: respect top-level field first (the direct webhook contract).
+    for (final entry in payload.entries) {
+      if (!keySet.contains(entry.key.toLowerCase())) continue;
+      final parsed = _parseDynamicBool(entry.value);
+      if (parsed != null) return parsed;
+    }
+
+    // Priority 2: scan nested payloads.
+    // If both true/false appear in different branches, false should win.
+    return _readBoolRecursive(payload, keySet);
+  }
+
+  bool? _readBoolRecursive(dynamic node, Set<String> keys) {
+    bool foundTrue = false;
+
+    if (node is Map) {
+      final map = Map<String, dynamic>.from(node);
+
+      for (final entry in map.entries) {
+        final key = entry.key.toLowerCase();
+        if (keys.contains(key)) {
+          final parsed = _parseDynamicBool(entry.value);
+          if (parsed != null) {
+            if (!parsed) return false;
+            foundTrue = true;
+          }
+        }
+      }
+
+      for (final value in map.values) {
+        final nested = _readBoolRecursive(value, keys);
+        if (nested != null) {
+          if (!nested) return false;
+          foundTrue = true;
+        }
+      }
+      return foundTrue ? true : null;
+    }
+
+    if (node is List) {
+      for (final item in node) {
+        final nested = _readBoolRecursive(item, keys);
+        if (nested != null) {
+          if (!nested) return false;
+          foundTrue = true;
+        }
+      }
+    }
+    return foundTrue ? true : null;
+  }
+
+  bool? _parseDynamicBool(dynamic raw) {
+    if (raw is bool) return raw;
+    if (raw is num) return raw != 0;
+    if (raw is String) {
+      final value = raw.trim().toLowerCase();
+      if (value == 'true' || value == '1' || value == 'yes') return true;
+      if (value == 'false' || value == '0' || value == 'no') return false;
     }
     return null;
   }

@@ -59,8 +59,12 @@ class _ChatUserViewState extends State<ChatUserView> {
       if (!mounted) return;
 
       if (result.status == SendMessageStatus.blocked) {
+        final reason = (result.reason ?? '').toLowerCase();
+        final message = reason.contains('moderation-blocked-by-n8n')
+            ? 'ระบบตรวจพบว่าข้อความที่พยายามส่งไม่เหมาะสม จึงบล็อกการส่ง'
+            : 'ไม่สามารถส่งข้อความนี้ได้ ระบบความปลอดภัยบล็อกการส่ง';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('ข้อความไม่สุภาพ ระบบบล็อกการส่งข้อความ')),
+          SnackBar(content: Text(message)),
         );
       }
 
