@@ -65,14 +65,23 @@ class Pet extends GetxController {
       final user = supabase.auth.currentUser;
       if (user == null) throw Exception('Not logged in');
 
-      // 1) username (ถ้ามี profiles.username)
+      // 1) username (รองรับหลายชื่อฟิลด์)
       final prof = await supabase
           .from('profiles')
-          .select('username')
+          .select('username, displayname, display_name, displayName')
           .eq('id', user.id)
           .maybeSingle();
-      final u = (prof?['username'] as String?);
-      if (u != null && u.trim().isNotEmpty) username.value = u.trim();
+      final fields = [
+        prof?['username'] as String?,
+        prof?['displayname'] as String?,
+        prof?['display_name'] as String?,
+        prof?['displayName'] as String?,
+      ];
+      final u = fields
+          .whereType<String>()
+          .map((v) => v.trim())
+          .firstWhere((v) => v.isNotEmpty, orElse: () => '');
+      if (u.isNotEmpty) username.value = u;
 
       // 2) pet_profiles
       final pet = await supabase
@@ -172,7 +181,8 @@ class Pet extends GetxController {
 
     // ไม่มีของ -> ถ้าเหลือเวลา -> แจ้งรอ
     final outOfFood = foodCount.value <= 0;
-    final canClaimNow = !isTimerRunning.value && remainingTime.value == "00:00:00";
+    final canClaimNow =
+        !isTimerRunning.value && remainingTime.value == "00:00:00";
 
     if (outOfFood && !canClaimNow) {
       Get.snackbar(
@@ -422,7 +432,6 @@ class PetPage extends StatelessWidget {
       child: Column(
         children: [
           const SizedBox(height: 20),
-
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -520,8 +529,7 @@ class PetPage extends StatelessWidget {
                             return Container(
                               width: currentW,
                               height: double.infinity,
-                              margin:
-                                  EdgeInsets.fromLTRB(left, 8.0, 0.0, 8.0),
+                              margin: EdgeInsets.fromLTRB(left, 8.0, 0.0, 8.0),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFD146),
                                 borderRadius: BorderRadius.circular(30),

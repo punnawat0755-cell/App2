@@ -20,16 +20,26 @@ class UserListScreen extends StatefulWidget {
 class _UserListScreenState extends State<UserListScreen> {
   final ChatUserService _chatService = ChatUserService();
 
-  String _safeName(dynamic username) {
-    if (username is String) {
-      return username;
-    }
-    if (username is Map && username.isNotEmpty) {
-      final value = username.values.first;
-      if (value is String) {
-        return value;
+  String _safeName(Map<String, dynamic> data) {
+    final candidates = [
+      data['username'],
+      data['displayName'],
+      data['displayname'],
+      data['display_name'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate is String && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+      if (candidate is Map && candidate.isNotEmpty) {
+        final value = candidate.values.first;
+        if (value is String && value.trim().isNotEmpty) {
+          return value.trim();
+        }
       }
     }
+
     return 'Unknown User';
   }
 
@@ -54,7 +64,7 @@ class _UserListScreenState extends State<UserListScreen> {
           chatId: chatRoomId,
           currentUserId: widget.currentUserId,
           recipientUserId: user.id,
-          nameUser: _safeName(data['username']),
+          nameUser: _safeName(data),
           emailUser: (data['email'] ?? '') as String,
           imgUser: _safeImageUrl(data['img']),
         ),
@@ -159,7 +169,7 @@ class _UserListScreenState extends State<UserListScreen> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _safeName(data['username']),
+                                    _safeName(data),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(

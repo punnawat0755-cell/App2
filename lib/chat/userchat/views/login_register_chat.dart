@@ -107,13 +107,19 @@ class _LoginChatScreenState extends State<LoginChatScreen> {
         password: _passwordController.text,
       );
 
+      final resolvedName = _nameController.text.trim().isEmpty
+          ? _emailController.text.trim().split('@').first
+          : _nameController.text.trim();
+
+      await credential.user?.updateDisplayName(resolvedName);
+
       await FirebaseFirestore.instance
           .collection('Users')
           .doc(credential.user!.uid)
           .set({
-        'username': _nameController.text.trim().isEmpty
-            ? _emailController.text.trim().split('@').first
-            : _nameController.text.trim(),
+        'username': resolvedName,
+        'displayName': resolvedName,
+        'displayname': resolvedName,
         'email': _emailController.text.trim(),
         'img': _imageUrlController.text.trim(),
       }, SetOptions(merge: true));

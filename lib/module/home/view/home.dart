@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'dart:convert'; // [NEW] สำหรับแปลง JSON
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http; // [NEW] สำหรับยิง API ปกติ
@@ -98,7 +98,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   // [NEW] Load username from Supabase via REST API (HTTP GET)
- 
+
   Future<void> _loadUsername() async {
     setState(() => _isNameLoading = true);
 
@@ -112,11 +112,13 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    // 1.  API Key 
-    const String apiKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmFnZGhqbGtsbXlzamp1dmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzQ0MjcsImV4cCI6MjA4Mzk1MDQyN30.pqinIw8uza_02BRRheQrBLNnRK0InCBBXG00HmB0Bys'; 
-    
-    // 2.  URL (ดึงตาราง profiles, เลือกคอลัมน์ username, กรองด้วย user.id)
-    final String apiUrl = 'https://dvbagdhjlklmysjjuvht.supabase.co/rest/v1/profiles?select=username&id=eq.${user.id}';
+    // 1.  API Key
+    const String apiKey =
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmFnZGhqbGtsbXlzamp1dmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzQ0MjcsImV4cCI6MjA4Mzk1MDQyN30.pqinIw8uza_02BRRheQrBLNnRK0InCBBXG00HmB0Bys';
+
+    // 2.  URL (รองรับหลายชื่อฟิลด์ของ display name)
+    final String apiUrl =
+        'https://dvbagdhjlklmysjjuvht.supabase.co/rest/v1/profiles?select=username,displayname,display_name,displayName&id=eq.${user.id}';
 
     try {
       // 3. ยิง HTTP GET Request เหมือนเรียก API ปกติ
@@ -132,13 +134,26 @@ class _HomePageState extends State<HomePage> {
       if (response.statusCode == 200) {
         // 4. แปลง JSON Response
         final List<dynamic> data = json.decode(response.body);
-        
+
         if (data.isNotEmpty) {
-          final username = data[0]['username']?.toString().trim();
-          
+          final profile = data[0] as Map<String, dynamic>;
+          final username = profile['username']?.toString().trim();
+          final displayname = profile['displayname']?.toString().trim();
+          final displayName = profile['displayName']?.toString().trim();
+          final displayNameSnake = profile['display_name']?.toString().trim();
+          final resolvedName = [
+            username,
+            displayname,
+            displayName,
+            displayNameSnake,
+          ].firstWhere(
+            (value) => value != null && value.isNotEmpty,
+            orElse: () => null,
+          );
+
           if (!mounted) return;
           setState(() {
-            _displayName = (username != null && username.isNotEmpty) ? username : 'ผู้ใช้';
+            _displayName = resolvedName ?? 'ผู้ใช้';
             _isNameLoading = false;
           });
         } else {
@@ -288,7 +303,8 @@ class _HomePageState extends State<HomePage> {
                   clipBehavior: Clip.none,
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   itemCount: clipList.length,
-                  separatorBuilder: (context, index) => const SizedBox(width: 5),
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(width: 5),
                   itemBuilder: (context, index) {
                     final item = clipList[index];
 
@@ -297,7 +313,8 @@ class _HomePageState extends State<HomePage> {
                         if (item['page'] != null) {
                           Get.to(item['page']);
                         } else {
-                          debugPrint("ยังไม่มีหน้าปลายทางสำหรับ ${item['title']}");
+                          debugPrint(
+                              "ยังไม่มีหน้าปลายทางสำหรับ ${item['title']}");
                         }
                       },
                       child: _buildClipCard(
@@ -360,7 +377,8 @@ class _HomePageState extends State<HomePage> {
                             builder: (context) => const ArticleDetailPage(
                               title: 'อยู่คนเดียวก็มีความสุขดีนะ',
                               imagePath: 'assets/images/article2.png',
-                              content: """การอยู่คนเดียวไม่ได้หมายความว่าต้องเหงาเสมอไป การได้ใช้เวลากับตัวเองคือโอกาสที่ดีในการทำความเข้าใจความต้องการของตัวเอง พัฒนาทักษะใหม่ๆ และเติมพลังให้กับจิตใจ
+                              content:
+                                  """การอยู่คนเดียวไม่ได้หมายความว่าต้องเหงาเสมอไป การได้ใช้เวลากับตัวเองคือโอกาสที่ดีในการทำความเข้าใจความต้องการของตัวเอง พัฒนาทักษะใหม่ๆ และเติมพลังให้กับจิตใจ
 
 ความสุขไม่ได้ขึ้นอยู่กับจำนวนคนรอบข้าง แต่อยู่ที่ความพึงพอใจในตัวเองและการมองเห็นคุณค่าในสิ่งเล็กๆ น้อยๆ รอบตัว ลองหาเวลาวันละนิดเพื่อทำสิ่งที่ชอบ หรือแค่นั่งจิบกาแฟเงียบๆ ก็อาจเป็นช่วงเวลาที่มีคุณภาพที่สุดของวันได้""",
                             ),

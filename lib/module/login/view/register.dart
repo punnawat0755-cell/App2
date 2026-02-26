@@ -95,7 +95,8 @@ class _RegisterPageState extends State<RegisterPage> {
       final password = _passwordController.text.trim();
 
       if (username.isEmpty || email.isEmpty || password.isEmpty) {
-        throw const AuthException('กรุณากรอกข้อมูลให้ครบ (Name, Email, Password)');
+        throw const AuthException(
+            'กรุณากรอกข้อมูลให้ครบ (Name, Email, Password)');
       }
       if (_birthday == null) {
         throw const AuthException('กรุณาเลือกวันเกิด');
@@ -118,7 +119,7 @@ class _RegisterPageState extends State<RegisterPage> {
         email: email,
         password: password,
         data: {
-          'username': username,
+          'display_name': username,
           // ชื่อต้องตรงกับ DB trigger
           'gender': gender,
           'birth_date': _toIsoDate(_birthday!), // YYYY-MM-DD
