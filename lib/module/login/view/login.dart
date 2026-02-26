@@ -148,107 +148,70 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   // ---------------- UI Widgets ----------------
-  Widget _pillField({
+  static const _mainBlue = Color(0xFF4A89D8);
+  static const _lightBlue = Color(0xFF64BFFF);
+  static const _fieldGrey = Color(0xFFF3F3F3);
+
+  Widget _roundedField({
     required TextEditingController controller,
     required IconData icon,
     required String hint,
+    TextInputType? keyboardType,
     bool obscure = false,
     Widget? suffix,
-    TextInputType? keyboardType,
   }) {
     return Container(
-      height: 46,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(999),
-        boxShadow: [
-          BoxShadow(
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-            color: Colors.black.withValues(alpha: 0.06),
-          ),
-        ],
+        color: _fieldGrey,
+        borderRadius: BorderRadius.circular(20),
       ),
-      alignment: Alignment.center,
       child: TextField(
         controller: controller,
         obscureText: obscure,
         keyboardType: keyboardType,
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(
-            color: Colors.black.withValues(alpha: 0.22),
-            fontWeight: FontWeight.w700,
-            fontSize: 12.5,
-          ),
-          prefixIcon: Icon(icon, color: Colors.black.withValues(alpha: 0.25), size: 20),
+          hintStyle: const TextStyle(color: Colors.grey),
+          prefixIcon: Icon(icon, color: Colors.grey),
           suffixIcon: suffix,
-          filled: true,
-          fillColor: Colors.transparent,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
-            borderSide: BorderSide.none,
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(999),
-            borderSide: BorderSide.none,
-          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
         ),
       ),
     );
   }
 
-  Widget _blueButton({
+  Widget _primaryButton({
     required String text,
     required VoidCallback? onPressed,
     required bool loading,
   }) {
     return SizedBox(
-      height: 46,
+      height: 55,
       width: double.infinity,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          gradient: const LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [Color(0xFF22C6FF), Color(0xFF1E88FF)],
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _lightBlue,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 18,
-              offset: const Offset(0, 10),
-              color: Colors.black.withValues(alpha: 0.10),
-            ),
-          ],
         ),
-        child: ElevatedButton(
-          onPressed: onPressed,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.transparent,
-            shadowColor: Colors.transparent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-          ),
-          child: loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(color: Colors.white),
-                )
-              : Text(
-                  text,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13.5,
-                  ),
+        child: loading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(color: Colors.white),
+              )
+            : Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
                 ),
-        ),
+              ),
       ),
     );
   }
@@ -256,127 +219,93 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE9F7FF),
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 380),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 26),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const SizedBox(height: 10),
-                  SizedBox(
-                    width: 92,
-                    height: 92,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Container(
-                          width: 86,
-                          height: 86,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.55),
-                            borderRadius: BorderRadius.circular(28),
-                          ),
-                        ),
-                        const Icon(
-                          Icons.flutter_dash,
-                          size: 44,
-                          color: Color(0xFF1E88FF),
-                        ),
-                      ],
-                    ),
+                  const SizedBox(height: 60),
+                  Image.asset(
+                    'assets/images/logo.png',
+                    width: 150,
+                    height: 150,
+                    fit: BoxFit.contain,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 20),
                   const Text(
-                    'Login',
+                    'เข้าสู่ระบบ',
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF1E88FF),
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: _mainBlue,
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  _pillField(
+                  const SizedBox(height: 40),
+                  _roundedField(
                     controller: _emailController,
-                    icon: Icons.person_outline,
-                    hint: 'Email',
+                    icon: Icons.person,
+                    hint: 'อีเมล',
                     keyboardType: TextInputType.emailAddress,
                   ),
-                  const SizedBox(height: 12),
-                  _pillField(
+                  const SizedBox(height: 20),
+                  _roundedField(
                     controller: _passwordController,
-                    icon: Icons.lock_outline,
-                    hint: 'Password',
+                    icon: Icons.lock,
+                    hint: 'รหัสผ่าน',
                     obscure: _hidePw,
                     suffix: IconButton(
                       onPressed: () => setState(() => _hidePw = !_hidePw),
                       icon: Icon(
                         _hidePw ? Icons.visibility : Icons.visibility_off,
-                        color: Colors.black.withValues(alpha: 0.25),
-                        size: 20,
+                        color: Colors.grey,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
                       onPressed: () {},
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 0),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        foregroundColor: Colors.black.withValues(alpha: 0.30),
-                      ),
                       child: const Text(
-                        'Forget password?',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                        'ลืมรหัสผ่าน?',
+                        style: TextStyle(color: Colors.grey, fontSize: 14),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  _blueButton(
-                    text: 'Login',
+                  const SizedBox(height: 30),
+                  _primaryButton(
+                    text: 'เข้าสู่ระบบ',
                     onPressed: _isLoading ? null : _login,
                     loading: _isLoading,
                   ),
-                  const SizedBox(height: 22),
+                  const SizedBox(height: 130),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        "Don't Have An Account?",
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black.withValues(alpha: 0.30),
-                        ),
+                      const Text(
+                        'ยังไม่มีบัญชีใช่ไหม? ',
+                        style: TextStyle(color: Colors.grey, fontSize: 16),
                       ),
-                      const SizedBox(width: 6),
                       TextButton(
                         onPressed: () => Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const RegisterPage()),
                         ),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
                         child: const Text(
-                          'Sign Up',
+                          'ลงทะเบียน',
                           style: TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w900,
-                            color: Color(0xFF1E88FF),
+                            color: _lightBlue,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 16,
                           ),
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
