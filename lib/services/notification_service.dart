@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
 class NotificationService {
   NotificationService._();
@@ -61,6 +62,15 @@ class NotificationService {
       await _saveTokenForCurrentUser(freshToken);
     });
 
+    supabase.Supabase.instance.client.auth.onAuthStateChange
+        .listen((event) async {
+      if (event.session?.user == null) {
+        return;
+      }
+      final freshToken = await messaging.getToken();
+      await _saveTokenForCurrentUser(freshToken);
+    });
+
     messaging.onTokenRefresh.listen((newToken) async {
       await _subscribeAllUsersTopic(messaging);
       await _saveTokenForCurrentUser(newToken);
@@ -75,15 +85,88 @@ class NotificationService {
       return;
     }
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser == null) {
       return;
     }
 
-    await FirebaseFirestore.instance.collection('Users').doc(user.uid).set({
+    final supabaseUser = supabase.Supabase.instance.client.auth.currentUser;
+    final userMetadata = supabaseUser?.userMetadata;
+
+    final email = _firstNonEmpty([
+      supabaseUser?.email,
+      firebaseUser.email,
+    ]);
+    final displayName = _firstNonEmpty([
+      _readMetadataString(userMetadata, 'display_name'),
+      _readMetadataString(userMetadata, 'full_name'),
+      _readMetadataString(userMetadata, 'name'),
+      firebaseUser.displayName,
+    ]);
+    final username = _resolveUsername(
+      firebaseUser: firebaseUser,
+      email: email,
+      displayName: displayName,
+      userMetadata: userMetadata,
+    );
+
+    final payload = <String, dynamic>{
       'fcmTokens': FieldValue.arrayUnion([token]),
+      'username': username,
       'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    };
+    if (email != null) {
+      payload['email'] = email;
+    }
+    if (displayName != null) {
+      payload['displayName'] = displayName;
+    }
+
+    await FirebaseFirestore.instance
+        .collection('Users')
+        .doc(firebaseUser.uid)
+        .set(payload, SetOptions(merge: true));
+  }
+
+  static String _resolveUsername({
+    required User firebaseUser,
+    required Map<String, dynamic>? userMetadata,
+    String? email,
+    String? displayName,
+  }) {
+    final metadataUsername = _firstNonEmpty([
+      _readMetadataString(userMetadata, 'username'),
+      _readMetadataString(userMetadata, 'user_name'),
+      _readMetadataString(userMetadata, 'preferred_username'),
+    ]);
+    if (metadataUsername != null) {
+      return metadataUsername;
+    }
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+    if (email != null && email.isNotEmpty && email.contains('@')) {
+      return email.split('@').first;
+    }
+    return 'user_${firebaseUser.uid.substring(0, 6)}';
+  }
+
+  static String? _readMetadataString(
+      Map<String, dynamic>? metadata, String key) {
+    final value = metadata?[key];
+    if (value is String && value.trim().isNotEmpty) {
+      return value.trim();
+    }
+    return null;
+  }
+
+  static String? _firstNonEmpty(Iterable<String?> values) {
+    for (final value in values) {
+      if (value != null && value.trim().isNotEmpty) {
+        return value.trim();
+      }
+    }
+    return null;
   }
 
   static Future<void> _showForegroundNotification(RemoteMessage message) async {
