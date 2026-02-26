@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../supabase_client.dart';
+import '../../../supabase_client.dart';
 import 'login.dart';
 
 class RegisterPage extends StatefulWidget {

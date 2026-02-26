@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/bottonbar.dart';
+import 'package:flutter_application_1/module/feed/view/feed_view.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_client.dart';
-import 'pages/home.dart';
-import 'pages/login.dart';
+import 'module/home/view/home.dart';
+import 'module/login/view/login.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,11 +26,21 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return GetMaterialApp(
+      // locale: const Locale('th', 'TH'),
       debugShowCheckedModeBanner: false,
       title: 'Supabase Flutter App',
-      theme: ThemeData(useMaterial3: true),
-      home: const AuthStateHandler(),
+      theme: ThemeData(
+        useMaterial3: true,
+
+        // แบบที่ 1: เปลี่ยนฟอนต์ทั้งแอป (แนะนำ)
+        // คุณสามารถเปลี่ยน .kanitTextTheme เป็น .promptTextTheme หรือ .robotoTextTheme ได้ตามใจชอบ
+        textTheme: GoogleFonts.mitrTextTheme(Theme.of(context).textTheme),
+
+        // ถ้าต้องการปรับสีหลักด้วย (Optional)
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+      ),
+      home: BottomNavBar(),
     );
   }
 }
@@ -46,7 +60,6 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
     return StreamBuilder<AuthState>(
       stream: _stream,
       builder: (context, snapshot) {
-        // UX: กันกระพริบตอนเริ่ม
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
