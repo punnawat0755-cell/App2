@@ -55,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       debugPrint('--- 🔍 กำลังดึงข้อมูล PDPA ของ: ${user.id} ---');
-      
+
       final response = await supabase
           .from('profiles')
           .select('pdpa_accepted_at')
@@ -64,7 +64,8 @@ class _LoginPageState extends State<LoginPage> {
 
       debugPrint('--- 📦 ข้อมูลที่ได้จาก DB: $response ---');
 
-      final hasAccepted = response != null && response['pdpa_accepted_at'] != null;
+      final hasAccepted =
+          response != null && response['pdpa_accepted_at'] != null;
 
       if (!mounted) return;
 
@@ -76,11 +77,11 @@ class _LoginPageState extends State<LoginPage> {
         );
       } else {
         debugPrint('--- ⚠️ ยังไม่ยอมรับ กำลังเรียก Dialog ---');
-        
+
         // เปิด Dialog และรอรับผลลัพธ์
         final bool? isAccepted = await showDialog<bool>(
           context: context,
-          barrierDismissible: false, 
+          barrierDismissible: false,
           builder: (context) => const PdpaDialog(),
         );
 
@@ -125,10 +126,9 @@ class _LoginPageState extends State<LoginPage> {
       await supabase.rpc('touch_last_login');
 
       if (!mounted) return;
-      
+
       // 📌 เรียกฟังก์ชันเช็ค PDPA ทันทีที่ล็อกอินผ่าน
       await _handlePostLogin();
-
     } on AuthException catch (e) {
       if (!mounted) return;
       _showError(_prettyAuthMessage(e.message));
@@ -230,9 +230,9 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   const SizedBox(height: 60),
                   Image.asset(
-                    'assets/images/logo.png',
-                    width: 150,
-                    height: 150,
+                    'assets/images/logosmall.png',
+                    width: 130,
+                    height: 130,
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 20),
@@ -292,7 +292,8 @@ class _LoginPageState extends State<LoginPage> {
                       TextButton(
                         onPressed: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const RegisterPage()),
+                          MaterialPageRoute(
+                              builder: (_) => const RegisterPage()),
                         ),
                         child: const Text(
                           'ลงทะเบียน',
