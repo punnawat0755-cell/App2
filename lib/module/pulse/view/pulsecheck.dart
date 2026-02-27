@@ -24,35 +24,80 @@ class _PulsecheckState extends State<Pulsecheck> {
     {"image": "assets/images/whale_love.png", "label": "มีความสุขมาก"},
   ];
 
-  // ข้อมูลแท็กความรู้สึก
-  final List<String> tags = [
-    "เศร้า",
-    "มีความหวัง",
-    "หดหู่",
-    "พยายามปรับ",
-    "สู้ต่อ",
-    "ใจเย็นลง",
-    "น้อยใจ",
-    "โกรธ",
+  // 🌟 ปรับข้อมูลแท็กให้เป็น List ซ้อน List เพื่อแยกตามแต่ละอารมณ์ (Index ตรงกับ moods)
+  final List<List<String>> moodTags = [
+    // 0: แย่มาก
+    [
+      "เศร้า",
+      "มีความหวัง",
+      "หดหู่",
+      "พยายามปรับ",
+      "สู้ต่อ",
+      "ใจเย็นลง",
+      "น้อยใจ",
+      "โกรธ",
+    ],
+    // 1: รู้สึกแย่
+    [
+      "วิตกกังวล",
+      "ปล่อยวาง",
+      "เสียใจ",
+      "ผิดหวัง",
+      "สงบนิ่ง",
+      "เหนื่อย",
+      "โมโห",
+      "ดีขึ้น",
+    ],
+    // 2: ปกติ
+    [
+      "เรื่อยๆ",
+      "สบายใจ",
+      "มีกำลังใจ",
+      "ภูมิใจ",
+      "สงบนิ่ง",
+      "เหนื่อย",
+      "เบื่อ",
+      "อ่อนเพลีย",
+    ],
+    // 3: พอใจ
+    [
+      "เบิกบาน",
+      "ร่าเริง",
+      "วิตกกังวล",
+      "เฉยๆ",
+      "สงบนิ่ง",
+      "เหนื่อย",
+      "งานเยอะ",
+      "สนุกสนาน",
+    ],
+    // 4: มีความสุขมาก
+    [
+      "กดดัน",
+      "ร่าเริง",
+      "ตื่นเต้น",
+      "อ่อนล้า",
+      "สงบนิ่ง",
+      "เหนื่อย",
+      "แรงบันดาลใจ",
+      "ดีใจ",
+    ],
   ];
 
   // โทนสีหลักของแอป
   final Color mainBlue = const Color(0xFF4A89D8);
-  final Color lightFillBlue = const Color(0xFFE0F2FE); // สีฟ้าน้ำทะเลอ่อนๆ
-  final Color tagFillBlue = const Color(
-    0xFF93C5FD,
-  ); // สีฟ้าเข้มสำหรับปุ่มที่เลือก
+  final Color lightFillBlue = const Color(0xFFE0F2FE);
+  final Color tagFillBlue = const Color(0xFF93C5FD);
 
   @override
   Widget build(BuildContext context) {
+    // 🌟 ดึงชุดคำ (Tags) ปัจจุบันที่ต้องแสดงผล ตามอารมณ์ที่เลือกไว้
+    List<String> currentTags = moodTags[selectedMoodIndex];
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF9FAFB), // สีพื้นหลังแอปออกเทาขาวนิดๆ
+      backgroundColor: const Color(0xFFF9FAFB),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: 30,
-          ), // ลดขอบซ้ายขวานิดนึงให้มีพื้นที่
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -74,7 +119,13 @@ class _PulsecheckState extends State<Pulsecheck> {
                   bool isSelected = selectedMoodIndex == index;
                   return Expanded(
                     child: GestureDetector(
-                      onTap: () => setState(() => selectedMoodIndex = index),
+                      onTap: () {
+                        setState(() {
+                          selectedMoodIndex = index; // เปลี่ยนอารมณ์วาฬ
+                          selectedTags
+                              .clear(); // 🌟 เคลียร์แท็กที่เคยเลือกไว้เมื่อเปลี่ยนอารมณ์หลัก
+                        });
+                      },
                       child: Column(
                         children: [
                           AnimatedOpacity(
@@ -82,15 +133,13 @@ class _PulsecheckState extends State<Pulsecheck> {
                             opacity: isSelected ? 1.0 : 0.4,
                             child: AnimatedScale(
                               duration: const Duration(milliseconds: 200),
-                              scale: isSelected
-                                  ? 1.3
-                                  : 1.0, // ปรับ scale ลงนิดนึงไม่ให้เบียดกันเกินไป
+                              scale: isSelected ? 1.5 : 1.0,
                               child: Padding(
-                                padding: const EdgeInsets.all(4.0),
+                                padding: const EdgeInsets.all(2.0),
                                 child: Image.asset(
                                   moods[index]["image"]!,
-                                  width: 45,
-                                  height: 45,
+                                  width: 50,
+                                  height: 50,
                                   errorBuilder: (context, error, stackTrace) =>
                                       Icon(
                                         Icons.pets,
@@ -123,16 +172,12 @@ class _PulsecheckState extends State<Pulsecheck> {
               ),
               const SizedBox(height: 32),
 
-              // --- 3. แท็กความรู้สึก (แยกฟังก์ชันเพื่อลดความซ้ำซ้อน) ---
+              // --- 3. แท็กความรู้สึก ---
               Column(
                 children: [
-                  _buildTagRow(
-                    tags.sublist(0, 4),
-                  ), // ดึง 4 คำแรกมาสร้างเป็นบรรทัดที่ 1
+                  _buildTagRow(currentTags.sublist(0, 4)),
                   const SizedBox(height: 12),
-                  _buildTagRow(
-                    tags.sublist(4, 8),
-                  ), // ดึง 4 คำหลังมาสร้างเป็นบรรทัดที่ 2
+                  _buildTagRow(currentTags.sublist(4, 8)),
                 ],
               ),
               const SizedBox(height: 32),
@@ -151,6 +196,7 @@ class _PulsecheckState extends State<Pulsecheck> {
                 controller: storyController,
                 hintText: "มาเริ่มการบันทึกกันเถอะ......",
                 height: 120,
+                maxLength: 200, // 🌟 เพิ่มอันนี้ให้แล้ว
               ),
               const SizedBox(height: 24),
 
@@ -171,15 +217,11 @@ class _PulsecheckState extends State<Pulsecheck> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFFFBBF24), // สีเหลืองทอง
+                      color: Color(0xFFFBBF24),
                     ),
                   ),
                   const SizedBox(width: 4),
-                  const Icon(
-                    Icons.monetization_on,
-                    color: Color(0xFFFBBF24),
-                    size: 18,
-                  ),
+                  Image.asset("assets/images/coin2.png", height: 18, width: 18),
                 ],
               ),
               const SizedBox(height: 10),
@@ -187,45 +229,46 @@ class _PulsecheckState extends State<Pulsecheck> {
                 controller: healingController,
                 hintText: "มาเริ่มการบันทึกกันเถอะ......",
                 height: 80,
+                maxLength: 50, // 🌟 เพิ่มอันนี้ให้แล้ว
               ),
               const SizedBox(height: 40),
 
               // --- 6. ปุ่มส่งพลังใจ ---
               Center(
                 child: SizedBox(
-                  width: MediaQuery.of(context).size.width * 0.7,
+                  width: MediaQuery.of(context).size.width * 0.85,
                   height: 55,
                   child: ElevatedButton(
                     onPressed: () {
-                      // TODO: ทำการบันทึกข้อมูลเข้า Database
                       print("อารมณ์: ${moods[selectedMoodIndex]['label']}");
                       print("แท็ก: $selectedTags");
                       print("บันทึก: ${storyController.text}");
                       print("ฮีลใจ: ${healingController.text}");
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFB5EFFF), // สีฟ้าพาสเทล
-                      elevation: 0, // เอาเงาออกให้ดูคลีนมินิมอล
+                      backgroundColor: const Color(0xFFB5EFFF),
+                      elevation: 6,
+                      shadowColor: Colors.black.withOpacity(0.35),
+                      padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        side: const BorderSide(color: Colors.black12, width: 1),
+                        borderRadius: BorderRadius.circular(20),
                       ),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(
-                          Icons.favorite,
-                          color: Color(0xFFEF4444),
-                          size: 28,
-                        ), // หัวใจสีแดง
+                        Image.asset(
+                          "assets/images/heartpulse.png",
+                          height: 40,
+                          width: 40,
+                        ),
                         const SizedBox(width: 10),
                         Text(
                           "ส่งพลังใจ (Energy)",
                           style: TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: mainBlue,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF4489D7),
                           ),
                         ),
                       ],
@@ -259,7 +302,6 @@ class _PulsecheckState extends State<Pulsecheck> {
                   }
                 });
               },
-              // ใช้ AnimatedContainer เพื่อให้ตอนกดสลับสีดูนุ่มนวลขึ้น
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 height: 42,
@@ -296,6 +338,7 @@ class _PulsecheckState extends State<Pulsecheck> {
     required TextEditingController controller,
     required String hintText,
     required double height,
+    required int maxLength,
   }) {
     return Container(
       height: height,
@@ -308,6 +351,7 @@ class _PulsecheckState extends State<Pulsecheck> {
         children: [
           TextField(
             controller: controller,
+            maxLength: maxLength,
             maxLines: null,
             keyboardType: TextInputType.multiline,
             style: TextStyle(color: mainBlue, fontSize: 16),
@@ -315,18 +359,32 @@ class _PulsecheckState extends State<Pulsecheck> {
               hintText: hintText,
               hintStyle: const TextStyle(color: Colors.black38),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.all(15),
+              contentPadding: const EdgeInsets.only(
+                left: 15,
+                right: 15,
+                top: 15,
+                bottom: 25,
+              ),
+              counterText: "",
             ),
           ),
           Positioned(
-            bottom: 5,
-            right: 5,
-            child: Icon(
-              Icons.signal_cellular_4_bar_rounded,
-              color: Colors.grey.withOpacity(0.4),
-              size: 20,
-            ),
-          ),
+            bottom: 8,
+            right: 12,
+            child: ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, child) {
+                return Text(
+                  "${value.text.length}/$maxLength",
+                  style: TextStyle(
+                    color: mainBlue.withOpacity(0.5),
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                );
+              }, // 🌟 ปิดวงเล็บที่หายไปตรงนี้
+            ), // 🌟 และตรงนี้
+          ), // 🌟 และตรงนี้
         ],
       ),
     );
