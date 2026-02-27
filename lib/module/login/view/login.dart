@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 // สมมติว่าไฟล์นี้มีตัวแปร supabase global อยู่ ถ้าไม่มีให้ใช้ Supabase.instance.client แทน
 import 'register.dart';
-import 'pdpa_dialog.dart';
+import 'policy.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -78,10 +78,9 @@ class _LoginPageState extends State<LoginPage> {
         debugPrint('--- ⚠️ ยังไม่ยอมรับ กำลังเรียก Dialog ---');
         
         // เปิด Dialog และรอรับผลลัพธ์
-        final bool? isAccepted = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false, 
-          builder: (context) => const PdpaDialog(),
+        final bool? isAccepted = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
         );
 
         if (!mounted) return;
