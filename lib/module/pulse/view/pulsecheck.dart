@@ -15,6 +15,14 @@ class _PulsecheckState extends State<Pulsecheck> {
   final TextEditingController storyController = TextEditingController();
   final TextEditingController healingController = TextEditingController();
 
+  // ✅ แก้ไข #1: เพิ่ม dispose() เพื่อป้องกัน memory leak
+  @override
+  void dispose() {
+    storyController.dispose();
+    healingController.dispose();
+    super.dispose();
+  }
+
   // ข้อมูลอารมณ์ (รูปวาฬ และ ข้อความ)
   final List<Map<String, String>> moods = [
     {"image": "assets/images/whale_cry.png", "label": "แย่มาก"},
@@ -196,7 +204,7 @@ class _PulsecheckState extends State<Pulsecheck> {
                 controller: storyController,
                 hintText: "มาเริ่มการบันทึกกันเถอะ......",
                 height: 120,
-                maxLength: 200, // 🌟 เพิ่มอันนี้ให้แล้ว
+                maxLength: 200,
               ),
               const SizedBox(height: 24),
 
@@ -229,7 +237,7 @@ class _PulsecheckState extends State<Pulsecheck> {
                 controller: healingController,
                 hintText: "มาเริ่มการบันทึกกันเถอะ......",
                 height: 80,
-                maxLength: 50, // 🌟 เพิ่มอันนี้ให้แล้ว
+                maxLength: 50,
               ),
               const SizedBox(height: 40),
 
@@ -239,16 +247,32 @@ class _PulsecheckState extends State<Pulsecheck> {
                   width: MediaQuery.of(context).size.width * 0.85,
                   height: 55,
                   child: ElevatedButton(
+                    // ✅ แก้ไข #3: เพิ่ม SnackBar แจ้งผู้ใช้ว่าบันทึกแล้ว
                     onPressed: () {
                       print("อารมณ์: ${moods[selectedMoodIndex]['label']}");
                       print("แท็ก: $selectedTags");
                       print("บันทึก: ${storyController.text}");
                       print("ฮีลใจ: ${healingController.text}");
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text(
+                            "ส่งพลังใจแล้ว! 🐋💙",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          backgroundColor: const Color(0xFF4A89D8),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFB5EFFF),
                       elevation: 6,
-                      shadowColor: Colors.black.withOpacity(0.35),
+                      // ✅ แก้ไข #4: เปลี่ยน withOpacity() → withValues() (Flutter รุ่นใหม่)
+                      shadowColor: Colors.black.withValues(alpha: 0.35),
                       padding: EdgeInsets.zero,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
@@ -347,45 +371,52 @@ class _PulsecheckState extends State<Pulsecheck> {
         borderRadius: BorderRadius.circular(15),
         border: Border.all(color: mainBlue, width: 1),
       ),
-      child: Stack(
-        children: [
-          TextField(
-            controller: controller,
-            maxLength: maxLength,
-            maxLines: null,
-            keyboardType: TextInputType.multiline,
-            style: TextStyle(color: mainBlue, fontSize: 16),
-            decoration: InputDecoration(
-              hintText: hintText,
-              hintStyle: const TextStyle(color: Colors.black38),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.only(
-                left: 15,
-                right: 15,
-                top: 15,
-                bottom: 25,
-              ),
-              counterText: "",
-            ),
-          ),
-          Positioned(
-            bottom: 8,
-            right: 12,
-            child: ValueListenableBuilder<TextEditingValue>(
-              valueListenable: controller,
-              builder: (context, value, child) {
-                return Text(
-                  "${value.text.length}/$maxLength",
-                  style: TextStyle(
-                    color: mainBlue.withOpacity(0.5),
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+      // ✅ แก้ไข #2: ห่อด้วย ClipRRect + SingleChildScrollView ป้องกันข้อความล้นกล่อง
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: Stack(
+          children: [
+            SingleChildScrollView(
+              child: TextField(
+                controller: controller,
+                maxLength: maxLength,
+                maxLines: null,
+                keyboardType: TextInputType.multiline,
+                style: TextStyle(color: mainBlue, fontSize: 16),
+                decoration: InputDecoration(
+                  hintText: hintText,
+                  hintStyle: const TextStyle(color: Colors.black38),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.only(
+                    left: 15,
+                    right: 15,
+                    top: 15,
+                    bottom: 25,
                   ),
-                );
-              }, // 🌟 ปิดวงเล็บที่หายไปตรงนี้
-            ), // 🌟 และตรงนี้
-          ), // 🌟 และตรงนี้
-        ],
+                  counterText: "",
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 8,
+              right: 12,
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: controller,
+                builder: (context, value, child) {
+                  return Text(
+                    "${value.text.length}/$maxLength",
+                    style: TextStyle(
+                      // ✅ แก้ไข #4: เปลี่ยน withOpacity() → withValues()
+                      color: mainBlue.withValues(alpha: 0.5),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
