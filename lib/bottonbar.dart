@@ -37,6 +37,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // ---------------------------------------------------------
   final List<Widget> _pages = [
     // const LoginPage(),
+    const ChatSelectionPage(),
     const Pulsecheck(),
     const Signup(),
     const LoginPagetwo(),
@@ -45,7 +46,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
     // const PrivacyPolicyPage(),
     const PetPage(),
     const NewPasswordPage(),
-    const ResetSentPage(),
+    // const ResetSentPage(),
     // const ResetPasswordPage(),
     // const FavoritesPage(),
     // const PrivacyPage(),
@@ -53,7 +54,6 @@ class _BottomNavBarState extends State<BottomNavBar> {
     // const SettingPage(),
     // const HomePage(),
     // const FeedPage(),
-    const ChatSelectionPage(),
     // const ProfilePage(),
   ];
 
