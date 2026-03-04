@@ -78,17 +78,10 @@ class _LoginPageState extends State<LoginPage> {
       } else {
         debugPrint('--- ⚠️ ยังไม่ยอมรับ กำลังเรียก Dialog ---');
 
-        // เปิด Dialog และรอรับผลลัพธ์
-<<<<<<< HEAD
-        final bool? isAccepted = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const PdpaDialog(),
-=======
+        // เปิดหน้าเงื่อนไข/นโยบาย และรอรับผลลัพธ์
         final bool? isAccepted = await Navigator.push<bool>(
           context,
           MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
->>>>>>> 9f8270f170a95ed9f96874af3dc454a3b1093722
         );
 
         if (!mounted) return;
@@ -236,15 +229,9 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   const SizedBox(height: 60),
                   Image.asset(
-<<<<<<< HEAD
-                    'assets/images/logosmall.png',
-                    width: 130,
-                    height: 130,
-=======
                     'assets/images/How 1.png',
                     width: 150,
                     height: 150,
->>>>>>> 9f8270f170a95ed9f96874af3dc454a3b1093722
                     fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 20),
