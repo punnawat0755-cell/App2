@@ -8,7 +8,7 @@ import 'package:flutter_application_1/module/login/view/login2.dart';
 import 'package:flutter_application_1/module/login/view/logo.dart';
 import 'package:flutter_application_1/module/login/view/register.dart';
 import 'package:flutter_application_1/module/login/view/singup.dart';
-import 'package:flutter_application_1/module/policy/view/policy.dart';
+import 'package:flutter_application_1/module/policy/view/policy_view.dart';
 import 'package:flutter_application_1/module/pulse/view/pulsecheck.dart';
 import 'package:flutter_application_1/module/reset/view/newpassword.dart';
 import 'package:flutter_application_1/module/reset/view/reset.dart';
@@ -19,6 +19,7 @@ import 'package:flutter_application_1/module/setting/view/edit.dart';
 import 'package:flutter_application_1/module/setting/view/favorites.dart';
 import 'package:flutter_application_1/module/setting/view/privacy.dart';
 import 'package:flutter_application_1/module/setting/view/setting.dart';
+import 'package:flutter_application_1/module/test/view/test_view.dart';
 
 class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key});
@@ -37,6 +38,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // ---------------------------------------------------------
   final List<Widget> _pages = [
     // const LoginPage(),
+    QuizScreen(),
     const ChatSelectionPage(),
     const Pulsecheck(),
     const Signup(),
@@ -45,7 +47,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
     // const SplashScreenpage(),
     // const PrivacyPolicyPage(),
     const PetPage(),
-    const NewPasswordPage(),
+    // const NewPasswordPage(),
     // const ResetSentPage(),
     // const ResetPasswordPage(),
     // const FavoritesPage(),
