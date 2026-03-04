@@ -53,6 +53,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   final TextEditingController _noteCtrl = TextEditingController();
   final TextEditingController _healingCtrl = TextEditingController();
   String? _serverNote;
+  String? _serverHealingQuote;
 
   // เรียกใช้ Supabase Client ให้สั้นลง
   SupabaseClient get _sb => Supabase.instance.client;
@@ -74,7 +75,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   // ---------- Helpers ----------
   String _todayAsKey() {
     var now = DateTime.now();
-    // 📌 ปรับปรุง: ตัดรอบตี 5 ให้ตรงกับฐานข้อมูล SQL แบบเป๊ะๆ
+    // ตัดรอบ 05:00 น. ให้ตรงกับ SQL
     if (now.hour < 5) {
       now = now.subtract(const Duration(days: 1));
     }
@@ -155,7 +156,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     await prefs.remove(_editUsedDateKey);
 
     _noteCtrl.clear();
+    _healingCtrl.clear();
+    _selectedTags.clear();
     _serverNote = null;
+    _serverHealingQuote = null;
 
     await _loadLocalStatus();
     if (!mounted) return;
@@ -187,6 +191,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     );
 
     if (shouldClear == true) {
+      // สามารถใส่คำสั่งลบข้อมูลจาก Supabase ตรงนี้เพิ่มได้ ถ้าต้องการให้ลบ DB ด้วย
       await _clearDailyMoodCache();
     }
   }
@@ -196,11 +201,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     if (!_isLoggedIn) return;
 
     try {
-      final response = await _sb.from('v_my_mood_today').select('mood_level, note').maybeSingle();
+      // ดึงข้อมูลใหม่มาให้ครบ รวมถึง emotions และ healing_quote
+      final response = await _sb.from('v_my_mood_today').select('mood_level, note, emotions, healing_quote').maybeSingle();
       
-      // 📌 จุดที่แก้ไขปัญหา: ถ้า Supabase บอกว่ายังไม่มีข้อมูล (เช่น สลับไปไอดีใหม่)
       if (response == null) {
-        // ต้องเคลียร์ Local Cache เก่าทิ้ง และรีเซ็ตหน้าจอให้กลับเป็น "ยังไม่ได้ตอบ"
         await _clearDailyMoodCache(showSnackbar: false);
         if (mounted) {
           setState(() {
@@ -208,12 +212,13 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
             _isEditMode = false;
           });
         }
-        return; // จบการทำงานตรงนี้
+        return;
       }
 
-      // กรณีมีข้อมูลใน Supabase ให้อัปเดต UI และ Local Cache ตามปกติ
       final moodLevel = response['mood_level'] as int?;
       final note = response['note'] as String?;
+      final healingQuote = response['healing_quote'] as String?;
+      final emotionsData = response['emotions'] as List<dynamic>?;
 
       if (moodLevel == null) return;
 
@@ -225,8 +230,17 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
         _answeredToday = true;
         _todayScore = option.score;
         _todayLabel = option.label;
+        
         _serverNote = note;
+        _serverHealingQuote = healingQuote;
         _noteCtrl.text = note ?? '';
+        _healingCtrl.text = healingQuote ?? '';
+
+        _selectedTags.clear();
+        if (emotionsData != null) {
+          _selectedTags.addAll(emotionsData.map((e) => e.toString()));
+        }
+
         _selectedMoodIndex = _indexFromOption(option);
       });
     } catch (e) {
@@ -234,14 +248,22 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     }
   }
 
-  Future<void> _saveToSupabase(_MoodOption option, {required String? note}) async {
+  Future<void> _saveToSupabase(
+    _MoodOption option, {
+    required String? note,
+    required List<String> emotions,
+    required String? healingQuote,
+  }) async {
     if (!_isLoggedIn) throw Exception('ยังไม่ได้ล็อกอิน');
 
     final moodLevel = _scoreToMoodLevel(option.score);
 
+    // ยิง RPC ฟังก์ชันที่แก้ไขใหม่
     await _sb.rpc('save_my_daily_mood', params: {
       'p_mood_level': moodLevel,
       'p_note': (note != null && note.trim().isNotEmpty) ? note.trim() : null,
+      'p_emotions': emotions.isNotEmpty ? emotions : null,
+      'p_healing_quote': (healingQuote != null && healingQuote.trim().isNotEmpty) ? healingQuote.trim() : null,
     });
   }
 
@@ -267,7 +289,12 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     // 1) Save to Supabase
     if (_isLoggedIn) {
       try {
-        await _saveToSupabase(option, note: _noteCtrl.text);
+        await _saveToSupabase(
+          option, 
+          note: _noteCtrl.text,
+          emotions: _selectedTags,
+          healingQuote: _healingCtrl.text,
+        );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -285,7 +312,9 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       _answeredToday = true;
       _todayScore = option.score;
       _todayLabel = option.label;
+      
       _serverNote = _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
+      _serverHealingQuote = _healingCtrl.text.trim().isEmpty ? null : _healingCtrl.text.trim();
       _selectedMoodIndex = _indexFromOption(option);
 
       if (canEditNow) {
