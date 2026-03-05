@@ -3,6 +3,7 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home.dart';
+import 'package:flutter_application_1/module/login/view/encouragement_view.dart';
 import 'package:flutter_application_1/module/login/view/login.dart';
 import 'package:flutter_application_1/module/login/view/login2.dart';
 import 'package:flutter_application_1/module/login/view/logo.dart';
@@ -38,6 +39,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
   // ---------------------------------------------------------
   final List<Widget> _pages = [
     // const LoginPage(),
+    EncouragementController(),
     QuizScreen(),
     const ChatSelectionPage(),
     const Pulsecheck(),
@@ -46,7 +48,7 @@ class _BottomNavBarState extends State<BottomNavBar> {
     // const RegisterPage(),
     // const SplashScreenpage(),
     // const PrivacyPolicyPage(),
-    const PetPage(),
+    // const PetPage(),
     // const NewPasswordPage(),
     // const ResetSentPage(),
     // const ResetPasswordPage(),
