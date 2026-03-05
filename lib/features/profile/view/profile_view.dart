@@ -33,8 +33,8 @@ class ProfileController extends GetxController {
     'N8N_ALLOW_BAD_CERT_HOSTS',
     defaultValue: 'n8n.tgstack.dev',
   );
-  static const Duration _predictionTimeout = Duration(seconds: 8);
-  static const Duration _selfcareTimeout = Duration(seconds: 25);
+  static const Duration _predictionTimeout = Duration(seconds: 15);
+  static const Duration _selfcareTimeout = Duration(seconds: 30);
 
   var coins = 138.obs;
   var today = DateTime.now().day.obs;
@@ -349,23 +349,46 @@ class ProfileController extends GetxController {
         'n8n period selfcare http=${response.statusCode} body=${response.body}',
       );
 
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        debugPrint(
-          'n8n period selfcare failed: ${response.statusCode} ${response.body}',
-        );
-        return;
+      // NOTE:
+      // - บางครั้ง n8n อาจตอบ status=502/4xx แต่ยังส่ง JSON (เช่น wrapper error + raw) มาให้
+      //   เราจะพยายาม parse ก่อนค่อยตัดสินใจ
+      final bodyText = response.body.trim();
+      dynamic decoded;
+      try {
+        if (bodyText.startsWith('{') || bodyText.startsWith('[')) {
+          decoded = jsonDecode(bodyText);
+        }
+      } catch (_) {
+        decoded = null;
       }
 
-      final decoded = jsonDecode(response.body);
-      final payload = _unwrapWebhookPayload(decoded);
+      var payload = _unwrapWebhookPayload(decoded);
       if (payload.isEmpty) return;
 
+      // ถ้า workflow ส่ง wrapper error (เช่น schema invalid) แต่มี raw ให้ใช้ raw แทน
       final okValue = payload['ok'];
-      if (okValue is bool && okValue == false) return;
+      if (okValue is bool && okValue == false) {
+        final raw = payload['raw'];
+        if (raw is Map<String, dynamic>) {
+          payload = raw;
+        } else if (raw is Map) {
+          payload = Map<String, dynamic>.from(raw);
+        } else {
+          return;
+        }
+      }
 
-      final advice = _readStringListIgnoreCase(payload, const ['advice']);
-      final redFlags =
+      var advice = _readStringListIgnoreCase(payload, const ['advice']);
+      var redFlags =
           _readStringListIgnoreCase(payload, const ['red_flags', 'redFlags']);
+
+      // รองรับรูปแบบ selfcare แบบใหม่ (care_by_symptom) จาก n8n
+      if (advice.isEmpty) {
+        advice = _extractSelfcareAdviceFromCareBySymptom(payload);
+      }
+      if (redFlags.isEmpty) {
+        redFlags = _extractSelfcareRedFlagsFromCareBySymptom(payload);
+      }
 
       if (advice.isEmpty && redFlags.isEmpty) return;
 
@@ -472,6 +495,105 @@ class ProfileController extends GetxController {
     final text = value.toString().trim();
     if (text.isEmpty) return const <String>[];
     return [text];
+  }
+
+  List<String> _extractSelfcareAdviceFromCareBySymptom(
+    Map<String, dynamic> payload,
+  ) {
+    final value = _readValueIgnoreCase(
+      payload,
+      const ['care_by_symptom', 'careBySymptom'],
+    );
+    if (value is! List) return const <String>[];
+
+    final advice = <String>[];
+
+    for (final item in value) {
+      if (item is! Map) continue;
+      final map = item is Map<String, dynamic>
+          ? item
+          : Map<String, dynamic>.from(item);
+
+      final symptom = (_readStringIgnoreCase(map, const ['symptom']) ?? '').trim();
+      final why = _readStringIgnoreCase(
+        map,
+        const ['why_it_can_happen', 'whyItCanHappen', 'why', 'reason'],
+      );
+      if (why != null && why.trim().isNotEmpty) {
+        final text = why.trim();
+        advice.add(symptom.isEmpty ? text : '$symptom: $text');
+      }
+
+      final doList = _readStringListIgnoreCase(
+        map,
+        const ['do', 'dos', 'recommend', 'recommendations', 'tips'],
+      );
+      for (final t in doList) {
+        advice.add(symptom.isEmpty ? t : '$symptom: $t');
+      }
+
+      final avoidList = _readStringListIgnoreCase(
+        map,
+        const ['avoid', 'dont', "don't", 'notRecommended', 'not_recommended'],
+      );
+      for (final t in avoidList) {
+        advice.add(
+          symptom.isEmpty ? 'หลีกเลี่ยง: $t' : '$symptom (หลีกเลี่ยง): $t',
+        );
+      }
+    }
+
+    final seen = <String>{};
+    final result = <String>[];
+    for (final t in advice) {
+      final text = t.trim();
+      if (text.isEmpty) continue;
+      if (seen.add(text)) result.add(text);
+    }
+    return result;
+  }
+
+  List<String> _extractSelfcareRedFlagsFromCareBySymptom(
+    Map<String, dynamic> payload,
+  ) {
+    final value = _readValueIgnoreCase(
+      payload,
+      const ['care_by_symptom', 'careBySymptom'],
+    );
+    if (value is! List) return const <String>[];
+
+    final flags = <String>[];
+
+    for (final item in value) {
+      if (item is! Map) continue;
+      final map = item is Map<String, dynamic>
+          ? item
+          : Map<String, dynamic>.from(item);
+
+      final symptom = (_readStringIgnoreCase(map, const ['symptom']) ?? '').trim();
+
+      final whenList = _readStringListIgnoreCase(
+        map,
+        const [
+          'when_to_seek_help',
+          'whenToSeekHelp',
+          'when_to_seek_medical_help',
+          'whenToSeekMedicalHelp',
+        ],
+      );
+      for (final t in whenList) {
+        flags.add(symptom.isEmpty ? t : '$symptom: $t');
+      }
+    }
+
+    final seen = <String>{};
+    final result = <String>[];
+    for (final t in flags) {
+      final text = t.trim();
+      if (text.isEmpty) continue;
+      if (seen.add(text)) result.add(text);
+    }
+    return result;
   }
 
   void _showSelfcarePopup({
