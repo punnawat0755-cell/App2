@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/Dashboard/dashboard.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_application_1/Dashboard/dashboard.dart';
 
 // ==========================================
 // 1. Controller
@@ -450,10 +452,40 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                       ],
                     ),
                   ),
-                  const CircleAvatar(
-                    radius: 25,
-                    backgroundImage: NetworkImage(
-                        'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg'),
+                  // ปุ่มกราฟ + Avatar
+                  Row(
+                    children: [
+                      // [ใหม่] ปุ่มเข้าหน้า Dashboard
+                      GestureDetector(
+                        onTap: () => Get.to(() => const HealthDashboardPage()),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF4489D7).withOpacity(0.18),
+                                blurRadius: 8,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.bar_chart_rounded,
+                            color: Color(0xFF4489D7),
+                            size: 24,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      const CircleAvatar(
+                        radius: 25,
+                        backgroundImage: NetworkImage(
+                            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg'),
+                      ),
+                    ],
                   ),
                 ],
               ),
