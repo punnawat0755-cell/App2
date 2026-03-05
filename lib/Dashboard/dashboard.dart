@@ -640,8 +640,9 @@ class _TimelineRow extends StatelessWidget {
 
     // สีแท่งตามความยาว
     Color barColor;
-    if (dur <= 3)      barColor = const Color(0xFF90CAF9);
-    else if (dur <= 5) barColor = const Color(0xFFF05A42);
+    if (dur <= 3) {
+      barColor = const Color(0xFF90CAF9);
+    } else if (dur <= 5) barColor = const Color(0xFFF05A42);
     else               barColor = const Color(0xFFB71C1C);
 
     return IntrinsicHeight(

@@ -656,8 +656,9 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                         ),
                         itemBuilder: (context, index) {
                           int day = index - controller.firstDayOffset + 1;
-                          if (day < 1 || day > controller.daysInMonth)
+                          if (day < 1 || day > controller.daysInMonth) {
                             return const SizedBox();
+                          }
 
                           return Obx(() {
                             String dayKey = controller.getDateKey(
