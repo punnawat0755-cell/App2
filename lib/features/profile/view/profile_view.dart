@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 // ==========================================
@@ -8,6 +14,27 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // ==========================================
 class ProfileController extends GetxController {
   final supabase = Supabase.instance.client;
+  late final http.Client _httpClient;
+
+  static const String _n8nPeriodWebhook = String.fromEnvironment(
+    'N8N_PERIOD_WEBHOOK',
+    defaultValue: 'https://n8n.tgstack.dev/webhook/HowAreYou',
+  );
+  static const String _n8nPeriodToken = String.fromEnvironment(
+    'N8N_PERIOD_TOKEN',
+    defaultValue: 'CHANGE_ME_TOKEN',
+  );
+  // true = ยอมรับ cert ที่ไม่สมบูรณ์สำหรับ host ที่ whitelist ไว้ (แนะนำใช้เฉพาะ debug/profile)
+  static const bool _allowBadCertificate = bool.fromEnvironment(
+    'N8N_ALLOW_BAD_CERT',
+    defaultValue: true,
+  );
+  static const String _allowBadCertificateHosts = String.fromEnvironment(
+    'N8N_ALLOW_BAD_CERT_HOSTS',
+    defaultValue: 'n8n.tgstack.dev',
+  );
+  static const Duration _predictionTimeout = Duration(seconds: 8);
+  static const Duration _selfcareTimeout = Duration(seconds: 25);
 
   var coins = 138.obs;
   var today = DateTime.now().day.obs;
@@ -20,6 +47,7 @@ class ProfileController extends GetxController {
   var predictionConfidence = "".obs; // [ใหม่] 'high' หรือ 'low'
   var avgCycleLength = 0.obs;        // [ใหม่] รอบเฉลี่ยจริง
   var latestCycleText = "".obs;
+  var predictedPeriodDays = <String>{}.obs; // [ใหม่] ไฮไลต์วันคาดการณ์ในปฏิทิน
 
   // [ใหม่] สถิติรวม
   var statTotalCycles = 0.obs;
@@ -45,6 +73,7 @@ class ProfileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _httpClient = _buildHttpClient();
     loadMonthData();
     fetchPeriodPrediction();
     fetchLatestCycle();
@@ -54,7 +83,45 @@ class ProfileController extends GetxController {
   @override
   void onClose() {
     notesController.dispose();
+    _httpClient.close();
     super.onClose();
+  }
+
+  /// สร้าง HTTP client สำหรับเรียก n8n
+  /// - ปกติใช้ client ปกติ (ตรวจ cert ตามระบบ)
+  /// - ถ้าเป็น debug/profile และเปิด allowBadCert -> ยอมรับ cert ไม่สมบูรณ์เฉพาะ host ที่ whitelist
+  http.Client _buildHttpClient() {
+    if (kReleaseMode || !_allowBadCertificate) {
+      return http.Client();
+    }
+
+    final configuredHosts = _allowBadCertificateHosts
+        .split(',')
+        .map((e) => e.trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet();
+
+    final webhookHost = Uri.tryParse(_n8nPeriodWebhook)?.host.toLowerCase();
+    if (webhookHost != null && webhookHost.isNotEmpty) {
+      configuredHosts.add(webhookHost);
+    }
+
+    final ioClient = HttpClient()
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) {
+        final isAllowed = configuredHosts.contains(host.toLowerCase());
+        if (isAllowed) {
+          debugPrint(
+            'n8n period warning: accepting untrusted cert from $host:$port (debug/profile only)',
+          );
+        } else {
+          debugPrint(
+            'n8n period blocked untrusted cert from non-allowed host $host:$port',
+          );
+        }
+        return isAllowed;
+      };
+
+    return IOClient(ioClient);
   }
 
   String getDateKey(int year, int month, int day) =>
@@ -76,6 +143,7 @@ class ProfileController extends GetxController {
       selectedDate.value = 1;
       _syncInputStateForDate();
       loadMonthData();
+      fetchPeriodPrediction();
     }
   }
 
@@ -171,35 +239,637 @@ class ProfileController extends GetxController {
   }
 
   Future<void> fetchPeriodPrediction() async {
+    predictedPeriodDays.clear();
+    predictionConfidence.value = "";
+    avgCycleLength.value = 0;
+
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) {
+      predictionText.value = "";
+      return;
+    }
+
+    if (_n8nPeriodWebhook.trim().isNotEmpty) {
+      final ok = await _fetchPeriodPredictionFromN8n(userId);
+      if (ok) return;
+    }
+
+    await _fetchPeriodPredictionFromSupabaseRpc();
+  }
+
+  Future<bool> _fetchPeriodPredictionFromN8n(String userId) async {
+    try {
+      final uri = Uri.parse(_n8nPeriodWebhook);
+      final accessToken = supabase.auth.currentSession?.accessToken;
+      debugPrint('n8n period prediction request url=$_n8nPeriodWebhook');
+
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        if (accessToken != null && accessToken.trim().isNotEmpty)
+          'Authorization': 'Bearer $accessToken',
+      };
+
+      final from = getDateKey(selectedYear.value, selectedMonth.value, 1);
+      final to =
+          getDateKey(selectedYear.value, selectedMonth.value, daysInMonth);
+
+      final response = await _httpClient
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode({
+              'action': 'period_record',
+              'token': _n8nPeriodToken,
+              'user_id': userId,
+              'from': from,
+              'to': to,
+              'year': selectedYear.value,
+              'month': selectedMonth.value,
+            }),
+          )
+          .timeout(_predictionTimeout);
+
+      debugPrint(
+        'n8n period prediction http=${response.statusCode} body=${response.body}',
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          'n8n period prediction failed: ${response.statusCode} ${response.body}',
+        );
+        return false;
+      }
+
+      final decoded = jsonDecode(response.body);
+      final payload = _unwrapWebhookPayload(decoded);
+      return _applyPredictionPayload(payload);
+    } catch (e) {
+      debugPrint('n8n period prediction error: $e');
+      return false;
+    }
+  }
+
+  Future<void> fetchPeriodSelfcarePopup() async {
+    final userId = supabase.auth.currentUser?.id;
+    if (userId == null) return;
+    if (_n8nPeriodWebhook.trim().isEmpty) return;
+
+    try {
+      final uri = Uri.parse(_n8nPeriodWebhook);
+      final accessToken = supabase.auth.currentSession?.accessToken;
+      debugPrint('n8n period selfcare request url=$_n8nPeriodWebhook');
+
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        if (accessToken != null && accessToken.trim().isNotEmpty)
+          'Authorization': 'Bearer $accessToken',
+      };
+
+      final from = getDateKey(selectedYear.value, selectedMonth.value, 1);
+      final to =
+          getDateKey(selectedYear.value, selectedMonth.value, daysInMonth);
+
+      final response = await _httpClient
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode({
+              'action': 'period_selfcare',
+              'token': _n8nPeriodToken,
+              'user_id': userId,
+              'from': from,
+              'to': to,
+              'year': selectedYear.value,
+              'month': selectedMonth.value,
+            }),
+          )
+          .timeout(_selfcareTimeout);
+
+      debugPrint(
+        'n8n period selfcare http=${response.statusCode} body=${response.body}',
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        debugPrint(
+          'n8n period selfcare failed: ${response.statusCode} ${response.body}',
+        );
+        return;
+      }
+
+      final decoded = jsonDecode(response.body);
+      final payload = _unwrapWebhookPayload(decoded);
+      if (payload.isEmpty) return;
+
+      final okValue = payload['ok'];
+      if (okValue is bool && okValue == false) return;
+
+      final advice = _readStringListIgnoreCase(payload, const ['advice']);
+      final redFlags =
+          _readStringListIgnoreCase(payload, const ['red_flags', 'redFlags']);
+
+      if (advice.isEmpty && redFlags.isEmpty) return;
+
+      _showSelfcarePopup(advice: advice, redFlags: redFlags);
+    } catch (e) {
+      debugPrint('n8n period selfcare error: $e');
+    }
+  }
+
+  Future<void> _fetchPeriodPredictionFromSupabaseRpc() async {
     try {
       final response = await supabase.rpc('predict_next_period');
       if (response != null && response is List && response.isNotEmpty) {
         var data = response[0];
-        // [ใหม่] รับ avg_cycle_length และ confidence
         avgCycleLength.value = data['avg_cycle_length'] ?? 28;
         predictionConfidence.value = data['confidence'] ?? 'low';
 
-        if (data['predicted_start_date'] != null) {
-          DateTime predictedDate = DateTime.parse(data['predicted_start_date'].toString());
-          int daysLeft = predictedDate.difference(DateTime.now()).inDays;
-          String thaiDate = "${predictedDate.day} ${monthNames[predictedDate.month - 1]}";
-
-          if (daysLeft == 0) {
-            predictionText.value = "คาดว่าประจำเดือนจะมา 🩸 วันนี้";
-          } else if (daysLeft > 0) {
-            predictionText.value = "คาดว่าประจำเดือนจะมา 🩸 $thaiDate (อีก $daysLeft วัน)";
-          } else {
-            predictionText.value = "ประจำเดือนมาช้ากว่ากำหนด ${daysLeft.abs()} วัน";
-          }
+        final predicted = _tryParseDate(data['predicted_start_date']);
+        if (predicted != null) {
+          predictedPeriodDays.add(
+            getDateKey(predicted.year, predicted.month, predicted.day),
+          );
+          _setPredictionTextFromDate(predicted);
+          return;
         }
-      } else {
-        predictionText.value = "บันทึกข้อมูลเพื่อคำนวณรอบเดือนถัดไป 🌸";
-        predictionConfidence.value = "";
       }
+
+      predictionText.value = "บันทึกข้อมูลเพื่อคำนวณรอบเดือนถัดไป 🌸";
+      predictionConfidence.value = "";
+      avgCycleLength.value = 0;
     } catch (e) {
       predictionText.value = "บันทึกข้อมูลเพื่อคำนวณรอบเดือนถัดไป 🌸";
       predictionConfidence.value = "";
+      avgCycleLength.value = 0;
     }
+  }
+
+  Map<String, dynamic> _unwrapWebhookPayload(dynamic decoded) {
+    if (decoded is List && decoded.isNotEmpty) {
+      final first = decoded.first;
+      if (first is Map<String, dynamic>) return first;
+      if (first is Map) return Map<String, dynamic>.from(first);
+    }
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    return <String, dynamic>{};
+  }
+
+  dynamic _readValueIgnoreCase(Map<String, dynamic> payload, List<String> keys) {
+    final keySet = keys.map((e) => e.toLowerCase()).toSet();
+    for (final entry in payload.entries) {
+      if (keySet.contains(entry.key.toLowerCase())) {
+        return entry.value;
+      }
+    }
+    return null;
+  }
+
+  String? _readStringIgnoreCase(Map<String, dynamic> payload, List<String> keys) {
+    final value = _readValueIgnoreCase(payload, keys);
+    if (value == null) return null;
+    if (value is String) {
+      final text = value.trim();
+      return text.isEmpty ? null : text;
+    }
+    final text = value.toString().trim();
+    return text.isEmpty ? null : text;
+  }
+
+  List<String> _readStringListIgnoreCase(
+    Map<String, dynamic> payload,
+    List<String> keys,
+  ) {
+    final value = _readValueIgnoreCase(payload, keys);
+    if (value == null) return const <String>[];
+
+    if (value is List) {
+      return value
+          .map((e) => (e?.toString() ?? '').trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+
+    if (value is String) {
+      final text = value.trim();
+      if (text.isEmpty) return const <String>[];
+      if (text.contains('\n')) {
+        return text
+            .split('\n')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+      if (text.contains(',')) {
+        return text
+            .split(',')
+            .map((e) => e.trim())
+            .where((e) => e.isNotEmpty)
+            .toList();
+      }
+      return [text];
+    }
+
+    final text = value.toString().trim();
+    if (text.isEmpty) return const <String>[];
+    return [text];
+  }
+
+  void _showSelfcarePopup({
+    required List<String> advice,
+    required List<String> redFlags,
+  }) {
+    if (Get.isDialogOpen == true) return;
+
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFCEEFFE),
+            borderRadius: BorderRadius.circular(30),
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: Get.height * 0.7),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "คำแนะนำการดูแลตัวเอง (จาก n8n)",
+                    style: TextStyle(
+                      color: Color(0xFF4489D7),
+                      fontFamily: 'Kanit',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (advice.isNotEmpty) ...[
+                    const Text(
+                      "แนะนำ",
+                      style: TextStyle(
+                        color: Color(0xFF4489D7),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...advice.take(10).map(
+                          (t) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              "• $t",
+                              style: const TextStyle(
+                                color: Color(0xFF4489D7),
+                                fontSize: 13,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (redFlags.isNotEmpty) ...[
+                    const Text(
+                      "สัญญาณอันตรายควรพบแพทย์",
+                      style: TextStyle(
+                        color: Color(0xFFF05A42),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    ...redFlags.take(10).map(
+                          (t) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              "• $t",
+                              style: const TextStyle(
+                                color: Color(0xFFF05A42),
+                                fontSize: 13,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ),
+                    const SizedBox(height: 10),
+                  ],
+                  Align(
+                    alignment: Alignment.center,
+                    child: ElevatedButton(
+                      onPressed: () => Get.back(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF5CD9FF),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 50,
+                          vertical: 10,
+                        ),
+                      ),
+                      child: const Text(
+                        "ปิด",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  int? _tryParseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is double) return value.round();
+    if (value is String) return int.tryParse(value.trim());
+    return null;
+  }
+
+  DateTime? _tryParseDate(dynamic value) {
+    if (value == null) return null;
+    if (value is DateTime) return value;
+
+    if (value is int) {
+      final ms = value > 100000000000 ? value : value * 1000;
+      return DateTime.fromMillisecondsSinceEpoch(ms);
+    }
+    if (value is double) {
+      final asInt = value.toInt();
+      final ms = asInt > 100000000000 ? asInt : asInt * 1000;
+      return DateTime.fromMillisecondsSinceEpoch(ms);
+    }
+
+    if (value is String) {
+      final raw = value.trim();
+      if (raw.isEmpty) return null;
+
+      final datePart = raw.length >= 10 ? raw.substring(0, 10) : raw;
+      final match = RegExp(r'^(\d{4})-(\d{2})-(\d{2})$').firstMatch(datePart);
+      if (match != null) {
+        return DateTime(
+          int.parse(match.group(1)!),
+          int.parse(match.group(2)!),
+          int.parse(match.group(3)!),
+        );
+      }
+
+      return DateTime.tryParse(raw);
+    }
+
+    return null;
+  }
+
+  void _setPredictionTextFromDate(DateTime predictedDate) {
+    int daysLeft = predictedDate.difference(DateTime.now()).inDays;
+    String thaiDate = "${predictedDate.day} ${monthNames[predictedDate.month - 1]}";
+
+    if (daysLeft == 0) {
+      predictionText.value = "คาดว่าประจำเดือนจะมา 🩸 วันนี้";
+    } else if (daysLeft > 0) {
+      predictionText.value = "คาดว่าประจำเดือนจะมา 🩸 $thaiDate (อีก $daysLeft วัน)";
+    } else {
+      predictionText.value = "ประจำเดือนมาช้ากว่ากำหนด ${daysLeft.abs()} วัน";
+    }
+  }
+
+  void _setPredictionTextFromEndDate(DateTime predictedEndDate) {
+    int daysLeft = predictedEndDate.difference(DateTime.now()).inDays;
+    String thaiDate =
+        "${predictedEndDate.day} ${monthNames[predictedEndDate.month - 1]}";
+
+    if (daysLeft == 0) {
+      predictionText.value = "คาดว่าประจำเดือนจะหมด 🩸 วันนี้";
+    } else if (daysLeft > 0) {
+      predictionText.value = "คาดว่าประจำเดือนจะหมด 🩸 $thaiDate (อีก $daysLeft วัน)";
+    } else {
+      predictionText.value = "ประจำเดือนน่าจะหมดไปแล้ว ${daysLeft.abs()} วัน";
+    }
+  }
+
+  bool _applyPredictionPayload(Map<String, dynamic> payload) {
+    if (payload.isEmpty) return false;
+
+    Map<String, dynamic>? prediction;
+    final predictionRaw = payload['prediction'];
+    if (predictionRaw is Map<String, dynamic>) {
+      prediction = predictionRaw;
+    } else if (predictionRaw is Map) {
+      prediction = Map<String, dynamic>.from(predictionRaw);
+    }
+
+    Map<String, dynamic>? analysis;
+    final analysisRaw = payload['analysis'];
+    if (analysisRaw is Map<String, dynamic>) {
+      analysis = analysisRaw;
+    } else if (analysisRaw is Map) {
+      analysis = Map<String, dynamic>.from(analysisRaw);
+    }
+
+    final avgCycle = _tryParseInt(_readValueIgnoreCase(payload, [
+      'avg_cycle_length',
+      'avgCycleLength',
+    ]));
+    if (avgCycle != null) {
+      avgCycleLength.value = avgCycle;
+    } else if (analysis != null) {
+      final cycleEstimate = _tryParseInt(_readValueIgnoreCase(analysis, [
+        'cycle_length_estimate_days',
+        'cycleLengthEstimateDays',
+        'avg_cycle_length',
+        'avgCycleLength',
+      ]));
+      if (cycleEstimate != null) avgCycleLength.value = cycleEstimate;
+    }
+
+    String? confidenceLabel = _readStringIgnoreCase(payload, [
+      'confidence',
+      'prediction_confidence',
+      'predictionConfidence',
+    ]);
+    if (confidenceLabel == null && analysis != null) {
+      final confidenceRaw =
+          _readValueIgnoreCase(analysis, const ['confidence']);
+      if (confidenceRaw is num) {
+        confidenceLabel = confidenceRaw >= 0.7 ? 'high' : 'low';
+      } else if (confidenceRaw != null) {
+        final normalized = confidenceRaw.toString().trim().toLowerCase();
+        if (normalized == 'high' || normalized == 'low') {
+          confidenceLabel = normalized;
+        }
+      }
+    }
+    if (confidenceLabel == null && prediction != null) {
+      final confidenceRaw =
+          _readValueIgnoreCase(prediction, const ['confidence']);
+      if (confidenceRaw is num) {
+        confidenceLabel = confidenceRaw >= 0.7 ? 'high' : 'low';
+      } else if (confidenceRaw != null) {
+        final normalized = confidenceRaw.toString().trim().toLowerCase();
+        if (normalized == 'high' || normalized == 'low') {
+          confidenceLabel = normalized;
+        }
+      }
+    }
+    if (confidenceLabel != null) predictionConfidence.value = confidenceLabel;
+
+    final message = _readStringIgnoreCase(payload, [
+      'prediction_text',
+      'predictionText',
+      'message',
+      'text',
+    ]);
+
+    DateTime? predictedStart = _tryParseDate(_readValueIgnoreCase(payload, [
+      'predicted_start_date',
+      'predictedStartDate',
+      'predicted_next_period',
+      'predictedNextPeriod',
+    ]));
+    if (predictedStart == null && analysis != null) {
+      predictedStart = _tryParseDate(_readValueIgnoreCase(analysis, [
+        'next_period_estimate',
+        'nextPeriodEstimate',
+        'predicted_start_date',
+        'predictedStartDate',
+      ]));
+    }
+
+    DateTime? predictedEnd = _tryParseDate(_readValueIgnoreCase(payload, [
+      'predicted_end_date',
+      'predictedEndDate',
+      'period_end_date',
+      'periodEndDate',
+    ]));
+    if (predictedEnd == null && prediction != null) {
+      predictedEnd = _tryParseDate(_readValueIgnoreCase(prediction, [
+        'predicted_end_date',
+        'predictedEndDate',
+        'latest_period_end_date',
+        'latestPeriodEndDate',
+      ]));
+    }
+
+    final predictedDaysValue = _readValueIgnoreCase(payload, [
+      'predicted_period_days',
+      'predicted_dates',
+      'predictedDays',
+      'period_days',
+      'periodDays',
+    ]);
+
+    final predictedDays = <DateTime>[];
+    if (predictedDaysValue is List) {
+      for (final item in predictedDaysValue) {
+        final parsed = _tryParseDate(item);
+        if (parsed != null) predictedDays.add(parsed);
+      }
+    } else if (predictedDaysValue is String) {
+      for (final part in predictedDaysValue.split(',')) {
+        final parsed = _tryParseDate(part);
+        if (parsed != null) predictedDays.add(parsed);
+      }
+    }
+
+    predictedDays.sort((a, b) => a.compareTo(b));
+    if (predictedStart == null && predictedDays.isNotEmpty) {
+      predictedStart = predictedDays.first;
+    }
+    if (predictedEnd == null && predictedDays.isNotEmpty) {
+      predictedEnd = predictedDays.last;
+    }
+
+    if (predictedStart == null && predictedDays.isEmpty) {
+      final eventsRaw = payload['events'];
+      if (eventsRaw is List) {
+        for (final eventRaw in eventsRaw) {
+          Map<String, dynamic>? event;
+          if (eventRaw is Map<String, dynamic>) {
+            event = eventRaw;
+          } else if (eventRaw is Map) {
+            event = Map<String, dynamic>.from(eventRaw);
+          }
+          if (event == null) continue;
+
+          final type = (event['type'] ?? '').toString().trim().toLowerCase();
+          if (type != 'next_period_estimate' &&
+              type != 'next_period' &&
+              type != 'predicted_period') {
+            continue;
+          }
+
+          predictedStart = _tryParseDate(event['date'] ?? event['start_date']);
+          if (predictedStart != null) break;
+        }
+      }
+    }
+
+    if (predictedDays.isEmpty && predictedStart != null) {
+      int? estimatedDurationDays;
+      if (analysis != null) {
+        final latestPeriodRaw = analysis['latest_period'];
+        Map<String, dynamic>? latestPeriod;
+        if (latestPeriodRaw is Map<String, dynamic>) {
+          latestPeriod = latestPeriodRaw;
+        } else if (latestPeriodRaw is Map) {
+          latestPeriod = Map<String, dynamic>.from(latestPeriodRaw);
+        }
+
+        if (latestPeriod != null) {
+          estimatedDurationDays = _tryParseInt(_readValueIgnoreCase(latestPeriod, [
+            'length_days',
+            'lengthDays',
+            'duration_days',
+            'durationDays',
+          ]));
+        }
+      }
+
+      final duration = (estimatedDurationDays != null && estimatedDurationDays > 0)
+          ? estimatedDurationDays
+          : 1;
+      final cappedDuration = duration.clamp(1, 7).toInt();
+      for (int i = 0; i < cappedDuration; i++) {
+        predictedDays.add(predictedStart.add(Duration(days: i)));
+      }
+    }
+
+    if (predictedDays.isNotEmpty) {
+      for (final date in predictedDays) {
+        predictedPeriodDays.add(getDateKey(date.year, date.month, date.day));
+      }
+    } else if (predictedStart != null) {
+      predictedPeriodDays.add(
+        getDateKey(predictedStart.year, predictedStart.month, predictedStart.day),
+      );
+    }
+
+    final hasPrediction = message != null ||
+        predictedStart != null ||
+        predictedEnd != null ||
+        predictedDays.isNotEmpty;
+    if (!hasPrediction) return false;
+
+    if (message != null) {
+      predictionText.value = message;
+    } else if (predictedEnd != null) {
+      _setPredictionTextFromEndDate(predictedEnd);
+    } else if (predictedStart != null) {
+      _setPredictionTextFromDate(predictedStart);
+    } else {
+      predictionText.value = "บันทึกข้อมูลเพื่อคำนวณรอบเดือนถัดไป 🌸";
+    }
+
+    return true;
   }
 
   // [ใหม่] ดึงสถิติรวม
@@ -286,66 +956,11 @@ class ProfileController extends GetxController {
       fetchLatestCycle();
       fetchMenstrualStats(); // [ใหม่] รีเฟรชสถิติ
 
-      if (isPeriod) showAdviceModal();
+      if (isPeriod) fetchPeriodSelfcarePopup();
     } catch (e) {
       Get.snackbar("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลได้: $e",
           backgroundColor: Colors.redAccent, colorText: Colors.white);
     }
-  }
-
-  void showAdviceModal() {
-    Get.dialog(
-      Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: const Color(0xFFCEEFFE),
-            borderRadius: BorderRadius.circular(40),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "แนะนำวิธีการดูแลตัวเองช่วงเป็นประจำเดือน",
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Color(0xFF4489D7),
-                  fontFamily: 'Kanit',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildAdviceItem("- พักผ่อนและขยับกายเบาๆ: นอนหลับให้เพียงพอ และอาจโยคะหรือเดินเล่นเบาๆ เพื่อช่วยให้ร่างกายหลั่งสารเอ็นดอร์ฟิน ลดความเครียด"),
-              _buildAdviceItem("- รักษาความสะอาด: เปลี่ยนผ้าอนามัยทุก 3-4 ชั่วโมง เพื่อป้องกันความอับชื้นและการสะสมของเชื้อแบคทีเรีย"),
-              _buildAdviceItem("- ดื่มน้ำอุ่นและเลี่ยงคาเฟอีน: น้ำอุ่นช่วยให้เลือดไหลเวียนดีขึ้น ส่วนการงดกาแฟหรือชาจะช่วยลดอาการคัดตึงหน้าอก"),
-              _buildAdviceItem("- เลือกอาหารย่อยง่าย: เน้นทานผัก ผลไม้ และอาหารที่มีธาตุเหล็ก เพื่อทดแทนเลือดที่เสียไป"),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: () => Get.back(),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5CD9FF),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-                  padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 10),
-                ),
-                child: const Text("ปิด",
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAdviceItem(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Text(text,
-          textAlign: TextAlign.left,
-          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 13, height: 1.4)),
-    );
   }
 
   String getWhaleImage(int day) {
@@ -596,9 +1211,12 @@ class ProfilePage extends StatelessWidget {
                                 controller.selectedMonth.value == DateTime.now().month;
                             bool isPeriodDay =
                                 controller.dailyPeriodStatus[dayKey] ?? false;
+                            bool isPredictedDay =
+                                controller.predictedPeriodDays.contains(dayKey);
 
                             Color bgColor = Colors.transparent;
                             Color textColor = const Color(0xFF4489D7);
+                            Border? border;
 
                             if (isSelected) {
                               bgColor = const Color(0xFFFFD348);
@@ -607,6 +1225,17 @@ class ProfilePage extends StatelessWidget {
                               textColor = Colors.white;
                             } else if (isToday) {
                               bgColor = const Color(0xFFCCCCCC);
+                            }
+
+                            if (isPredictedDay && !isPeriodDay) {
+                              border = Border.all(
+                                color: const Color(0xFFF05A42),
+                                width: 1.5,
+                              );
+                              if (!isSelected && bgColor == Colors.transparent) {
+                                bgColor =
+                                    const Color(0xFFF05A42).withOpacity(0.12);
+                              }
                             }
 
                             return GestureDetector(
@@ -619,7 +1248,10 @@ class ProfilePage extends StatelessWidget {
                                     height: 36,
                                     alignment: Alignment.center,
                                     decoration: BoxDecoration(
-                                        color: bgColor, shape: BoxShape.circle),
+                                      color: bgColor,
+                                      shape: BoxShape.circle,
+                                      border: border,
+                                    ),
                                     child: Text("$day",
                                         style: TextStyle(
                                             color: textColor,
