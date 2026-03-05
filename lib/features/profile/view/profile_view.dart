@@ -57,7 +57,7 @@ class ProfileController extends GetxController {
   }
 
   // ==========================================
-  // [แก้ไข] ดึงข้อมูลจาก Supabase ผ่าน Function ที่สร้างใหม่
+  // ดึงข้อมูลจาก Supabase
   // ==========================================
   Future<void> loadMonthData() async {
     try {
@@ -65,43 +65,36 @@ class ProfileController extends GetxController {
       final userId = supabase.auth.currentUser?.id;
       if (userId == null) return;
 
-      // เรียกใช้ Function get_monthly_calendar_data ที่เราสร้างใน Supabase
-      final response = await supabase.rpc(
-        'get_monthly_calendar_data',
-        params: {
-          'p_year': selectedYear.value,
-          'p_month': selectedMonth.value,
-        },
-      );
+      String startDate = getDateKey(selectedYear.value, selectedMonth.value, 1);
+      String endDate = getDateKey(selectedYear.value, selectedMonth.value, daysInMonth);
+
+      final response = await supabase
+          .from('daily_mood_entries')
+          .select()
+          .eq('user_id', userId)
+          .gte('window_start', '$startDate 00:00:00')
+          .lte('window_start', '$endDate 23:59:59');
 
       // เคลียร์ข้อมูลเก่า
       dailyPeriodStatus.clear();
       dailySymptoms.clear();
       dailyWhaleMoods.clear();
 
-      if (response != null) {
-        for (var row in response) {
-          // calendar_date ที่ได้จาก SQL เป็น format YYYY-MM-DD อยู่แล้ว
-          String key = row['calendar_date'].toString(); 
+      for (var row in response) {
+        // แปลงวันที่จาก DB ให้เป็น DateKey
+        DateTime date = DateTime.parse(row['window_start'].toString());
+        String key = getDateKey(date.year, date.month, date.day);
 
-          dailyPeriodStatus[key] = row['is_menstruating'] ?? false;
-          
-          if (row['symptoms'] != null) {
-            dailySymptoms[key] = List<String>.from(row['symptoms']);
-          }
-
-          // ประมวลผลอารมณ์วาฬจาก mood_level (1-5)
-          if (row['mood_level'] != null) {
-            int moodLevel = row['mood_level'];
-            if (moodLevel >= 4) {
-              dailyWhaleMoods[key] = 'whale_love'; // อารมณ์ดีมาก
-            } else if (moodLevel <= 2) {
-              dailyWhaleMoods[key] = 'whale_cry'; // อารมณ์แย่
-            } else {
-              dailyWhaleMoods[key] = 'whale_happy'; // อารมณ์ปกติ
-            }
-          }
+        dailyPeriodStatus[key] = row['is_menstruating'] ?? false;
+        
+        // จัดการ Array ของ Symptoms
+        if (row['symptoms'] != null) {
+          dailySymptoms[key] = List<String>.from(row['symptoms']);
         }
+
+        // เช็คอารมณ์วาฬจาก DB (สมมติถ้ามี mood_score)
+        // int moodScore = row['mood_score'] ?? 50;
+        // dailyWhaleMoods[key] = moodScore > 70 ? 'whale_love' : 'whale_happy';
       }
     } catch (e) {
       print("Error loading data: $e");
@@ -168,7 +161,7 @@ class ProfileController extends GetxController {
   }
 
   // ==========================================
-  // [แก้ไข] บันทึกข้อมูลลง Supabase ผ่าน Function 
+  // บันทึกข้อมูลลง Supabase
   // ==========================================
   Future<void> saveDailyData() async {
     final userId = supabase.auth.currentUser?.id;
@@ -178,15 +171,15 @@ class ProfileController extends GetxController {
     }
 
     try {
-      // เรียกใช้ Function บันทึกอาการแทนการ Insert ตรงๆ
-      await supabase.rpc(
-        'save_calendar_health_log',
-        params: {
-          'p_log_date': dateKey, // ส่งเป็น String YYYY-MM-DD
-          'p_is_menstruating': getPeriodStatusForSelectedDay(),
-          'p_symptoms': getSymptomsForSelectedDay(),
-        },
-      );
+      // สร้าง Timestamp ของวันที่เลือก (เช่น 2026-03-04 12:00:00)
+      DateTime recordDate = DateTime(selectedYear.value, selectedMonth.value, selectedDate.value, 12, 0, 0);
+      
+      await supabase.from('daily_mood_entries').upsert({
+        'user_id': userId,
+        'window_start': recordDate.toIso8601String(),
+        'is_menstruating': getPeriodStatusForSelectedDay(),
+        'symptoms': getSymptomsForSelectedDay(),
+      }, onConflict: 'user_id, window_start');
 
       Get.snackbar(
         "สำเร็จ",
@@ -267,15 +260,11 @@ class ProfileController extends GetxController {
     String dateKey = getDateKey(selectedYear.value, selectedMonth.value, day);
     String? type = dailyWhaleMoods[dateKey];
     
-    // ถ้าระบุว่าเป็นประจำเดือน ให้หน้าน้องวาฬดูเหนื่อยๆ (cry) ก่อน
+    // สำหรับ Demo ถ้าระบุว่าเป็นประจำเดือน ให้หน้าน้องวาฬดูเหนื่อยๆ (cry)
     if (dailyPeriodStatus[dateKey] == true) return 'assets/images/whale_cry.png';
-    
-    // ถ้ามีการบันทึกอารมณ์มา แสดงตามอารมณ์
     if (type == 'whale_love') return 'assets/images/whale_love.png';
-    if (type == 'whale_cry') return 'assets/images/whale_cry.png';
     
-    // ถ้าไม่มีอารมณ์และไม่เป็นประจำเดือน ให้เป็นหน้าปกติ
-    return 'assets/images/whale_happy.png';
+    return 'assets/images/whale_happy.png'; // ค่าเริ่มต้น
   }
 
   final List<Map<String, String>> symptomsList = [
