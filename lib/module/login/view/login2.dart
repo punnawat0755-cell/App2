@@ -1,13 +1,8 @@
 import 'package:flutter/material.dart';
 
-class LoginPagetwo extends StatefulWidget {
+class LoginPagetwo extends StatelessWidget {
   const LoginPagetwo({super.key});
 
-  @override
-  State<LoginPagetwo> createState() => _LoginPagetwoState();
-}
-
-class _LoginPagetwoState extends State<LoginPagetwo> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -18,7 +13,6 @@ class _LoginPagetwoState extends State<LoginPagetwo> {
           child: Column(
             children: [
               const SizedBox(height: 60),
-              // โลโก้ปลาวาฬ
               Image.asset(
                 'assets/images/logo.png',
                 width: 150,
@@ -26,7 +20,6 @@ class _LoginPagetwoState extends State<LoginPagetwo> {
                 fit: BoxFit.contain,
               ),
               const SizedBox(height: 20),
-              // หัวข้อ "เข้าสู่ระบบ"
               const Text(
                 "เข้าสู่ระบบ",
                 style: TextStyle(
@@ -36,18 +29,13 @@ class _LoginPagetwoState extends State<LoginPagetwo> {
                 ),
               ),
               const SizedBox(height: 40),
-
-              // ช่องกรอกชื่อผู้ใช้
               _buildTextField(hintText: "ชื่อผู้ใช้", icon: Icons.person),
               const SizedBox(height: 20),
-
-              // ช่องกรอกรหัสผ่าน
               _buildTextField(
                 hintText: "รหัสผ่าน",
                 icon: Icons.lock,
                 isPassword: true,
               ),
-
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
@@ -59,8 +47,6 @@ class _LoginPagetwoState extends State<LoginPagetwo> {
                 ),
               ),
               const SizedBox(height: 30),
-
-              // ปุ่มเข้าสู่ระบบ
               SizedBox(
                 width: double.infinity,
                 height: 55,
@@ -83,9 +69,7 @@ class _LoginPagetwoState extends State<LoginPagetwo> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 150),
-              // สมัครสมาชิกด้านล่าง
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -114,7 +98,6 @@ class _LoginPagetwoState extends State<LoginPagetwo> {
     );
   }
 
-  // ฟังก์ชันช่วยสร้าง TextField ให้เหมือนกัน
   Widget _buildTextField({
     required String hintText,
     required IconData icon,
@@ -122,7 +105,7 @@ class _LoginPagetwoState extends State<LoginPagetwo> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F3F3), // สีพื้นหลังเทาอ่อนตามรูป
+        color: const Color(0xFFF3F3F3),
         borderRadius: BorderRadius.circular(20),
       ),
       child: TextField(

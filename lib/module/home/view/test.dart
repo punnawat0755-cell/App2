@@ -1,94 +1,99 @@
 import 'package:flutter/material.dart';
 import 'package:pod_player/pod_player.dart';
-import 'package:video_player/video_player.dart';
+import 'package:get/get.dart';
 
-/// Stateful widget to fetch and then display video content.
-class VideoApp extends StatefulWidget {
-  const VideoApp({super.key});
-
-  @override
-  _VideoAppState createState() => _VideoAppState();
-}
-
-class _VideoAppState extends State<VideoApp> {
-  late VideoPlayerController _controller;
+class VideoAppController extends GetxController {
+  late final VideoPlayerController videoController;
+  final RxBool isInitialized = false.obs;
+  final RxBool isPlaying = false.obs;
 
   @override
-  void initState() {
-    super.initState();
-    _controller =
-        VideoPlayerController.networkUrl(
-            Uri.parse(
-              'https://www.youtube.com/watch?v=l6a8q-WU6E4&list=RDl6a8q-WU6E4&start_radio=1',
-            ),
-          )
-          ..initialize().then((_) {
-            // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
-            setState(() {});
-          });
+  void onInit() {
+    super.onInit();
+    videoController = VideoPlayerController.networkUrl(
+      Uri.parse('https://www.youtube.com/watch?v=l6a8q-WU6E4&list=RDl6a8q-WU6E4&start_radio=1'),
+    )..initialize().then((_) {
+        isInitialized.value = true;
+        isPlaying.value = videoController.value.isPlaying;
+      });
+    videoController.addListener(_syncPlayback);
+  }
+
+  void _syncPlayback() {
+    isPlaying.value = videoController.value.isPlaying;
+  }
+
+  void togglePlayPause() {
+    if (videoController.value.isPlaying) {
+      videoController.pause();
+    } else {
+      videoController.play();
+    }
+    isPlaying.value = videoController.value.isPlaying;
   }
 
   @override
+  void onClose() {
+    videoController.removeListener(_syncPlayback);
+    videoController.dispose();
+    super.onClose();
+  }
+}
+
+class VideoApp extends StatelessWidget {
+  VideoApp({super.key});
+
+  final VideoAppController controller = Get.put(VideoAppController(), tag: 'video_app');
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: _controller.value.isInitialized
-            ? AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: VideoPlayer(_controller),
-              )
-            : Container(),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          setState(() {
-            _controller.value.isPlaying
-                ? _controller.pause()
-                : _controller.play();
-          });
-        },
-        child: Icon(
-          _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+    return Obx(
+      () => Scaffold(
+        body: Center(
+          child: controller.isInitialized.value
+              ? AspectRatio(
+                  aspectRatio: controller.videoController.value.aspectRatio,
+                  child: VideoPlayer(controller.videoController),
+                )
+              : Container(),
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: controller.togglePlayPause,
+          child: Icon(controller.isPlaying.value ? Icons.pause : Icons.play_arrow),
         ),
       ),
     );
   }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
 }
 
-class PlayVideoFromNetwork extends StatefulWidget {
-  const PlayVideoFromNetwork({Key? key}) : super(key: key);
-
-  @override
-  State<PlayVideoFromNetwork> createState() => _PlayVideoFromNetworkState();
-}
-
-class _PlayVideoFromNetworkState extends State<PlayVideoFromNetwork> {
+class PlayVideoNetworkController extends GetxController {
   late final PodPlayerController controller;
 
   @override
-  void initState() {
+  void onInit() {
+    super.onInit();
     controller = PodPlayerController(
       playVideoFrom: PlayVideoFrom.network(
         'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
       ),
     )..initialise();
-    super.initState();
   }
 
   @override
-  void dispose() {
+  void onClose() {
     controller.dispose();
-    super.dispose();
+    super.onClose();
   }
+}
+
+class PlayVideoFromNetwork extends StatelessWidget {
+  PlayVideoFromNetwork({super.key});
+
+  final PlayVideoNetworkController podController =
+      Get.put(PlayVideoNetworkController(), tag: 'pod_video');
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(body: PodVideoPlayer(controller: controller));
+    return Scaffold(body: PodVideoPlayer(controller: podController.controller));
   }
 }

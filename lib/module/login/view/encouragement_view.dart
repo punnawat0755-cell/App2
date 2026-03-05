@@ -7,7 +7,6 @@ import 'package:get/get.dart';
 class EncouragementController extends GetxController {
   void onNextPressed() {
     print("User clicked Next");
-    // สามารถใส่โค้ดเปลี่ยนหน้าตรงนี้ได้เลย เช่น Get.to(() => NextScreen());
   }
 }
 

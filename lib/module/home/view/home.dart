@@ -5,17 +5,10 @@ import 'package:flutter_application_1/module/home/view/widget/article/article_ca
 import 'package:flutter_application_1/module/home/view/widget/article/article_detail.dart';
 import 'package:get/get.dart';
 
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  int _currentBannerIndex = 0;
-  late PageController _pageController;
-  Timer? _timer;
+class HomeController extends GetxController {
+  final RxInt currentBannerIndex = 0.obs;
+  late final PageController pageController;
+  Timer? timer;
 
   // ข้อมูลจำลอง (Mock Data)
   final List<Map<String, dynamic>> clipList = [
@@ -57,21 +50,21 @@ class _HomePageState extends State<HomePage> {
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _pageController = PageController(initialPage: 0);
+  void onInit() {
+    super.onInit();
+    pageController = PageController(initialPage: 0);
 
     // ตั้งเวลาเลื่อนแบนเนอร์อัตโนมัติ
-    _timer = Timer.periodic(const Duration(seconds: 6), (Timer timer) {
-      if (_currentBannerIndex < 2) {
-        _currentBannerIndex++;
+    timer = Timer.periodic(const Duration(seconds: 6), (Timer timer) {
+      if (currentBannerIndex.value < 2) {
+        currentBannerIndex.value++;
       } else {
-        _currentBannerIndex = 0;
+        currentBannerIndex.value = 0;
       }
 
-      if (_pageController.hasClients) {
-        _pageController.animateToPage(
-          _currentBannerIndex,
+      if (pageController.hasClients) {
+        pageController.animateToPage(
+          currentBannerIndex.value,
           duration: const Duration(milliseconds: 800),
           curve: Curves.fastOutSlowIn,
         );
@@ -80,17 +73,24 @@ class _HomePageState extends State<HomePage> {
   }
 
   @override
-  void dispose() {
-    _timer?.cancel();
-    _pageController.dispose();
-    super.dispose();
+  void onClose() {
+    timer?.cancel();
+    pageController.dispose();
+    super.onClose();
   }
+}
+
+class HomePage extends StatelessWidget {
+  HomePage({super.key});
+
+  final HomeController controller = Get.isRegistered<HomeController>()
+      ? Get.find<HomeController>()
+      : Get.put(HomeController());
 
   @override
   Widget build(BuildContext context) {
     const name = 'Seal';
-
-    return Scaffold(
+    return Obx(() => Scaffold(
       backgroundColor: const Color(0xFFE6F7FF),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -152,11 +152,9 @@ class _HomePageState extends State<HomePage> {
               SizedBox(
                 height: 160,
                 child: PageView(
-                  controller: _pageController,
+                  controller: controller.pageController,
                   onPageChanged: (index) {
-                    setState(() {
-                      _currentBannerIndex = index;
-                    });
+                    controller.currentBannerIndex.value = index;
                   },
                   children: [
                     _buildDailyMissionBanner(),
@@ -175,10 +173,10 @@ class _HomePageState extends State<HomePage> {
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 800),
                     margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: _currentBannerIndex == index ? 24 : 8,
+                    width: controller.currentBannerIndex.value == index ? 24 : 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: _currentBannerIndex == index
+                      color: controller.currentBannerIndex.value == index
                           ? const Color(0xFF4489D7)
                           : Colors.blue.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(4),
@@ -200,13 +198,13 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                   ), // เพิ่มระยะขอบซ้าย-ขวาของ List
-                  itemCount: clipList.length,
+                  itemCount: controller.clipList.length,
                   // ตัวคั่นระหว่าง item (เว้นระยะห่าง 15 px)
                   separatorBuilder: (context, index) =>
                       const SizedBox(width: 5),
                   // ตัวสร้าง Item
                   itemBuilder: (context, index) {
-                    final item = clipList[index];
+                    final item = controller.clipList[index];
 
                     return InkWell(
                       onTap: () {
@@ -296,7 +294,7 @@ class _HomePageState extends State<HomePage> {
           ),
         ),
       ),
-    );
+    ));
   }
 
   // --------------------------------------------------------------------------

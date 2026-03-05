@@ -3,284 +3,243 @@ import 'package:flutter_application_1/module/setting/view/setting.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-class EditProfilePage extends StatefulWidget {
-  const EditProfilePage({super.key});
+class EditProfileController extends GetxController {
+  final RxnString activeField = RxnString();
 
-  @override
-  State<EditProfilePage> createState() => _EditProfilePageState();
-}
-
-class _EditProfilePageState extends State<EditProfilePage> {
-  String? activeField;
-
-  String username = "แมวน้ำ";
-  String gender = "หญิง";
-  String birthday = "17/12/2004";
+  final RxString username = 'แมวน้ำ'.obs;
+  final RxString gender = 'หญิง'.obs;
+  final RxString birthday = '17/12/2004'.obs;
 
   late String originalName;
   late TextEditingController nameController;
 
   @override
-  void initState() {
-    super.initState();
-    originalName = username;
-    nameController = TextEditingController(text: username);
+  void onInit() {
+    super.onInit();
+    originalName = username.value;
+    nameController = TextEditingController(text: username.value);
   }
 
-  Future<void> _selectDate(BuildContext context) async {
-    print(
-      "ฟังก์ชัน _selectDate ถูกเรียกแล้ว!",
-    ); // ใส่เพื่อเช็คใน Debug Console ว่ากดติดไหม
+  @override
+  void onClose() {
+    nameController.dispose();
+    super.onClose();
+  }
+
+  Future<void> selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime(2004, 12, 17),
       firstDate: DateTime(1950),
       lastDate: DateTime.now(),
-      // ลองคอมเมนต์บรรทัด locale ออกก่อนถ้ายังกดไม่ขึ้น
-      // locale: const Locale('th', 'TH'),
     );
 
     if (picked != null) {
-      setState(() {
-        birthday = DateFormat('dd/MM/yyyy').format(picked);
-        activeField = "birth";
-      });
+      birthday.value = DateFormat('dd/MM/yyyy').format(picked);
+      activeField.value = 'birth';
     }
   }
 
+  void save() {
+    if (nameController.text.trim().isEmpty) {
+      username.value = originalName;
+      nameController.text = originalName;
+    } else {
+      username.value = nameController.text;
+      originalName = username.value;
+    }
+    activeField.value = null;
+  }
+}
+
+class EditProfilePage extends StatelessWidget {
+  EditProfilePage({super.key});
+
+  final EditProfileController controller = Get.isRegistered<EditProfileController>()
+      ? Get.find<EditProfileController>()
+      : Get.put(EditProfileController());
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        titleSpacing: -8, // ปรับให้ข้อความชิดปุ่ม Back มากขึ้น
-        leading: IconButton(
-          icon: Image.asset(
-            'assets/images/back.png',
-            width: 25,
-            height: 25,
-            fit: BoxFit.contain,
+    return Obx(
+      () => Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          titleSpacing: -8,
+          leading: IconButton(
+            icon: Image.asset(
+              'assets/images/back.png',
+              width: 25,
+              height: 25,
+              fit: BoxFit.contain,
+            ),
+            onPressed: () => Get.to(() => const SettingPage()),
           ),
-          onPressed: () => Get.to(() => const SettingPage()),
-        ),
-        title: const Text(
-          "แก้ไขข้อมูล",
-          style: TextStyle(
-            color: Color(0xFF4489D7),
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
+          title: const Text(
+            'แก้ไขข้อมูล',
+            style: TextStyle(
+              color: Color(0xFF4489D7),
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-      ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
-              // --- รูปโปรไฟล์พร้อมปุ่ม Refresh ---
-              Center(
-                child: Stack(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: const CircleAvatar(
-                        radius: 75,
-                        backgroundImage: NetworkImage(
-                          'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 1,
-                      right: 3,
-                      child: GestureDetector(
-                        onTap: () {
-                          // ใส่ฟังก์ชันสำหรับเปลี่ยนรูปโปรไฟล์ที่นี่
-                        },
-                        child: CircleAvatar(
-                          backgroundColor: Colors.transparent,
-                          radius: 18,
-                          child: Image.asset(
-                            'assets/images/refresh.png', // ตรวจสอบว่าชื่อไฟล์ Refresh.png ตรงกับในเครื่อง
-                            width: 32,
-                            height: 32,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) =>
-                                const Icon(
-                                  Icons.refresh,
-                                  color: Colors.grey,
-                                  size: 20,
-                                ), // ถ้าหาไฟล์รูปไม่เจอ ให้แสดงไอคอนสำรองแทน
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 25),
-              // --- แสดงชื่อผู้ใช้ตรงกลางหน้าจอ ---
-              Center(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      username,
-                      style: const TextStyle(
-                        color: Color(0xFF4489D7),
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 30),
-
-              // --- 1. แถบชื่อผู้ใช้ ---
-              _buildEditItem(
-                label: "ชื่อผู้ใช้ :",
-                fieldKey: "name",
-                content: activeField == "name"
-                    ? TextField(
-                        controller: nameController,
-                        autofocus: true,
-                        style: const TextStyle(
-                          color: Color(0xFF4489D7),
-                          fontSize: 18,
-                        ),
-                        decoration: const InputDecoration(
-                          border: InputBorder.none,
-                          isDense: true,
-                          contentPadding: EdgeInsets.zero,
-                        ),
-                        onChanged: (val) => setState(
-                          () => username = val.isEmpty ? originalName : val,
-                        ),
-                      )
-                    : Text(
-                        username,
-                        style: const TextStyle(
-                          color: Color(0xFF4489D7),
-                          fontSize: 18,
-                        ),
-                      ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // --- 2. แถบเพศ ---
-              _buildEditItem(
-                label: "เพศ :",
-                fieldKey: "gender",
-                content: Text(
-                  gender,
-                  style: const TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontSize: 18,
-                  ),
-                ),
-              ),
-              if (activeField == "gender")
-                Padding(
-                  padding: const EdgeInsets.only(top: 15, bottom: 5),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 30),
+            child: Column(
+              children: [
+                const SizedBox(height: 40),
+                Center(
+                  child: Stack(
                     children: [
-                      _buildGenderChip("ชาย"),
-                      _buildGenderChip("หญิง"),
-                      _buildGenderChip("LGBTQ+"),
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: const CircleAvatar(
+                          radius: 75,
+                          backgroundImage: NetworkImage(
+                            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 1,
+                        right: 3,
+                        child: GestureDetector(
+                          onTap: () {},
+                          child: CircleAvatar(
+                            backgroundColor: Colors.transparent,
+                            radius: 18,
+                            child: Image.asset(
+                              'assets/images/refresh.png',
+                              width: 32,
+                              height: 32,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const Icon(Icons.refresh, color: Colors.grey, size: 20),
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-
-              const SizedBox(height: 20),
-
-              // --- 3. แถบวันเกิด (แก้ไขให้กดได้ทั้งช่อง) ---
-              _buildEditItem(
-                label: "วันเกิด :",
-                fieldKey: "birth",
-                icon: Icons.calendar_month, // ใช้ไอคอนปฏิทินตามรูป
-                onIconTap: () => _selectDate(context),
-                content: GestureDetector(
-                  onTap: () =>
-                      _selectDate(context), // กดที่ตัวเลขวันที่เพื่อเปิดปฏิทิน
+                const SizedBox(height: 25),
+                Center(
                   child: Text(
-                    birthday,
+                    controller.username.value,
                     style: const TextStyle(
                       color: Color(0xFF4489D7),
-                      fontSize: 18,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-              ),
-
-              const SizedBox(height: 30),
-
-              // --- ปุ่มบันทึกข้อมูล ---
-              if (activeField != null)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 5,
-                          offset: const Offset(0, 3),
+                const SizedBox(height: 30),
+                _buildEditItem(
+                  context: context,
+                  label: 'ชื่อผู้ใช้ :',
+                  fieldKey: 'name',
+                  content: controller.activeField.value == 'name'
+                      ? TextField(
+                          controller: controller.nameController,
+                          autofocus: true,
+                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          onChanged: (val) =>
+                              controller.username.value = val.isEmpty ? controller.originalName : val,
+                        )
+                      : Text(
+                          controller.username.value,
+                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
                         ),
+                ),
+                const SizedBox(height: 20),
+                _buildEditItem(
+                  context: context,
+                  label: 'เพศ :',
+                  fieldKey: 'gender',
+                  content: Text(
+                    controller.gender.value,
+                    style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                  ),
+                ),
+                if (controller.activeField.value == 'gender')
+                  Padding(
+                    padding: const EdgeInsets.only(top: 15, bottom: 5),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildGenderChip('ชาย'),
+                        _buildGenderChip('หญิง'),
+                        _buildGenderChip('LGBTQ+'),
                       ],
                     ),
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          if (nameController.text.trim().isEmpty) {
-                            username = originalName;
-                            nameController.text = originalName;
-                          } else {
-                            username = nameController.text;
-                            originalName = username;
-                          }
-                          activeField = null;
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2D4983),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 25,
-                          vertical: 8,
-                        ),
+                  ),
+                const SizedBox(height: 20),
+                _buildEditItem(
+                  context: context,
+                  label: 'วันเกิด :',
+                  fieldKey: 'birth',
+                  onIconTap: () => controller.selectDate(context),
+                  content: GestureDetector(
+                    onTap: () => controller.selectDate(context),
+                    child: Text(
+                      controller.birthday.value,
+                      style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 30),
+                if (controller.activeField.value != null)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 5,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
                       ),
-                      child: const Text(
-                        "บันทึก",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                      child: ElevatedButton(
+                        onPressed: controller.save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2D4983),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
+                        ),
+                        child: const Text(
+                          'บันทึก',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -288,10 +247,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildEditItem({
+    required BuildContext context,
     required String label,
     required String fieldKey,
     required Widget content,
-    IconData? icon, // ยังเก็บไว้เผื่อกรณีฉุกเฉิน
     VoidCallback? onIconTap,
   }) {
     return Container(
@@ -303,7 +262,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 4,
             offset: const Offset(0, 4),
           ),
@@ -322,18 +281,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
           const SizedBox(width: 20),
           Expanded(child: content),
           GestureDetector(
-            onTap: onIconTap ?? () => setState(() => activeField = fieldKey),
-            child: fieldKey == "birth"
-                ? Image.asset(
-                    'assets/images/calendar.png', // รูปปฏิทิน
-                    width: 30,
-                    height: 30,
-                  )
-                : Image.asset(
-                    'assets/images/pen.png', // รูปดินสอ
-                    width: 25,
-                    height: 25,
-                  ),
+            onTap: onIconTap ?? () => controller.activeField.value = fieldKey,
+            child: fieldKey == 'birth'
+                ? Image.asset('assets/images/calendar.png', width: 30, height: 30)
+                : Image.asset('assets/images/pen.png', width: 25, height: 25),
           ),
         ],
       ),
@@ -341,9 +292,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildGenderChip(String label) {
-    bool isSelected = gender == label;
+    final isSelected = controller.gender.value == label;
     return GestureDetector(
-      onTap: () => setState(() => gender = label),
+      onTap: () => controller.gender.value = label,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
         decoration: BoxDecoration(

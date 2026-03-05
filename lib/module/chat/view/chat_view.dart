@@ -7,7 +7,7 @@ import 'dart:async';
 // ---------------------------------------------------------
 class ChatSelectionController extends GetxController {
   void goToStartChat() {
-    Get.to(() => const WaitingChatPage());
+    Get.to(() => WaitingChatPage());
   }
 
   void goToCounseling() {
@@ -227,54 +227,33 @@ class HalfCircleButton extends StatelessWidget {
 // ---------------------------------------------------------
 // 4. หน้าจอรอคู่สนทนา (WaitingChatPage) - [หยุดเวลาเมื่อมี Pop-up]
 // ---------------------------------------------------------
-class WaitingChatPage extends StatefulWidget {
-  const WaitingChatPage({super.key});
+class WaitingChatController extends GetxController
+    with GetSingleTickerProviderStateMixin {
+  late final AnimationController animationController;
+  Timer? timer;
 
   @override
-  State<WaitingChatPage> createState() => _WaitingChatPageState();
-}
-
-class _WaitingChatPageState extends State<WaitingChatPage>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
+  void onInit() {
+    super.onInit();
+    animationController = AnimationController(
       duration: const Duration(seconds: 6),
       vsync: this,
     )..repeat();
-
-    // เริ่มนับเวลา 5 วินาที
-    _startTimer();
+    startTimer();
   }
 
-  // [เพิ่ม] ฟังก์ชันเริ่มนับเวลา (แยกออกมาเพื่อให้เรียกใหม่ได้)
-  void _startTimer() {
-    _timer = Timer(const Duration(seconds: 5), () {
-      if (mounted) {
-        Get.off(() => const ChatPage());
-      }
+  void startTimer() {
+    timer?.cancel();
+    timer = Timer(const Duration(seconds: 5), () {
+      Get.off(() => ChatPage());
     });
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  // ฟังก์ชันแสดง Pop-up ยืนยันการออก
-  void _showExitDialog() {
-    // [สำคัญ] สั่งหยุดเวลาทันทีที่ Pop-up เด้ง
-    _timer?.cancel();
-
+  void showExitDialog(BuildContext context) {
+    timer?.cancel();
     showDialog(
       context: context,
-      barrierDismissible: false, // ห้ามกดพื้นหลังเพื่อปิด (บังคับเลือก)
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return Dialog(
           backgroundColor: const Color(0xFFC3F3FF),
@@ -284,7 +263,6 @@ class _WaitingChatPageState extends State<WaitingChatPage>
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 50),
             height: 220,
-            // width: 400,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -301,12 +279,9 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // --- ปุ่ม ยืนยัน (ออกจากการรอ) ---
                     GestureDetector(
                       onTap: () {
-                        // 1. ปิด Pop-up
                         Get.back();
-                        // 2. กลับไปหน้าเลือกโหมด (ออกจริง)
                         Get.back();
                       },
                       child: Container(
@@ -329,14 +304,10 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                       ),
                     ),
                     const SizedBox(width: 20),
-
-                    // --- ปุ่ม ยกเลิก (กลับมารอต่อ) ---
                     GestureDetector(
                       onTap: () {
-                        // 1. ปิด Pop-up
                         Get.back();
-                        // 2. [สำคัญ] เริ่มนับเวลาใหม่ เพราะเราหยุดไปตอน Pop-up ขึ้น
-                        _startTimer();
+                        startTimer();
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -368,12 +339,27 @@ class _WaitingChatPageState extends State<WaitingChatPage>
   }
 
   @override
+  void onClose() {
+    animationController.dispose();
+    timer?.cancel();
+    super.onClose();
+  }
+}
+
+class WaitingChatPage extends StatelessWidget {
+  WaitingChatPage({super.key});
+
+  final WaitingChatController controller = Get.isRegistered<WaitingChatController>()
+      ? Get.find<WaitingChatController>()
+      : Get.put(WaitingChatController());
+
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        _showExitDialog(); // กดปุ่ม Back ของเครื่อง -> หยุดเวลาแล้วโชว์ Pop-up
+        controller.showExitDialog(context);
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF0F9FF),
@@ -382,7 +368,7 @@ class _WaitingChatPageState extends State<WaitingChatPage>
           elevation: 0,
           leading: IconButton(
             icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[700]),
-            onPressed: _showExitDialog, // กดลูกศร -> หยุดเวลาแล้วโชว์ Pop-up
+            onPressed: () => controller.showExitDialog(context),
           ),
         ),
         body: Center(
@@ -415,7 +401,7 @@ class _WaitingChatPageState extends State<WaitingChatPage>
                         color: const Color(0xFFAEDEF4),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withValues(alpha: 0.1),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -445,9 +431,9 @@ class _WaitingChatPageState extends State<WaitingChatPage>
 
   Widget _buildOneWayRipple(double startDelay) {
     return AnimatedBuilder(
-      animation: _controller,
+      animation: controller.animationController,
       builder: (context, child) {
-        final double t = (_controller.value + startDelay) % 1.0;
+        final double t = (controller.animationController.value + startDelay) % 1.0;
         final double currentSize = 240 + (180 * t);
         final double opacity = 0.4 * (1.0 - t);
         return Container(
@@ -455,9 +441,9 @@ class _WaitingChatPageState extends State<WaitingChatPage>
           height: currentSize,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFFAEDEF4).withOpacity(opacity),
+            color: const Color(0xFFAEDEF4).withValues(alpha: opacity),
             border: Border.all(
-              color: Colors.white.withOpacity(opacity),
+              color: Colors.white.withValues(alpha: opacity),
               width: 1,
             ),
           ),
@@ -470,17 +456,9 @@ class _WaitingChatPageState extends State<WaitingChatPage>
 // ---------------------------------------------------------
 // 5. หน้าแชท (ChatPage)
 // ---------------------------------------------------------
-class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
-
-  @override
-  State<ChatPage> createState() => _ChatPageState();
-}
-
-class _ChatPageState extends State<ChatPage> {
-  final TextEditingController _textController = TextEditingController();
-
-  final List<Map<String, dynamic>> _messages = [
+class ChatPageController extends GetxController {
+  final TextEditingController textController = TextEditingController();
+  final RxList<Map<String, dynamic>> messages = <Map<String, dynamic>>[
     {'text': 'ฉันรู้สึกเสียใจที่ทำงานพลาด', 'isMe': true},
     {'text': 'ฉันจัดการความรู้สึกนี้ยังไงดี', 'isMe': true},
     {
@@ -488,20 +466,31 @@ class _ChatPageState extends State<ChatPage> {
           'ความเสียใจจากการทำงานพลาดเป็นเรื่องปกติและไม่ได้หมายความว่าคุณไม่เก่งสิ่งสำคัญคือการยอมรับความรู้สึกโดยไม่โทษตัวเองแยกความผิดพลาดออกจากคุณค่าในตัวเอง แล้วนำบทเรียนไปปรับใช้พร้อมดูแลใจตัวเองเพื่อก้าวต่อไปอย่างเข้มแข็ง',
       'isMe': false,
     },
-  ];
+  ].obs;
 
-  void _sendMessage() {
-    if (_textController.text.trim().isEmpty) return;
-    setState(() {
-      _messages.insert(0, {'text': _textController.text, 'isMe': true});
-      _textController.clear();
-    });
+  void sendMessage() {
+    if (textController.text.trim().isEmpty) return;
+    messages.insert(0, {'text': textController.text, 'isMe': true});
+    textController.clear();
   }
 
-  void _endConversation() {
-    // [แก้ไข] เปลี่ยนจากกลับหน้าหลัก เป็นไปหน้า ConversationSummaryPage
-    Get.to(() => const ConversationSummaryPage());
+  void endConversation() {
+    Get.to(() => ConversationSummaryPage());
   }
+
+  @override
+  void onClose() {
+    textController.dispose();
+    super.onClose();
+  }
+}
+
+class ChatPage extends StatelessWidget {
+  ChatPage({super.key});
+
+  final ChatPageController controller = Get.isRegistered<ChatPageController>()
+      ? Get.find<ChatPageController>()
+      : Get.put(ChatPageController());
 
   @override
   Widget build(BuildContext context) {
@@ -532,7 +521,7 @@ class _ChatPageState extends State<ChatPage> {
             padding: const EdgeInsets.only(right: 15),
             child: UnconstrainedBox(
               child: GestureDetector(
-                onTap: _endConversation,
+                onTap: controller.endConversation,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -578,49 +567,51 @@ class _ChatPageState extends State<ChatPage> {
             ),
           ),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 15),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final isMe = msg['isMe'];
-                return Align(
-                  alignment: isMe
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0E0E0),
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: isMe
-                            ? const Radius.circular(20)
-                            : Radius.circular(0),
-                        bottomRight: isMe
-                            ? Radius.circular(0)
-                            : const Radius.circular(20),
+            child: Obx(
+              () => ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 15),
+                itemCount: controller.messages.length,
+                itemBuilder: (context, index) {
+                  final msg = controller.messages[index];
+                  final isMe = msg['isMe'];
+                  return Align(
+                    alignment: isMe
+                        ? Alignment.centerRight
+                        : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      constraints: BoxConstraints(
+                        maxWidth: MediaQuery.of(context).size.width * 0.75,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0E0E0),
+                        borderRadius: BorderRadius.only(
+                          topLeft: const Radius.circular(20),
+                          topRight: const Radius.circular(20),
+                          bottomLeft: isMe
+                              ? const Radius.circular(20)
+                              : Radius.circular(0),
+                          bottomRight: isMe
+                              ? Radius.circular(0)
+                              : const Radius.circular(20),
+                        ),
+                      ),
+                      child: Text(
+                        msg['text'],
+                        style: TextStyle(
+                          color: Colors.grey[800],
+                          fontSize: 16,
+                          height: 1.4,
+                        ),
                       ),
                     ),
-                    child: Text(
-                      msg['text'],
-                      style: TextStyle(
-                        color: Colors.grey[800],
-                        fontSize: 16,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
           Padding(
@@ -644,7 +635,7 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                   Expanded(
                     child: TextField(
-                      controller: _textController,
+                      controller: controller.textController,
                       decoration: const InputDecoration(
                         hintText: 'ส่งข้อความ.......',
                         hintStyle: TextStyle(color: Colors.grey),
@@ -654,7 +645,7 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: _sendMessage,
+                    onTap: controller.sendMessage,
                     child: Padding(
                       padding: const EdgeInsets.only(right: 15),
                       child: Transform.rotate(
@@ -680,25 +671,12 @@ class _ChatPageState extends State<ChatPage> {
 // ---------------------------------------------------------
 // 6. หน้าสรุปการสนทนา (ConversationSummaryPage) - [เพิ่มระบบ Block]
 // ---------------------------------------------------------
-class ConversationSummaryPage extends StatefulWidget {
-  const ConversationSummaryPage({super.key});
+class ConversationSummaryController extends GetxController {
+  final RxBool isFollowed = false.obs;
+  final RxBool isBlocked = false.obs;
+  final RxInt currentRating = 3.obs;
 
-  @override
-  State<ConversationSummaryPage> createState() =>
-      _ConversationSummaryPageState();
-}
-
-class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
-  // สถานะติดตาม
-  bool isFollowed = false;
-  // สถานะบล็อก (ถ้า true ปุ่มจะหายไป)
-  bool isBlocked = false;
-
-  // คะแนนดาวเริ่มต้น
-  int currentRating = 3;
-
-  // ฟังก์ชันแสดง Pop-up ยืนยันการบล็อก
-  void _showBlockDialog() {
+  void showBlockDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -729,12 +707,8 @@ class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
                     // ปุ่ม ยืนยัน
                     GestureDetector(
                       onTap: () {
-                        // 1. ปิด Pop-up
                         Get.back();
-                        // 2. อัปเดตสถานะเป็นบล็อก (ปุ่มจะหายไป)
-                        setState(() {
-                          isBlocked = true;
-                        });
+                        isBlocked.value = true;
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -789,10 +763,19 @@ class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
       },
     );
   }
+}
+
+class ConversationSummaryPage extends StatelessWidget {
+  ConversationSummaryPage({super.key});
+
+  final ConversationSummaryController controller =
+      Get.isRegistered<ConversationSummaryController>()
+          ? Get.find<ConversationSummaryController>()
+          : Get.put(ConversationSummaryController());
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Obx(() => Scaffold(
       backgroundColor: const Color(0xFFF0F9FF),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
@@ -844,16 +827,14 @@ class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
             // -----------------------------------------------------
             // ส่วนปุ่ม ติดตาม / บล็อก (จะแสดงก็ต่อเมื่อ ยังไม่บล็อก)
             // -----------------------------------------------------
-            if (!isBlocked) ...[
+            if (!controller.isBlocked.value) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   // [1] ปุ่มติดตาม
                   GestureDetector(
                     onTap: () {
-                      setState(() {
-                        isFollowed = !isFollowed;
-                      });
+                      controller.isFollowed.value = !controller.isFollowed.value;
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
@@ -862,11 +843,11 @@ class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
                         vertical: 10,
                       ),
                       decoration: BoxDecoration(
-                        color: isFollowed
+                        color: controller.isFollowed.value
                             ? const Color(0xFFE0E0E0)
                             : const Color(0xFFD3ECF8),
                         borderRadius: BorderRadius.circular(20),
-                        boxShadow: isFollowed
+                        boxShadow: controller.isFollowed.value
                             ? [
                                 // [แก้ตรงนี้ 1] ใส่เงาสำหรับปุ่มสีเทา (ติดตามแล้ว)
                                 BoxShadow(
@@ -888,9 +869,9 @@ class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
                               ],
                       ),
                       child: Text(
-                        isFollowed ? "ติดตามแล้ว" : "ติดตาม",
+                        controller.isFollowed.value ? "ติดตามแล้ว" : "ติดตาม",
                         style: TextStyle(
-                          color: isFollowed
+                          color: controller.isFollowed.value
                               ? Colors.grey[600]
                               : const Color(0xFF4489D7),
                           fontWeight: FontWeight.bold,
@@ -903,7 +884,7 @@ class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
 
                   // [2] ปุ่มบล็อก (กดแล้วเด้ง Pop-up)
                   GestureDetector(
-                    onTap: _showBlockDialog, // เรียกฟังก์ชัน Pop-up
+                    onTap: () => controller.showBlockDialog(context),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 25,
@@ -946,16 +927,14 @@ class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
               children: List.generate(5, (index) {
                 return GestureDetector(
                   onTap: () {
-                    setState(() {
-                      currentRating = index + 1;
-                    });
+                    controller.currentRating.value = index + 1;
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: Icon(
                       Icons.star_rounded,
                       size: 55,
-                      color: index < currentRating
+                      color: index < controller.currentRating.value
                           ? const Color(0xFFFFE082)
                           : const Color(0xFFE0E0E0),
                     ),
@@ -1001,6 +980,6 @@ class _ConversationSummaryPageState extends State<ConversationSummaryPage> {
           ],
         ),
       ),
-    );
+    ));
   }
 }

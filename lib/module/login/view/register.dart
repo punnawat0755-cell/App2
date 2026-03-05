@@ -1,43 +1,33 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../supabase_client.dart';
 import 'login.dart';
 
-class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+class RegisterController extends GetxController {
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController birthdayController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  final RxBool isLoading = false.obs;
+  final RxBool hidePw = true.obs;
+  final Rxn<DateTime> birthday = Rxn<DateTime>();
+  final RxString sex = 'Female'.obs;
 
   @override
-  State<RegisterPage> createState() => _RegisterPageState();
-}
-
-class _RegisterPageState extends State<RegisterPage> {
-  final _usernameController = TextEditingController();
-  final _birthdayController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _passwordController = TextEditingController();
-
-  bool _isLoading = false;
-  bool _hidePw = true;
-
-  DateTime? _birthday;
-  String _sex = 'Female';
-
-  // ---------- helpers ----------
-  void _showError(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), backgroundColor: Colors.red),
-    );
+  void onClose() {
+    usernameController.dispose();
+    birthdayController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    passwordController.dispose();
+    super.onClose();
   }
 
-  void _showSuccess(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), backgroundColor: Colors.green),
-    );
-  }
-
-  String _prettyAuthMessage(String message) {
+  String prettyAuthMessage(String message) {
     final m = message.toLowerCase();
 
     if (m.contains('only request this after')) {
@@ -54,56 +44,39 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     return message;
   }
-  // ----------------------------
 
-  String _toIsoDate(DateTime d) {
+  String toIsoDate(DateTime d) {
     final mm = d.month.toString().padLeft(2, '0');
     final dd = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$mm-$dd'; // YYYY-MM-DD
+    return '${d.year}-$mm-$dd';
   }
 
-  Future<void> _pickBirthday() async {
-    final now = DateTime.now();
-    final initial = _birthday ?? DateTime(now.year - 18, now.month, now.day);
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime(1900),
-      lastDate: now,
-    );
-
-    if (picked == null) return;
-
-    setState(() {
-      _birthday = picked;
-      // แสดงแบบ dd/MM/yyyy ในช่อง (อ่านง่าย)
-      final dd = picked.day.toString().padLeft(2, '0');
-      final mm = picked.month.toString().padLeft(2, '0');
-      _birthdayController.text = '$dd/$mm/${picked.year}';
-    });
+  void setBirthday(DateTime value) {
+    birthday.value = value;
+    final dd = value.day.toString().padLeft(2, '0');
+    final mm = value.month.toString().padLeft(2, '0');
+    birthdayController.text = '$dd/$mm/${value.year}';
   }
 
-  Future<void> _register() async {
-    if (_isLoading) return;
-    setState(() => _isLoading = true);
+  Future<String?> register() async {
+    if (isLoading.value) return null;
+    isLoading.value = true;
 
     try {
-      final username = _usernameController.text.trim();
-      final email = _emailController.text.trim();
-      final phone = _phoneController.text.trim();
-      final password = _passwordController.text.trim();
+      final username = usernameController.text.trim();
+      final email = emailController.text.trim();
+      final phone = phoneController.text.trim();
+      final password = passwordController.text.trim();
 
       if (username.isEmpty || email.isEmpty || password.isEmpty) {
         throw const AuthException('กรุณากรอกข้อมูลให้ครบ (Name, Email, Password)');
       }
-      if (_birthday == null) {
+      if (birthday.value == null) {
         throw const AuthException('กรุณาเลือกวันเกิด');
       }
 
-      // map เพศให้สอดคล้องกับ DB
       String gender;
-      switch (_sex) {
+      switch (sex.value) {
         case 'Male':
           gender = 'male';
           break;
@@ -119,9 +92,8 @@ class _RegisterPageState extends State<RegisterPage> {
         password: password,
         data: {
           'username': username,
-          // ชื่อต้องตรงกับ DB trigger
           'gender': gender,
-          'birth_date': _toIsoDate(_birthday!), // YYYY-MM-DD
+          'birth_date': toIsoDate(birthday.value!),
           'phone': phone,
         },
       );
@@ -130,36 +102,31 @@ class _RegisterPageState extends State<RegisterPage> {
         throw const AuthException('สมัครไม่สำเร็จ กรุณาลองใหม่');
       }
 
-      if (!mounted) return;
-
-      _showSuccess('สมัครสำเร็จ! ถ้าเปิดยืนยันอีเมล ให้ไปกดยืนยันก่อนล็อกอิน');
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginPage()),
+      Get.snackbar(
+        'สำเร็จ',
+        'สมัครสำเร็จ! ถ้าเปิดยืนยันอีเมล ให้ไปกดยืนยันก่อนล็อกอิน',
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
       );
+      Get.off(() => LoginPage());
+      return null;
     } on AuthException catch (e) {
-      if (!mounted) return;
-      _showError(_prettyAuthMessage(e.message));
+      return prettyAuthMessage(e.message);
     } catch (e) {
-      if (!mounted) return;
-      _showError('Error: $e');
+      return 'Error: $e';
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      isLoading.value = false;
     }
   }
+}
 
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    _birthdayController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
+class RegisterPage extends StatelessWidget {
+  RegisterPage({super.key});
 
-  // ---------- UI ----------
+  final RegisterController controller = Get.isRegistered<RegisterController>()
+      ? Get.find<RegisterController>()
+      : Get.put(RegisterController());
+
   static const _bg = Color(0xFFE9F7FF);
   static const _blue = Color(0xFF1E88FF);
 
@@ -235,11 +202,11 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Widget _sexButton(String value) {
-    final selected = _sex == value;
+    final selected = controller.sex.value == value;
 
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _sex = value),
+        onTap: () => controller.sex.value = value,
         child: Container(
           height: 34,
           alignment: Alignment.center,
@@ -247,7 +214,9 @@ class _RegisterPageState extends State<RegisterPage> {
             color: selected ? const Color(0xFF79D7FF) : Colors.white,
             borderRadius: BorderRadius.circular(999),
             border: Border.all(
-              color: selected ? Colors.transparent : Colors.black.withValues(alpha: 0.10),
+              color: selected
+                  ? Colors.transparent
+                  : Colors.black.withValues(alpha: 0.10),
             ),
             boxShadow: selected
                 ? [
@@ -255,7 +224,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       blurRadius: 14,
                       offset: const Offset(0, 8),
                       color: Colors.black.withValues(alpha: 0.08),
-                    )
+                    ),
                   ]
                 : [],
           ),
@@ -264,7 +233,9 @@ class _RegisterPageState extends State<RegisterPage> {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w900,
-              color: selected ? const Color(0xFF0D47A1) : Colors.black.withValues(alpha: 0.35),
+              color: selected
+                  ? const Color(0xFF0D47A1)
+                  : Colors.black.withValues(alpha: 0.35),
             ),
           ),
         ),
@@ -323,136 +294,161 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
+  Future<void> _pickBirthday(BuildContext context) async {
+    final now = DateTime.now();
+    final initial = controller.birthday.value ??
+        DateTime(now.year - 18, now.month, now.day);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(1900),
+      lastDate: now,
+    );
+
+    if (picked == null) return;
+    controller.setBirthday(picked);
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: _bg,
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 380),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 18),
-              child: Column(
-                children: [
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Create New\nAccount',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: _blue,
-                      height: 1.15,
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Name')),
-                  _pillField(controller: _usernameController, hint: ''),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Birthday')),
-                  _pillField(
-                    controller: _birthdayController,
-                    hint: '',
-                    readOnly: true,
-                    onTap: _pickBirthday,
-                    suffix: IconButton(
-                      onPressed: _pickBirthday,
-                      icon: Icon(
-                        Icons.calendar_today_outlined,
-                        size: 18,
-                        color: Colors.black.withValues(alpha: 0.25),
+    return Obx(
+      () => Scaffold(
+        backgroundColor: _bg,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 380),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 18),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Create New\nAccount',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: _blue,
+                        height: 1.15,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Sex')),
-                  Row(
-                    children: [
-                      _sexButton('Male'),
-                      const SizedBox(width: 10),
-                      _sexButton('Female'),
-                      const SizedBox(width: 10),
-                      _sexButton('None'),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Email')),
-                  _pillField(
-                    controller: _emailController,
-                    hint: '',
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Number Phone')),
-                  _pillField(
-                    controller: _phoneController,
-                    hint: '',
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 12),
-
-                  Align(alignment: Alignment.centerLeft, child: _label('Password')),
-                  _pillField(
-                    controller: _passwordController,
-                    hint: '',
-                    obscure: _hidePw,
-                    suffix: IconButton(
-                      onPressed: () => setState(() => _hidePw = !_hidePw),
-                      icon: Icon(
-                        _hidePw ? Icons.visibility : Icons.visibility_off,
-                        size: 20,
-                        color: Colors.black.withValues(alpha: 0.25),
+                    const SizedBox(height: 18),
+                    Align(alignment: Alignment.centerLeft, child: _label('Name')),
+                    _pillField(controller: controller.usernameController, hint: ''),
+                    const SizedBox(height: 12),
+                    Align(alignment: Alignment.centerLeft, child: _label('Birthday')),
+                    _pillField(
+                      controller: controller.birthdayController,
+                      hint: '',
+                      readOnly: true,
+                      onTap: () => _pickBirthday(context),
+                      suffix: IconButton(
+                        onPressed: () => _pickBirthday(context),
+                        icon: Icon(
+                          Icons.calendar_today_outlined,
+                          size: 18,
+                          color: Colors.black.withValues(alpha: 0.25),
+                        ),
                       ),
                     ),
-                  ),
-
-                  const SizedBox(height: 18),
-                  _blueButton(
-                    text: 'Sign Up',
-                    onPressed: _isLoading ? null : _register,
-                    loading: _isLoading,
-                  ),
-
-                  const SizedBox(height: 14),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'already have an account? ',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.black.withValues(alpha: 0.28),
+                    const SizedBox(height: 12),
+                    Align(alignment: Alignment.centerLeft, child: _label('Sex')),
+                    Row(
+                      children: [
+                        _sexButton('Male'),
+                        const SizedBox(width: 10),
+                        _sexButton('Female'),
+                        const SizedBox(width: 10),
+                        _sexButton('None'),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Align(alignment: Alignment.centerLeft, child: _label('Email')),
+                    _pillField(
+                      controller: controller.emailController,
+                      hint: '',
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: _label('Number Phone'),
+                    ),
+                    _pillField(
+                      controller: controller.phoneController,
+                      hint: '',
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 12),
+                    Align(alignment: Alignment.centerLeft, child: _label('Password')),
+                    _pillField(
+                      controller: controller.passwordController,
+                      hint: '',
+                      obscure: controller.hidePw.value,
+                      suffix: IconButton(
+                        onPressed: () =>
+                            controller.hidePw.value = !controller.hidePw.value,
+                        icon: Icon(
+                          controller.hidePw.value
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          size: 20,
+                          color: Colors.black.withValues(alpha: 0.25),
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LoginPage()),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          minimumSize: const Size(0, 0),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: const Text(
-                          'Login',
+                    ),
+                    const SizedBox(height: 18),
+                    _blueButton(
+                      text: 'Sign Up',
+                      onPressed: controller.isLoading.value
+                          ? null
+                          : () async {
+                              final errorText = await controller.register();
+                              if (errorText != null && errorText.isNotEmpty) {
+                                Get.snackbar(
+                                  'Error',
+                                  errorText,
+                                  backgroundColor: Colors.red,
+                                  colorText: Colors.white,
+                                );
+                              }
+                            },
+                      loading: controller.isLoading.value,
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'already have an account? ',
                           style: TextStyle(
                             fontSize: 11.5,
-                            fontWeight: FontWeight.w900,
-                            color: _blue,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.black.withValues(alpha: 0.28),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ],
+                        TextButton(
+                          onPressed: () => Get.off(() => LoginPage()),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(0, 0),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text(
+                            'Login',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w900,
+                              color: _blue,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

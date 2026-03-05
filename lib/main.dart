@@ -1,6 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/bottonbar.dart';
-import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -45,31 +46,45 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthStateHandler extends StatefulWidget {
-  const AuthStateHandler({super.key});
+class AuthStateController extends GetxController {
+  final RxBool isLoading = true.obs;
+  final Rxn<Session> session = Rxn<Session>();
+  StreamSubscription<AuthState>? _authSub;
 
   @override
-  State<AuthStateHandler> createState() => _AuthStateHandlerState();
+  void onInit() {
+    super.onInit();
+    session.value = supabase.auth.currentSession;
+    isLoading.value = false;
+    _authSub = supabase.auth.onAuthStateChange.listen((state) {
+      session.value = state.session;
+      isLoading.value = false;
+    });
+  }
+
+  @override
+  void onClose() {
+    _authSub?.cancel();
+    super.onClose();
+  }
 }
 
-class _AuthStateHandlerState extends State<AuthStateHandler> {
-  late final Stream<AuthState> _stream = supabase.auth.onAuthStateChange;
+class AuthStateHandler extends StatelessWidget {
+  const AuthStateHandler({super.key});
+
+  static final AuthStateController _controller = Get.put(AuthStateController());
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<AuthState>(
-      stream: _stream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
+    return Obx(() {
+      if (_controller.isLoading.value) {
+        return const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        );
+      }
 
-        final session = supabase.auth.currentSession;
-        if (session == null) return const LoginPage();
-        return const HomePage();
-      },
-    );
+      if (_controller.session.value == null) return LoginPage();
+      return HomePage();
+    });
   }
 }

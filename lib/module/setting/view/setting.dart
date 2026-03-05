@@ -68,14 +68,14 @@ class SettingPage extends StatelessWidget {
                 Image.asset("assets/images/person.png"),
                 "แก้ไขข้อมูล",
                 () => Get.to(
-                  () => const EditProfilePage(),
+                  () => EditProfilePage(),
                 ), // เปลี่ยนจาก GetPage เป็น Get.to
               ),
               const SizedBox(height: 20),
               _buildSettingItem(
                 Image.asset("assets/images/lock.png"),
                 "ความเป็นส่วนตัว",
-                () => Get.to(() => const PrivacyPage()),
+                () => Get.to(() => PrivacyPage()),
               ),
               const SizedBox(height: 20),
               _buildSettingItem(

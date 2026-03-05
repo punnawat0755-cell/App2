@@ -1,17 +1,46 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // เพิ่มตัวนี้เพื่อใช้งาน FilteringTextInputFormatter
+import 'package:flutter/services.dart';
 import 'package:flutter_application_1/module/reset/view/resetsent.dart';
 import 'package:get/get.dart';
 
-class ResetPasswordPage extends StatefulWidget {
-  const ResetPasswordPage({super.key});
+class ResetPasswordController extends GetxController {
+  final TextEditingController emailController = TextEditingController();
 
   @override
-  State<ResetPasswordPage> createState() => _ResetPasswordPageState();
+  void onClose() {
+    emailController.dispose();
+    super.onClose();
+  }
+
+  void sendEmail() {
+    final emailPrefix = emailController.text.trim();
+    final finalEmail = '$emailPrefix@gmail.com';
+
+    if (emailPrefix.isNotEmpty) {
+      print('Sending to: $finalEmail');
+      Get.to(() => ResetSentPage());
+      return;
+    }
+
+    Get.snackbar(
+      'แจ้งเตือน',
+      'กรุณากรอกชื่ออีเมลของคุณก่อนกดส่ง',
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: Colors.orangeAccent,
+      colorText: Colors.white,
+      margin: const EdgeInsets.all(15),
+      duration: const Duration(seconds: 2),
+    );
+  }
 }
 
-class _ResetPasswordPageState extends State<ResetPasswordPage> {
-  final TextEditingController emailController = TextEditingController();
+class ResetPasswordPage extends StatelessWidget {
+  ResetPasswordPage({super.key});
+
+  final ResetPasswordController controller =
+      Get.isRegistered<ResetPasswordController>()
+          ? Get.find<ResetPasswordController>()
+          : Get.put(ResetPasswordController());
 
   @override
   Widget build(BuildContext context) {
@@ -24,13 +53,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           onTap: () => Get.back(),
           child: Padding(
             padding: const EdgeInsets.only(left: 15),
-            child: Image.asset("assets/images/back.png", width: 32, height: 32),
+            child: Image.asset('assets/images/back.png', width: 32, height: 32),
           ),
         ),
         titleSpacing: 0,
         centerTitle: false,
         title: const Text(
-          "ลืมรหัสผ่าน",
+          'ลืมรหัสผ่าน',
           style: TextStyle(
             color: Color(0xFF4489D7),
             fontSize: 22,
@@ -44,15 +73,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
           child: Column(
             children: [
               const SizedBox(height: 40),
-
-              // --- 1. รูปกุญแจพร้อมวงกลมซ้อน ---
               Center(
                 child: Container(
                   width: 290,
                   height: 290,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: const Color(0xFFB3E5FC).withOpacity(0.2),
+                    color: const Color(0xFFB3E5FC).withValues(alpha: 0.2),
                   ),
                   child: Center(
                     child: Container(
@@ -60,7 +87,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       height: 250,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFFB5EFFF).withOpacity(0.4),
+                        color: const Color(0xFFB5EFFF).withValues(alpha: 0.4),
                       ),
                       child: Center(
                         child: Container(
@@ -71,7 +98,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                             color: const Color(0xFF8BE2FB),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
+                                color: Colors.black.withValues(alpha: 0.1),
                                 blurRadius: 20,
                                 offset: const Offset(0, 10),
                               ),
@@ -79,7 +106,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                           ),
                           child: Center(
                             child: Image.asset(
-                              "assets/images/lockk.png",
+                              'assets/images/lockk.png',
                               width: 100,
                               height: 110,
                               color: const Color(0xFF4C91E2),
@@ -92,12 +119,9 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   ),
                 ),
               ),
-
               const SizedBox(height: 30),
-
-              // --- 2. ข้อความแนะนำ ---
               const Text(
-                "กรุณากรอกอีเมลของคุณเพื่อตั้งรหัสผ่านใหม่",
+                'กรุณากรอกอีเมลของคุณเพื่อตั้งรหัสผ่านใหม่',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xFF6A99D3),
@@ -105,36 +129,29 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   fontWeight: FontWeight.bold,
                 ),
               ),
-
               const SizedBox(height: 30),
-
-              // --- 3. ช่องกรอกอีเมล (TextField) ---
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: TextField(
-                  controller: emailController,
-                  // จำกัดตัวอักษรที่พิมพ์ได้
+                  controller: controller.emailController,
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'[a-zA-Z0-9@._-]'),
-                    ),
+                    FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9@._-]')),
                   ],
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: const Color(0xFFF5F5F5),
-                    hintText: "กรุณากรอกอีเมลของคุณ",
-                    // แสดง @gmail.com ต่อท้าย
-                    suffixText: "@gmail.com",
+                    hintText: 'กรุณากรอกอีเมลของคุณ',
+                    suffixText: '@gmail.com',
                     suffixStyle: const TextStyle(
                       color: Color(0xFF4489D7),
                       fontWeight: FontWeight.bold,
@@ -151,51 +168,19 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     ),
                     prefixIcon: Padding(
                       padding: const EdgeInsets.only(left: 15, right: 8),
-                      child: Image.asset(
-                        "assets/images/email.png",
-                        width: 35,
-                        height: 40,
-                      ),
+                      child: Image.asset('assets/images/email.png', width: 35, height: 40),
                     ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      vertical: 15,
-                      horizontal: 10,
-                    ),
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 15, horizontal: 10),
                   ),
                 ),
               ),
-
               const SizedBox(height: 150),
-
-              // --- 4. ปุ่มส่งอีเมล ---
               SizedBox(
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // 1. ดึงค่าจาก TextField
-                    String emailPrefix = emailController.text.trim();
-                    String finalEmail = "$emailPrefix@gmail.com";
-
-                    // 2. ตรวจสอบว่าได้กรอกชื่ออีเมลหรือยัง
-                    if (emailPrefix.isNotEmpty) {
-                      print("Sending to: $finalEmail");
-
-                      // 3. ใช้ GetX เพื่อเปลี่ยนหน้าไปที่ ResetSentPage
-                      Get.to(() => const ResetSentPage());
-                    } else {
-                      // แจ้งเตือนจากด้านบน (ตามที่คุณต้องการ) ถ้ายังไม่ได้กรอกอีเมล
-                      Get.snackbar(
-                        "แจ้งเตือน",
-                        "กรุณากรอกชื่ออีเมลของคุณก่อนกดส่ง",
-                        snackPosition: SnackPosition.TOP, // เด้งจากข้างบน
-                        backgroundColor: Colors.orangeAccent,
-                        colorText: Colors.white,
-                        margin: const EdgeInsets.all(15),
-                        duration: const Duration(seconds: 2),
-                      );
-                    }
-                  },
+                  onPressed: controller.sendEmail,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20C2FF),
                     foregroundColor: Colors.white,
@@ -205,7 +190,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                     elevation: 0,
                   ),
                   child: const Text(
-                    "ส่งอีเมล",
+                    'ส่งอีเมล',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                   ),
                 ),
