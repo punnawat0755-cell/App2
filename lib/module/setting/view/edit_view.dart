@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/module/setting/view/setting.dart';
+import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 

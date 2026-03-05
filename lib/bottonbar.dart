@@ -1,10 +1,11 @@
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
-import 'package:flutter_application_1/module/login/view/encouragement_view.dart';
-import 'package:flutter_application_1/module/login/view/login2.dart';
-import 'package:flutter_application_1/module/login/view/singup.dart';
-import 'package:flutter_application_1/module/pulse/view/pulsecheck.dart';
+import 'package:flutter_application_1/module/encouragement/view/encouragement_view.dart';
+import 'package:flutter_application_1/module/login/view/login2_view.dart';
+import 'package:flutter_application_1/module/login/view/singup_view.dart';
+import 'package:flutter_application_1/module/pulse/view/pulsecheck_view.dart';
+import 'package:flutter_application_1/module/rolelogic/view/widget/rolelogic_view.dart';
 import 'package:flutter_application_1/module/test/view/test_view.dart';
 import 'package:get/get.dart';
 
@@ -14,12 +15,13 @@ class BottomNavController extends GetxController {
 
   // Keep page ordering the same as before to preserve behavior.
   final List<Widget> pages = [
+    RoleSelection(),
+    Pulsecheck(),
     Encouragement(),
     QuizScreen(),
     ChatSelectionPage(),
-    Pulsecheck(),
     Signup(),
-    LoginPagetwo(),
+    // LoginPagetwo(),
   ];
 
   void changePage(int index) {
@@ -50,7 +52,11 @@ class BottomNavBar extends StatelessWidget {
           ),
           Icon(Icons.chat, size: 30, color: Color.fromARGB(255, 244, 244, 244)),
           Icon(Icons.pets, size: 30, color: Color.fromARGB(255, 244, 244, 244)),
-          Icon(Icons.person, size: 30, color: Color.fromARGB(255, 244, 244, 244)),
+          Icon(
+            Icons.person,
+            size: 30,
+            color: Color.fromARGB(255, 244, 244, 244),
+          ),
         ],
         color: const Color(0xFF5CD9FF),
         buttonBackgroundColor: const Color(0xFF5CD9FF),

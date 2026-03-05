@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_application_1/module/encouragement/view/encouragement_view.dart';
 
 class PulsecheckController extends GetxController {
-  final RxInt selectedMoodIndex = 2.obs;
+  final RxInt selectedMoodIndex = (-1).obs;
   final RxList<String> selectedTags = <String>[].obs;
 
   final TextEditingController storyController = TextEditingController();
@@ -28,10 +29,21 @@ class PulsecheckController extends GetxController {
   final Color lightFillBlue = const Color(0xFFE0F2FE);
   final Color tagFillBlue = const Color(0xFF93C5FD);
 
-  List<String> get currentTags => moodTags[selectedMoodIndex.value];
+  List<String> get currentTags {
+    final index = selectedMoodIndex.value;
+    if (index < 0 || index >= moodTags.length) {
+      return const [];
+    }
+    return moodTags[index];
+  }
 
   void selectMood(int index) {
     selectedMoodIndex.value = index;
+    selectedTags.clear();
+  }
+
+  void resetSelection() {
+    selectedMoodIndex.value = -1;
     selectedTags.clear();
   }
 
@@ -43,23 +55,20 @@ class PulsecheckController extends GetxController {
     }
   }
 
-  void submit(BuildContext context) {
+  void submit() {
+    if (selectedMoodIndex.value < 0) {
+      return;
+    }
+
     print('อารมณ์: ${moods[selectedMoodIndex.value]['label']}');
     print('แท็ก: ${selectedTags.join(', ')}');
     print('บันทึก: ${storyController.text}');
     print('ฮีลใจ: ${healingController.text}');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text(
-          'ส่งพลังใจแล้ว! 🐋💙',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: const Color(0xFF4A89D8),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ),
-    );
+    final isNegativeMood = selectedMoodIndex.value == 0 || selectedMoodIndex.value == 1;
+    if (isNegativeMood) {
+      Get.to(() => Encouragement());
+    }
   }
 
   @override
@@ -71,7 +80,9 @@ class PulsecheckController extends GetxController {
 }
 
 class Pulsecheck extends StatelessWidget {
-  Pulsecheck({super.key});
+  Pulsecheck({super.key}) {
+    controller.resetSelection();
+  }
 
   final PulsecheckController controller = Get.isRegistered<PulsecheckController>()
       ? Get.find<PulsecheckController>()
@@ -148,13 +159,14 @@ class Pulsecheck extends StatelessWidget {
                   }),
                 ),
                 const SizedBox(height: 32),
-                Column(
-                  children: [
-                    _buildTagRow(controller.currentTags.sublist(0, 4)),
-                    const SizedBox(height: 12),
-                    _buildTagRow(controller.currentTags.sublist(4, 8)),
-                  ],
-                ),
+                if (controller.currentTags.isNotEmpty)
+                  Column(
+                    children: [
+                      _buildTagRow(controller.currentTags.sublist(0, 4)),
+                      const SizedBox(height: 12),
+                      _buildTagRow(controller.currentTags.sublist(4, 8)),
+                    ],
+                  ),
                 const SizedBox(height: 32),
                 Text(
                   'บันทึกเรื่องราวของวันนี้',
@@ -208,7 +220,7 @@ class Pulsecheck extends StatelessWidget {
                     width: MediaQuery.of(context).size.width * 0.85,
                     height: 55,
                     child: ElevatedButton(
-                      onPressed: () => controller.submit(context),
+                      onPressed: controller.submit,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFB5EFFF),
                         elevation: 6,

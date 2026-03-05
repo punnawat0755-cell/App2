@@ -7,8 +7,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'supabase_client.dart';
-import 'module/home/view/home.dart';
-import 'module/login/view/login.dart';
+import 'module/home/view/home_view.dart';
+import 'module/login/view/login_view.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();

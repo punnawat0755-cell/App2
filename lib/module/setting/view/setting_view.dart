@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/module/setting/view/edit.dart';
-import 'package:flutter_application_1/module/setting/view/privacy.dart';
+import 'package:flutter_application_1/module/setting/view/edit_view.dart';
+import 'package:flutter_application_1/module/setting/view/privacy_view.dart';
 import 'package:get/get.dart';
 // ลบ GoogleFonts ออกตามที่คุณต้องการใช้ font จาก main
 

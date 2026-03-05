@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_1/module/reset/view/resetsent.dart';
+import 'package:flutter_application_1/module/reset/view/resetsent_view.dart';
 import 'package:get/get.dart';
 
 class ResetPasswordController extends GetxController {

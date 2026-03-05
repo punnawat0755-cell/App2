@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../supabase_client.dart';
-import 'login.dart';
+import 'login_view.dart';
 
 class RegisterController extends GetxController {
   final TextEditingController usernameController = TextEditingController();

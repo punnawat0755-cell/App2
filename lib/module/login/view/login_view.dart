@@ -3,8 +3,8 @@ import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../supabase_client.dart';
-import '../../home/view/home.dart';
-import 'register.dart';
+import '../../home/view/home_view.dart';
+import 'register_view.dart';
 
 class LoginController extends GetxController {
   final TextEditingController emailController = TextEditingController();
