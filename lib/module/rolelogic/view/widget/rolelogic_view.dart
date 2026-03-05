@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/home/view/home_view.dart';
 import 'package:flutter_application_1/module/rolelogic/view/widget/choice_card.dart';
+import 'package:flutter_application_1/module/test/view/test_view.dart';
 import 'package:get/get.dart';
 
 // --------------------------------------------------------
@@ -27,7 +29,7 @@ class RoleSelection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // กำหนดโทนสีที่ดึงมาจากรูปภาพ
-    const Color bgColor = Color(0xFFF9F9F9); // สีพื้นหลังขาวอมเทานิดๆ
+    const Color bgColor = Colors.white; // สีพื้นหลังขาว
     const Color primaryTextColor = Color(0xFF5A85C4); // สีตัวอักษรสีฟ้าหลัก
     const Color cardYesColor = Color(0xFFAEE4FC); // สีฟลอร์การ์ด "ต้องการ"
     const Color cardNoColor = Color(0xFFF5D586); // สีฟลอร์การ์ด "ไม่ต้องการ"
@@ -85,7 +87,10 @@ class RoleSelection extends StatelessWidget {
                         bgColor: cardYesColor,
                         textColor: Color(0xff4489D7),
                         selectedRole: logic.selectedRole,
-                        onSelect: logic.selectRole,
+                        onSelect: (id) {
+                          logic.selectRole(id);
+                          Get.off(() => QuizScreen());
+                        },
                       ),
                     ),
                     const SizedBox(width: 20), // ระยะห่างระหว่างการ์ด
@@ -97,7 +102,10 @@ class RoleSelection extends StatelessWidget {
                         bgColor: cardNoColor,
                         textColor: const Color(0xFFC49A3E),
                         selectedRole: logic.selectedRole,
-                        onSelect: logic.selectRole,
+                        onSelect: (id) {
+                          logic.selectRole(id);
+                          Get.off(() => HomePage());
+                        },
                       ),
                     ),
                   ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/setting/view/edit_view.dart';
+import 'package:flutter_application_1/module/setting/view/favorites_view.dart';
 import 'package:flutter_application_1/module/setting/view/privacy_view.dart';
 import 'package:get/get.dart';
 // ลบ GoogleFonts ออกตามที่คุณต้องการใช้ font จาก main
@@ -81,7 +82,7 @@ class SettingPage extends StatelessWidget {
               _buildSettingItem(
                 Image.asset("assets/images/heart.png"),
                 "รายการโปรด",
-                () => Get.toNamed('/favorites'), 
+                () => Get.to(() => FavoritesPage()),
               ),
             ],
           ),

@@ -127,7 +127,7 @@ class RegisterPage extends StatelessWidget {
       ? Get.find<RegisterController>()
       : Get.put(RegisterController());
 
-  static const _bg = Color(0xFFE9F7FF);
+  static const _bg = Colors.white;
   static const _blue = Color(0xFF1E88FF);
 
   Widget _label(String text) {

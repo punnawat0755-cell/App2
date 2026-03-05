@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/test/view/test_view.dart';
 import 'package:get/get.dart';
 
 class EncouragementController extends GetxController {
   void onNextPressed() {
-    print("User clicked Next");
+    Get.to(() => QuizScreen());
   }
 }
 

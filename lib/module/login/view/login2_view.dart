@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/home/view/home_view.dart';
+import 'package:flutter_application_1/module/login/view/singup_view.dart';
+import 'package:get/get.dart';
 
 class LoginPagetwo extends StatelessWidget {
   const LoginPagetwo({super.key});
@@ -51,7 +54,7 @@ class LoginPagetwo extends StatelessWidget {
                 width: double.infinity,
                 height: 55,
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () => Get.offAll(() => HomePage()),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF64BFFF),
                     shape: RoundedRectangleBorder(
@@ -78,7 +81,7 @@ class LoginPagetwo extends StatelessWidget {
                     style: TextStyle(color: Colors.grey, fontSize: 16),
                   ),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () => Get.to(() => Signup()),
                     child: const Text(
                       "ลงทะเบียน",
                       style: TextStyle(

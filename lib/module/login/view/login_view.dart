@@ -187,7 +187,7 @@ class LoginPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Obx(
       () => Scaffold(
-        backgroundColor: const Color(0xFFE9F7FF),
+        backgroundColor: Colors.white,
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(

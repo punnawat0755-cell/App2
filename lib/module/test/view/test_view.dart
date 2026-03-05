@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/home/view/home_view.dart';
 import 'package:get/get.dart';
 
 // --------------------------------------------------------
@@ -137,7 +138,10 @@ class QuizScreen extends StatelessWidget {
       bool isSelected = controller.selectedIndex.value == index;
 
       return GestureDetector(
-        onTap: () => controller.selectOption(index),
+        onTap: () {
+          controller.selectOption(index);
+          Get.off(() => HomePage());
+        },
         child: Container(
           margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 40),
           padding: const EdgeInsets.symmetric(vertical: 16.0),

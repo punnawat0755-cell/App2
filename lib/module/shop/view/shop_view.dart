@@ -34,7 +34,7 @@ class ShopPage extends StatelessWidget {
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE6F7FF),
+      backgroundColor: Colors.white,
       body: SafeArea(
         top: false,
         bottom: false,

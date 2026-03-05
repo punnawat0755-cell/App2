@@ -17,17 +17,22 @@ class ArticleDetailPage extends StatelessWidget {
     bool isNetworkImage = imagePath.startsWith('http');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F9FF),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.grey),
-                onPressed: () => Navigator.pop(context),
+              children: [
+              GestureDetector(
+                onTap: () => Navigator.pop(context), // เปลี่ยนจาก onPressed มาใส่ onTap ตรงนี้แทน
+                child: Image.asset(
+                  'assets/images/back.png',
+                  width: 25,
+                  height: 25,
+                ),
               ),
+            ],
               const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),

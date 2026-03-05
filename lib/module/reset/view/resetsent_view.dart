@@ -35,7 +35,6 @@ class ResetSentController extends GetxController {
 
     if (otp.length == 6) {
       Get.to(() => NewPasswordPage());
-      Get.back();
       Get.snackbar(
         'สำเร็จ',
         'รหัสถูกต้อง',

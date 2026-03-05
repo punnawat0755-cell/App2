@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/login/view/login2_view.dart';
 import 'package:get/get.dart';
 
 class NewPasswordController extends GetxController {
@@ -32,6 +33,7 @@ class NewPasswordController extends GetxController {
         backgroundColor: Colors.green,
         colorText: Colors.white,
       );
+      Get.offAll(() => LoginPagetwo());
       return;
     }
 

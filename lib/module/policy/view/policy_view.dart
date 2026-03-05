@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/pulse/view/pulsecheck_view.dart';
 import 'package:get/get.dart';
 
 class PrivacyPolicyController extends GetxController {
@@ -17,8 +18,8 @@ class PrivacyPolicyPage extends StatelessWidget {
 
   final PrivacyPolicyController controller =
       Get.isRegistered<PrivacyPolicyController>()
-          ? Get.find<PrivacyPolicyController>()
-          : Get.put(PrivacyPolicyController());
+      ? Get.find<PrivacyPolicyController>()
+      : Get.put(PrivacyPolicyController());
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +49,8 @@ class PrivacyPolicyPage extends StatelessWidget {
                       'แอปพลิเคชัน Howareyou ให้ความสำคัญอย่างยิ่งกับความเป็นส่วนตัวและความปลอดภัยของข้อมูลผู้ใช้งาน ท่านนโยบายฉบับนี้จัดทำขึ้นเพื่อชี้แจงรายละเอียดเกี่ยวกับการเก็บรวบรวมใช้และเปิดเผยข้อมูลของท่านตามพระราชบัญญัติคุ้มครองข้อมูลส่วนบุคคล (PDPA)',
                   hasReadMore: true,
                   value: controller.isTermsAccepted.value,
-                  onChanged: (val) => controller.isTermsAccepted.value = val ?? false,
+                  onChanged: (val) =>
+                      controller.isTermsAccepted.value = val ?? false,
                 ),
                 const Divider(height: 40, color: Color(0xFFE0E0E0)),
                 _buildPolicyItem(
@@ -63,7 +65,8 @@ class PrivacyPolicyPage extends StatelessWidget {
                   title:
                       'ฉันยินยอมให้นำข้อมูลการสนทนาไปใช้เพื่อวิเคราะห์และพัฒนาคุณภาพการให้คำปรึกษา',
                   value: controller.isChatDataAccepted.value,
-                  onChanged: (val) => controller.isChatDataAccepted.value = val ?? false,
+                  onChanged: (val) =>
+                      controller.isChatDataAccepted.value = val ?? false,
                 ),
                 const Spacer(),
                 SizedBox(
@@ -72,13 +75,14 @@ class PrivacyPolicyPage extends StatelessWidget {
                   child: ElevatedButton(
                     onPressed: controller.isAllAccepted
                         ? () {
-                            print('กดยอมรับนโยบายครบถ้วนแล้ว');
+                            Get.to(() => Pulsecheck());
                           }
                         : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF20C2FF),
-                      disabledBackgroundColor:
-                          const Color(0xFF20C2FF).withValues(alpha: 0.4),
+                      disabledBackgroundColor: const Color(
+                        0xFF20C2FF,
+                      ).withValues(alpha: 0.4),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(18),
                       ),
@@ -89,8 +93,9 @@ class PrivacyPolicyPage extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
-                        color:
-                            controller.isAllAccepted ? Colors.white : Colors.white70,
+                        color: controller.isAllAccepted
+                            ? Colors.white
+                            : Colors.white70,
                       ),
                     ),
                   ),
@@ -120,7 +125,9 @@ class PrivacyPolicyPage extends StatelessWidget {
             value: value,
             onChanged: onChanged,
             activeColor: const Color(0xFF64BFFF),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(4),
+            ),
             side: const BorderSide(color: Color(0xFF64BFFF), width: 2),
           ),
         ),
@@ -216,13 +223,20 @@ class PrivacyDetailPage extends StatelessWidget {
               'เราเก็บรวบรวมข้อมูลเพื่อให้บริการและพัฒนาประสบการณ์การใช้งาน โดยแบ่งเป็นประเภทดังนี้:',
               contentColor,
             ),
-            _buildSubHeader('1.1 ข้อมูลส่วนบุคคลทั่วไป (General Personal Data)'),
-            _buildBullet('ข้อมูลระบุตัวตน: ชื่อ, นามสกุล, วันเดือนปีเกิด, เพศ', contentColor),
+            _buildSubHeader(
+              '1.1 ข้อมูลส่วนบุคคลทั่วไป (General Personal Data)',
+            ),
+            _buildBullet(
+              'ข้อมูลระบุตัวตน: ชื่อ, นามสกุล, วันเดือนปีเกิด, เพศ',
+              contentColor,
+            ),
             _buildBullet(
               'ข้อมูลบัญชีผู้ใช้: ชื่อผู้ใช้งาน (Username), รหัสผ่าน (ที่เข้ารหัสแล้ว), รูปโปรไฟล์',
               contentColor,
             ),
-            _buildSubHeader('1.2 ข้อมูลส่วนบุคคลที่อ่อนไหว (Sensitive Personal Data)'),
+            _buildSubHeader(
+              '1.2 ข้อมูลส่วนบุคคลที่อ่อนไหว (Sensitive Personal Data)',
+            ),
             _buildSectionText(
               'เราจะเก็บรวบรวมข้อมูลเหล่านี้ก็ต่อเมื่อได้รับความยินยอมโดยชัดแจ้ง (Explicit Consent) จากท่านเท่านั้น:',
               contentColor,
@@ -235,6 +249,74 @@ class PrivacyDetailPage extends StatelessWidget {
               'ข้อมูลสุขภาพจิตและพฤติกรรม: บันทึกอารมณ์ประจำวัน (Mood tracking), ผลแบบสอบถามด้านอารมณ์',
               contentColor,
             ),
+            _buildSubHeader('1.3 ข้อมูลการสนทนา (Chat Logs)'),
+            _buildBullet(
+              'เราทำการบันทึกข้อความการสนทนาระหว่าง "ผู้ขอคำปรึกษา" และ "ผู้ให้คำปรึกษา" ภายในแอปพลิเคชัน',
+              contentColor,
+            ),
+            _buildHeader('2. วัตถุประสงค์การใช้ข้อมูล'),
+            _buildSectionText(
+              'เรานำข้อมูลของท่านไปใช้เพื่อวัตถุประสงค์ดังต่อไปนี้:',
+              contentColor,
+            ),
+            _buildBullet(
+              'เพื่อการให้บริการหลัก: ใช้คำนวณและคาดการณ์รอบเดือน, แสดงผลสถิติอารมณ์ย้อนหลัง, และจับคู่ผู้ให้คำปรึกษาที่เหมาะสม',
+              contentColor,
+            ),
+            _buildBullet(
+              'เพื่อการวิเคราะห์และพัฒนา (สำคัญ): เรานำข้อมูลการสนทนา (Chat Logs) มาวิเคราะห์ในภาพรวม (โดยไม่ระบุตัวตน) เพื่อทำความเข้าใจหัวข้อการสนทนาส่วนใหญ่ เทรนด์ของปัญหาด้านอารมณ์ และนำผลลัพธ์ไปปรับปรุงคุณภาพการให้คำปรึกษา หรือพัฒนาฟีเจอร์ใหม่ๆ ในอนาคต',
+              contentColor,
+            ),
+            _buildBullet(
+              'เพื่อความปลอดภัย: เพื่อตรวจสอบและป้องกันการใช้งานที่ไม่เหมาะสม หรือการคุกคามภายในแชท',
+              contentColor,
+            ),
+            _buildHeader('3. การเปิดเผยและส่งต่อข้อมูล'),
+            _buildSectionText(
+              'เราจะไม่เปิดเผยข้อมูลส่วนบุคคลของท่านแก่บุคคลภายนอก เว้นแต่ในกรณีดังนี้:',
+              contentColor,
+            ),
+            _buildBullet('ได้รับความยินยอมจากท่าน', contentColor),
+            _buildBullet(
+              'เป็นการปฏิบัติตามกฎหมาย หรือคำสั่งจากหน่วยงานรัฐ',
+              contentColor,
+            ),
+            _buildBullet(
+              'ผู้ให้บริการภายนอก (Service Providers) ที่ช่วยเราดำเนินระบบ (เช่น Cloud Server) ซึ่งมีมาตรฐานความปลอดภัยที่เหมาะสม',
+              contentColor,
+            ),
+            _buildHeader('4. การเก็บรักษาและความปลอดภัย'),
+            _buildBullet(
+              'เราจัดเก็บข้อมูลของท่านด้วยมาตรฐานความปลอดภัยทางเทคโนโลยี (เช่น การเข้ารหัสข้อมูล) เพื่อป้องกันการเข้าถึงโดยไม่ได้รับอนุญาต',
+              contentColor,
+            ),
+            _buildBullet(
+              'ข้อมูลสุขภาพและข้อมูลแชทจะถูกเก็บเป็นความลับอย่างเคร่งครัด',
+              contentColor,
+            ),
+            _buildHeader('5. สิทธิของเจ้าของข้อมูลส่วนบุคคล'),
+            _buildSectionText(
+              'ท่านมีสิทธิตามกฎหมาย PDPA ดังนี้:',
+              contentColor,
+            ),
+            _buildBullet('สิทธิขอเข้าถึงและขอรับสำเนาข้อมูล', contentColor),
+            _buildBullet('สิทธิขอให้ลบหรือทำลายข้อมูล', contentColor),
+            _buildBullet('สิทธิขอให้แก้ไขข้อมูลให้ถูกต้อง', contentColor),
+            _buildBullet(
+              'สิทธิในการถอนความยินยอม (การถอนความยินยอมอาจส่งผลต่อการใช้งานฟีเจอร์บางอย่าง เช่น การทำนายรอบเดือน)',
+              contentColor,
+            ),
+            _buildHeader('6. ช่องทางการติดต่อ'),
+            _buildSectionText(
+              'หากมีข้อสงสัยเกี่ยวกับนโยบายความเป็นส่วนตัว สามารถติดต่อเราได้ที่:',
+              contentColor,
+            ),
+            _buildBullet('ผู้ดูแลแอปพลิเคชัน Howareyou', contentColor),
+            _buildBullet(
+              'ที่อยู่: บริษัท ไทเกอร์ซอฟท์ (1998) จำกัด เลขที่ 18 อาคารซีทีซี ซอยรามอินทรา 51 แขวงท่าแร้ง เขตบางเขน กรุงเทพมหานคร 10230',
+              contentColor,
+            ),
+            const SizedBox(height: 20),
           ],
         ),
       ),
