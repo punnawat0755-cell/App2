@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/io_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:flutter_application_1/features/setting/view/setting.dart';
 
 // ==========================================
 // 1. Controller
@@ -33,19 +34,19 @@ class ProfileController extends GetxController {
     'N8N_ALLOW_BAD_CERT_HOSTS',
     defaultValue: 'n8n.tgstack.dev',
   );
-  static const Duration _predictionTimeout = Duration(seconds: 15);
-  static const Duration _selfcareTimeout = Duration(seconds: 30);
+  static const Duration _predictionTimeout = Duration(seconds: 8);
+  static const Duration _selfcareTimeout = Duration(seconds: 25);
 
   var coins = 138.obs;
   var today = DateTime.now().day.obs;
   var selectedMonth = DateTime.now().month.obs;
   var selectedYear = DateTime.now().year.obs;
-  var selectedDate = DateTime.now().day.obs;
+  var selectedDate = 0.obs;
 
   var isLoading = false.obs;
   var predictionText = "".obs;
   var predictionConfidence = "".obs; // [ใหม่] 'high' หรือ 'low'
-  var avgCycleLength = 0.obs;        // [ใหม่] รอบเฉลี่ยจริง
+  var avgCycleLength = 0.obs; // [ใหม่] รอบเฉลี่ยจริง
   var latestCycleText = "".obs;
   var predictedPeriodDays = <String>{}.obs; // [ใหม่] ไฮไลต์วันคาดการณ์ในปฏิทิน
 
@@ -59,16 +60,17 @@ class ProfileController extends GetxController {
   var dailyPeriodStatus = <String, bool>{}.obs;
   var dailySymptoms = <String, List<String>>{}.obs;
   var dailyWhaleMoods = <String, String>{}.obs;
-  var dailyFlowLevel = <String, String?>{}.obs;   // [ใหม่]
-  var dailyPainLevel = <String, int?>{}.obs;       // [ใหม่]
-  var dailyNotes = <String, String?>{}.obs;        // [ใหม่]
+  var dailyFlowLevel = <String, String?>{}.obs; // [ใหม่]
+  var dailyPainLevel = <String, int?>{}.obs; // [ใหม่]
+  var dailyNotes = <String, String?>{}.obs; // [ใหม่]
 
   // State สำหรับ Input ที่กำลังแก้อยู่
-  var currentFlowLevel = Rxn<String>();  // [ใหม่]
-  var currentPainLevel = Rxn<int>();     // [ใหม่]
-  var currentNotes = "".obs;            // [ใหม่]
+  var currentFlowLevel = Rxn<String>(); // [ใหม่]
+  var currentPainLevel = Rxn<int>(); // [ใหม่]
+  var currentNotes = "".obs; // [ใหม่]
 
-  final TextEditingController notesController = TextEditingController(); // [ใหม่]
+  final TextEditingController notesController =
+      TextEditingController(); // [ใหม่]
 
   @override
   void onInit() {
@@ -127,20 +129,33 @@ class ProfileController extends GetxController {
   String getDateKey(int year, int month, int day) =>
       "$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
 
-  String get dateKey => getDateKey(selectedYear.value, selectedMonth.value, selectedDate.value);
+  String get dateKey =>
+      getDateKey(selectedYear.value, selectedMonth.value, selectedDate.value);
 
   final List<String> monthNames = [
-    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+    "มกราคม",
+    "กุมภาพันธ์",
+    "มีนาคม",
+    "เมษายน",
+    "พฤษภาคม",
+    "มิถุนายน",
+    "กรกฎาคม",
+    "สิงหาคม",
+    "กันยายน",
+    "ตุลาคม",
+    "พฤศจิกายน",
+    "ธันวาคม",
   ];
 
-  int get daysInMonth => DateTime(selectedYear.value, selectedMonth.value + 1, 0).day;
-  int get firstDayOffset => DateTime(selectedYear.value, selectedMonth.value, 1).weekday % 7;
+  int get daysInMonth =>
+      DateTime(selectedYear.value, selectedMonth.value + 1, 0).day;
+  int get firstDayOffset =>
+      DateTime(selectedYear.value, selectedMonth.value, 1).weekday % 7;
 
   void changeMonth(String? monthName) {
     if (monthName != null) {
       selectedMonth.value = monthNames.indexOf(monthName) + 1;
-      selectedDate.value = 1;
+      selectedDate.value = 0;
       _syncInputStateForDate();
       loadMonthData();
       fetchPeriodPrediction();
@@ -175,9 +190,9 @@ class ProfileController extends GetxController {
       dailyPeriodStatus.clear();
       dailySymptoms.clear();
       dailyWhaleMoods.clear();
-      dailyFlowLevel.clear();  // [ใหม่]
-      dailyPainLevel.clear();  // [ใหม่]
-      dailyNotes.clear();      // [ใหม่]
+      dailyFlowLevel.clear(); // [ใหม่]
+      dailyPainLevel.clear(); // [ใหม่]
+      dailyNotes.clear(); // [ใหม่]
 
       if (response != null) {
         for (var row in response) {
@@ -228,7 +243,8 @@ class ProfileController extends GetxController {
         if (startStr == endStr) {
           latestCycleText.value = "รอบเดือนล่าสุด: $startStr (รวม 1 วัน)";
         } else {
-          latestCycleText.value = "รอบเดือนล่าสุด: $startStr ถึง $endStr (รวม $days วัน)";
+          latestCycleText.value =
+              "รอบเดือนล่าสุด: $startStr ถึง $endStr (รวม $days วัน)";
         }
       } else {
         latestCycleText.value = "ยังไม่มีประวัติรอบเดือน";
@@ -251,10 +267,14 @@ class ProfileController extends GetxController {
 
     if (_n8nPeriodWebhook.trim().isNotEmpty) {
       final ok = await _fetchPeriodPredictionFromN8n(userId);
-      if (ok) return;
+      if (ok) {
+        _trimPredictedDaysByRecordedPeriodStatus();
+        return;
+      }
     }
 
     await _fetchPeriodPredictionFromSupabaseRpc();
+    _trimPredictedDaysByRecordedPeriodStatus();
   }
 
   Future<bool> _fetchPeriodPredictionFromN8n(String userId) async {
@@ -437,7 +457,8 @@ class ProfileController extends GetxController {
     return <String, dynamic>{};
   }
 
-  dynamic _readValueIgnoreCase(Map<String, dynamic> payload, List<String> keys) {
+  dynamic _readValueIgnoreCase(
+      Map<String, dynamic> payload, List<String> keys) {
     final keySet = keys.map((e) => e.toLowerCase()).toSet();
     for (final entry in payload.entries) {
       if (keySet.contains(entry.key.toLowerCase())) {
@@ -447,7 +468,8 @@ class ProfileController extends GetxController {
     return null;
   }
 
-  String? _readStringIgnoreCase(Map<String, dynamic> payload, List<String> keys) {
+  String? _readStringIgnoreCase(
+      Map<String, dynamic> payload, List<String> keys) {
     final value = _readValueIgnoreCase(payload, keys);
     if (value == null) return null;
     if (value is String) {
@@ -510,11 +532,11 @@ class ProfileController extends GetxController {
 
     for (final item in value) {
       if (item is! Map) continue;
-      final map = item is Map<String, dynamic>
-          ? item
-          : Map<String, dynamic>.from(item);
+      final map =
+          item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item);
 
-      final symptom = (_readStringIgnoreCase(map, const ['symptom']) ?? '').trim();
+      final symptom =
+          (_readStringIgnoreCase(map, const ['symptom']) ?? '').trim();
       final why = _readStringIgnoreCase(
         map,
         const ['why_it_can_happen', 'whyItCanHappen', 'why', 'reason'],
@@ -566,11 +588,11 @@ class ProfileController extends GetxController {
 
     for (final item in value) {
       if (item is! Map) continue;
-      final map = item is Map<String, dynamic>
-          ? item
-          : Map<String, dynamic>.from(item);
+      final map =
+          item is Map<String, dynamic> ? item : Map<String, dynamic>.from(item);
 
-      final symptom = (_readStringIgnoreCase(map, const ['symptom']) ?? '').trim();
+      final symptom =
+          (_readStringIgnoreCase(map, const ['symptom']) ?? '').trim();
 
       final whenList = _readStringListIgnoreCase(
         map,
@@ -753,12 +775,14 @@ class ProfileController extends GetxController {
 
   void _setPredictionTextFromDate(DateTime predictedDate) {
     int daysLeft = predictedDate.difference(DateTime.now()).inDays;
-    String thaiDate = "${predictedDate.day} ${monthNames[predictedDate.month - 1]}";
+    String thaiDate =
+        "${predictedDate.day} ${monthNames[predictedDate.month - 1]}";
 
     if (daysLeft == 0) {
       predictionText.value = "คาดว่าประจำเดือนจะมา 🩸 วันนี้";
     } else if (daysLeft > 0) {
-      predictionText.value = "คาดว่าประจำเดือนจะมา 🩸 $thaiDate (อีก $daysLeft วัน)";
+      predictionText.value =
+          "คาดว่าประจำเดือนจะมา 🩸 $thaiDate (อีก $daysLeft วัน)";
     } else {
       predictionText.value = "ประจำเดือนมาช้ากว่ากำหนด ${daysLeft.abs()} วัน";
     }
@@ -772,10 +796,47 @@ class ProfileController extends GetxController {
     if (daysLeft == 0) {
       predictionText.value = "คาดว่าประจำเดือนจะหมด 🩸 วันนี้";
     } else if (daysLeft > 0) {
-      predictionText.value = "คาดว่าประจำเดือนจะหมด 🩸 $thaiDate (อีก $daysLeft วัน)";
+      predictionText.value =
+          "คาดว่าประจำเดือนจะหมด 🩸 $thaiDate (อีก $daysLeft วัน)";
     } else {
       predictionText.value = "ประจำเดือนน่าจะหมดไปแล้ว ${daysLeft.abs()} วัน";
     }
+  }
+
+  bool _hasExplicitNonPeriodRecord(String dayKey) =>
+      dailyPeriodStatus.containsKey(dayKey) &&
+      dailyPeriodStatus[dayKey] == false;
+
+  void _trimPredictedDaysByRecordedPeriodStatus() {
+    if (predictedPeriodDays.isEmpty) return;
+
+    final sortedKeys = predictedPeriodDays.toList()..sort();
+
+    String? firstRecordedPeriodDay;
+    for (final key in sortedKeys) {
+      if (dailyPeriodStatus[key] == true) {
+        firstRecordedPeriodDay = key;
+        break;
+      }
+    }
+
+    if (firstRecordedPeriodDay == null) return;
+
+    String? firstRecordedNonPeriodDay;
+    for (final key in sortedKeys) {
+      if (key.compareTo(firstRecordedPeriodDay) < 0) continue;
+      if (_hasExplicitNonPeriodRecord(key)) {
+        firstRecordedNonPeriodDay = key;
+        break;
+      }
+    }
+
+    if (firstRecordedNonPeriodDay == null) return;
+
+    predictedPeriodDays.removeWhere(
+      (key) => key.compareTo(firstRecordedNonPeriodDay!) >= 0,
+    );
+    predictedPeriodDays.refresh();
   }
 
   bool _applyPredictionPayload(Map<String, dynamic> payload) {
@@ -881,6 +942,30 @@ class ProfileController extends GetxController {
       ]));
     }
 
+    // รองรับ workflow "ทำนายวันหมดประจำเดือน" จาก n8n
+    // - ใช้ latest_period_start_date เป็น start
+    // - ถ้ามี predicted_end_date ใน prediction และเป็นวันหลังกว่า ให้ใช้แทน
+    if (prediction != null) {
+      predictedStart ??= _tryParseDate(
+        _readValueIgnoreCase(prediction, [
+          'latest_period_start_date',
+          'latestPeriodStartDate',
+        ]),
+      );
+
+      final endFromPrediction = _tryParseDate(
+        _readValueIgnoreCase(prediction, [
+          'predicted_end_date',
+          'predictedEndDate',
+        ]),
+      );
+      if (endFromPrediction != null) {
+        if (predictedEnd == null || endFromPrediction.isAfter(predictedEnd)) {
+          predictedEnd = endFromPrediction;
+        }
+      }
+    }
+
     final predictedDaysValue = _readValueIgnoreCase(payload, [
       'predicted_period_days',
       'predicted_dates',
@@ -935,6 +1020,41 @@ class ProfileController extends GetxController {
       }
     }
 
+    // ถ้ามี start/end แล้ว แต่รายการวันคาดเดายังไม่ครบ -> เติมช่วงวันต่อเนื่อง (สูงสุด 10 วัน)
+    if (predictedStart != null && predictedEnd != null) {
+      final startDate = DateTime(
+        predictedStart.year,
+        predictedStart.month,
+        predictedStart.day,
+      );
+      final endDate = DateTime(
+        predictedEnd.year,
+        predictedEnd.month,
+        predictedEnd.day,
+      );
+
+      final diffDays = endDate.difference(startDate).inDays;
+      final shouldFill = predictedDays.isEmpty ||
+          DateTime(
+            predictedDays.first.year,
+            predictedDays.first.month,
+            predictedDays.first.day,
+          ).isAfter(startDate) ||
+          DateTime(
+            predictedDays.last.year,
+            predictedDays.last.month,
+            predictedDays.last.day,
+          ).isBefore(endDate);
+
+      if (diffDays >= 0 && shouldFill) {
+        final span = (diffDays + 1).clamp(1, 10).toInt();
+        predictedDays
+          ..clear()
+          ..addAll(
+              List.generate(span, (i) => startDate.add(Duration(days: i))));
+      }
+    }
+
     if (predictedDays.isEmpty && predictedStart != null) {
       int? estimatedDurationDays;
       if (analysis != null) {
@@ -947,7 +1067,8 @@ class ProfileController extends GetxController {
         }
 
         if (latestPeriod != null) {
-          estimatedDurationDays = _tryParseInt(_readValueIgnoreCase(latestPeriod, [
+          estimatedDurationDays =
+              _tryParseInt(_readValueIgnoreCase(latestPeriod, [
             'length_days',
             'lengthDays',
             'duration_days',
@@ -956,9 +1077,10 @@ class ProfileController extends GetxController {
         }
       }
 
-      final duration = (estimatedDurationDays != null && estimatedDurationDays > 0)
-          ? estimatedDurationDays
-          : 1;
+      final duration =
+          (estimatedDurationDays != null && estimatedDurationDays > 0)
+              ? estimatedDurationDays
+              : 1;
       final cappedDuration = duration.clamp(1, 7).toInt();
       for (int i = 0; i < cappedDuration; i++) {
         predictedDays.add(predictedStart.add(Duration(days: i)));
@@ -971,7 +1093,8 @@ class ProfileController extends GetxController {
       }
     } else if (predictedStart != null) {
       predictedPeriodDays.add(
-        getDateKey(predictedStart.year, predictedStart.month, predictedStart.day),
+        getDateKey(
+            predictedStart.year, predictedStart.month, predictedStart.day),
       );
     }
 
@@ -1004,7 +1127,8 @@ class ProfileController extends GetxController {
         statAvgCycleLength.value = data['avg_cycle_length'] ?? 0;
         statAvgPeriodDuration.value = data['avg_period_duration'] ?? 0;
         if (data['most_common_symptoms'] != null) {
-          statCommonSymptoms.value = List<String>.from(data['most_common_symptoms']);
+          statCommonSymptoms.value =
+              List<String>.from(data['most_common_symptoms']);
         }
       }
     } catch (e) {
@@ -1058,14 +1182,18 @@ class ProfileController extends GetxController {
           // [ใหม่] ส่งค่าใหม่ทั้งหมด (null ถ้าไม่เป็นประจำเดือน)
           'p_flow_level': isPeriod ? currentFlowLevel.value : null,
           'p_pain_level': isPeriod ? currentPainLevel.value : null,
-          'p_notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
+          'p_notes': notesController.text.trim().isEmpty
+              ? null
+              : notesController.text.trim(),
         },
       );
 
       // อัปเดต local state
       dailyFlowLevel[dateKey] = isPeriod ? currentFlowLevel.value : null;
       dailyPainLevel[dateKey] = isPeriod ? currentPainLevel.value : null;
-      dailyNotes[dateKey] = notesController.text.trim().isEmpty ? null : notesController.text.trim();
+      dailyNotes[dateKey] = notesController.text.trim().isEmpty
+          ? null
+          : notesController.text.trim();
 
       Get.snackbar(
         "สำเร็จ ✨",
@@ -1117,7 +1245,7 @@ class ProfilePage extends StatelessWidget {
     final ProfileController controller = Get.put(ProfileController());
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE6F7FF),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -1129,27 +1257,35 @@ class ProfilePage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFDA7B),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
                       children: [
-                        Image.asset('assets/images/k1.png', width: 35, height: 30),
-                        const SizedBox(width: 5),
+                        Image.asset('assets/images/k1.png',
+                            width: 35, height: 30),
+                        const SizedBox(width: 1),
                         Obx(() => Text(
-                          "${controller.coins}",
-                          style: const TextStyle(
-                              color: Color(0xFF5D4037), fontWeight: FontWeight.bold, fontSize: 16),
-                        )),
+                              "${controller.coins}",
+                              style: const TextStyle(
+                                  color: Color(0xFF5D4037),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16),
+                            )),
                       ],
                     ),
                   ),
-                  const CircleAvatar(
-                    radius: 25,
-                    backgroundImage: NetworkImage(
-                        'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg'),
+                  GestureDetector(
+                    onTap: () => Get.to(() => const SettingPage()),
+                    child: const CircleAvatar(
+                      radius: 25,
+                      backgroundImage: NetworkImage(
+                        'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -1163,123 +1299,45 @@ class ProfilePage extends StatelessWidget {
                     "รอบเดือนและอาการ",
                     style: GoogleFonts.mitr(
                       textStyle: const TextStyle(
-                          color: Color(0xFF4489D7), fontSize: 22, fontWeight: FontWeight.w500),
+                          color: Color(0xFF4489D7),
+                          fontSize: 22,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
                   Obx(() => DropdownButton<String>(
-                    value: controller.monthNames[controller.selectedMonth.value - 1],
-                    icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF757575)),
-                    underline: const SizedBox(),
-                    style: GoogleFonts.mitr(
-                      textStyle: const TextStyle(
-                          color: Color(0xFF757575), fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    onChanged: (val) => controller.changeMonth(val),
-                    items: controller.monthNames
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
-                  )),
+                        value: controller
+                            .monthNames[controller.selectedMonth.value - 1],
+                        icon: const Icon(Icons.arrow_drop_down,
+                            color: Color(0xFF757575)),
+                        underline: const SizedBox(),
+                        style: GoogleFonts.mitr(
+                          textStyle: const TextStyle(
+                              color: Color(0xFF757575),
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold),
+                        ),
+                        onChanged: (val) => controller.changeMonth(val),
+                        items: controller.monthNames
+                            .map(
+                              (m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(m, style: GoogleFonts.mitr()),
+                              ),
+                            )
+                            .toList(),
+                      )),
                 ],
               ),
-              const SizedBox(height: 10),
-
-              // ─── Banner: รอบเดือนล่าสุด ────────────────────────────
-              Obx(() {
-                final text = controller.latestCycleText.value;
-                if (text.isEmpty || text == "ยังไม่มีประวัติรอบเดือน") return const SizedBox();
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF8E1),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: const Color(0xFFFFD348), width: 1.5),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_month, color: Color(0xFFF05A42), size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          text,
-                          style: const TextStyle(
-                              color: Color(0xFF5D4037), fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-
-              // ─── Banner: การทำนาย + Confidence ────────────────────
-              Obx(() {
-                final prediction = controller.predictionText.value;
-                if (prediction.isEmpty || prediction.contains('🌸')) return const SizedBox();
-                final confidence = controller.predictionConfidence.value;
-                final avgCycle = controller.avgCycleLength.value;
-
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 15),
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4))
-                    ],
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.auto_awesome, color: Color(0xFFF05A42)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              prediction,
-                              style: const TextStyle(
-                                  color: Color(0xFF5D4037),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // [ใหม่] แสดง confidence และรอบเฉลี่ย
-                      if (confidence.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const SizedBox(width: 34),
-                            _ConfidenceBadge(confidence: confidence),
-                            const SizedBox(width: 8),
-                            if (avgCycle > 0)
-                              Text(
-                                "รอบเฉลี่ย $avgCycle วัน",
-                                style: const TextStyle(
-                                    color: Color(0xFF9E9E9E), fontSize: 12),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
-                );
-              }),
+              const SizedBox(height: 15),
 
               // ─── Calendar ─────────────────────────────────────────
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFCEEFFE).withAlpha(128),
+                  color: const Color(0xFFCEEFFE).withOpacity(0.5),
                   borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: const Color(0xFF90CAF9), width: 1.5),
+                  border:
+                      Border.all(color: const Color(0xFF90CAF9), width: 1.5),
                 ),
                 child: Column(
                   children: [
@@ -1287,77 +1345,70 @@ class ProfilePage extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"]
                           .map((day) => SizedBox(
-                        width: 35,
-                        child: Text(day,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                color: Color(0xFF4489D7),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
-                      ))
+                                width: 35,
+                                child: Text(day,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        color: Color(0xFF4489D7),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16)),
+                              ))
                           .toList(),
                     ),
                     const SizedBox(height: 10),
-                    Obx(() {
-                      if (controller.isLoading.value) {
-                        return const Padding(
-                          padding: EdgeInsets.all(20.0),
-                          child: Center(
-                              child: CircularProgressIndicator(color: Color(0xFF4489D7))),
-                        );
-                      }
-                      return GridView.builder(
+                    Obx(
+                      () => GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
                         itemCount:
-                        controller.daysInMonth + controller.firstDayOffset,
+                            controller.daysInMonth + controller.firstDayOffset,
                         gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
+                            const SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 7,
                           childAspectRatio: 0.65,
                           mainAxisSpacing: 5,
                           crossAxisSpacing: 0,
                         ),
                         itemBuilder: (context, index) {
-                          int day = index - controller.firstDayOffset + 1;
-                          if (day < 1 || day > controller.daysInMonth)
+                          final day = index - controller.firstDayOffset + 1;
+                          if (day < 1 || day > controller.daysInMonth) {
                             return const SizedBox();
+                          }
 
                           return Obx(() {
-                            String dayKey = controller.getDateKey(
-                                controller.selectedYear.value,
-                                controller.selectedMonth.value,
-                                day);
-                            bool isSelected = controller.selectedDate.value == day;
-                            bool isToday = controller.today.value == day &&
-                                controller.selectedMonth.value == DateTime.now().month;
-                            bool isPeriodDay =
+                            final dayKey = controller.getDateKey(
+                              controller.selectedYear.value,
+                              controller.selectedMonth.value,
+                              day,
+                            );
+
+                            final isSelected =
+                                controller.selectedDate.value == day;
+                            final isToday = controller.today.value == day &&
+                                controller.selectedMonth.value ==
+                                    DateTime.now().month;
+                            final isPeriodDay =
                                 controller.dailyPeriodStatus[dayKey] ?? false;
-                            bool isPredictedDay =
+                            final isPredictedDay =
                                 controller.predictedPeriodDays.contains(dayKey);
 
                             Color bgColor = Colors.transparent;
                             Color textColor = const Color(0xFF4489D7);
-                            Border? border;
 
+                            //ส่วนการบันทึกประจำเดือนและการคาดเดาวันประจำเดือน
                             if (isSelected) {
-                              bgColor = const Color(0xFFFFD348);
+                              bgColor =
+                                  const Color(0xFFFFD348); // สีเหลืองเมื่อจิ้ม
                             } else if (isPeriodDay) {
-                              bgColor = const Color(0xFFF05A42);
+                              bgColor = const Color(
+                                  0xFFFF5240); // สีแดงเมื่อบันทึกแล้ว
+                              textColor = Colors.white;
+                            } else if (isPredictedDay) {
+                              bgColor = const Color(
+                                  0xFFFFBCB5); // สีคาดเดาวันหมดประจำเดือน
                               textColor = Colors.white;
                             } else if (isToday) {
                               bgColor = const Color(0xFFCCCCCC);
-                            }
-
-                            if (isPredictedDay && !isPeriodDay) {
-                              border = Border.all(
-                                color: const Color(0xFFF05A42),
-                                width: 1.5,
-                              );
-                              if (!isSelected && bgColor == Colors.transparent) {
-                                bgColor =
-                                    const Color(0xFFF05A42).withOpacity(0.12);
-                              }
                             }
 
                             return GestureDetector(
@@ -1372,13 +1423,15 @@ class ProfilePage extends StatelessWidget {
                                     decoration: BoxDecoration(
                                       color: bgColor,
                                       shape: BoxShape.circle,
-                                      border: border,
                                     ),
-                                    child: Text("$day",
-                                        style: TextStyle(
-                                            color: textColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16)),
+                                    child: Text(
+                                      "$day",
+                                      style: TextStyle(
+                                        color: textColor,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(height: 4),
                                   Image.asset(
@@ -1387,90 +1440,88 @@ class ProfilePage extends StatelessWidget {
                                     height: 32,
                                     fit: BoxFit.contain,
                                     errorBuilder: (c, e, s) =>
-                                    const SizedBox(height: 32),
+                                        const SizedBox(height: 32),
                                   ),
                                 ],
                               ),
                             );
                           });
                         },
-                      );
-                    }),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 25),
 
-              // ─── [ใหม่] สถิติรวม ──────────────────────────────────
-              _MenstrualStatsCard(controller: controller),
-              const SizedBox(height: 25),
-
               // ─── บันทึกอาการ ──────────────────────────────────────
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "บันทึกอาการ",
-                    style: GoogleFonts.mitr(
-                      textStyle: const TextStyle(
-                          color: Color(0xFF4489D7),
-                          fontSize: 22,
-                          fontWeight: FontWeight.w500),
-                    ),
+              Text(
+                "บันทึกอาการ",
+                style: GoogleFonts.mitr(
+                  textStyle: const TextStyle(
+                    color: Color(0xFF4489D7),
+                    fontSize: 22,
+                    fontWeight: FontWeight.w500,
                   ),
-                  Obx(() => Text(
-                    "วันที่ ${controller.selectedDate.value} ${controller.monthNames[controller.selectedMonth.value - 1]}",
-                    style: const TextStyle(
-                        color: Color(0xFF757575), fontWeight: FontWeight.bold),
-                  )),
-                ],
+                ),
               ),
               const SizedBox(height: 20),
 
               Obx(() {
-                if (controller.selectedDate.value == 0) return const SizedBox();
-
-                bool isPeriod = controller.getPeriodStatusForSelectedDay();
+                if (controller.selectedDate.value == 0) {
+                  return Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFDA7B),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: const Color(0xFF757575),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Text(
+                      "กรุณาเลือกวันที่ต้องการ",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Color(0xFF5D4037),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  );
+                }
 
                 return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ปุ่มสถานะ
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildStatusButton(controller, "เป็นประจำเดือน",
-                            const Color(0xFFF05A42), Colors.white, true),
+                        _buildStatusButton(
+                          controller,
+                          "เป็นประจำเดือน",
+                          const Color(0xFFA6E3F9),
+                          true,
+                        ),
                         const SizedBox(width: 15),
-                        _buildStatusButton(controller, "ไม่เป็นประจำเดือน",
-                            const Color(0xFFA6E3F9), const Color(0xFF424242), false),
+                        _buildStatusButton(
+                          controller,
+                          "ไม่เป็นประจำเดือน",
+                          const Color(0xFFA6E3F9),
+                          false,
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 24),
-
-                    // [ใหม่] Flow Level (แสดงเฉพาะตอนเป็นประจำเดือน)
-                    if (isPeriod) ...[
-                      _SectionLabel(label: "ปริมาณเลือด"),
-                      const SizedBox(height: 10),
-                      _FlowLevelSelector(controller: controller),
-                      const SizedBox(height: 20),
-
-                      // [ใหม่] Pain Level
-                      _SectionLabel(label: "ระดับความเจ็บปวด"),
-                      const SizedBox(height: 10),
-                      _PainLevelSelector(controller: controller),
-                      const SizedBox(height: 20),
-                    ],
-
-                    // อาการ
-                    _SectionLabel(label: "อาการ"),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 30),
                     Wrap(
                       spacing: 15,
                       runSpacing: 20,
                       alignment: WrapAlignment.center,
                       children: controller.symptomsList.map((item) {
-                        bool isSelected = controller
+                        final isSelected = controller
                             .getSymptomsForSelectedDay()
                             .contains(item['name']);
                         return GestureDetector(
@@ -1484,54 +1535,37 @@ class ProfilePage extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: isSelected
                                       ? const Color(0xFFA6E3F9)
-                                      : const Color(0xFFFFDA7B).withAlpha(204),
+                                      : const Color(
+                                          0xFFFFDA7B,
+                                        ).withOpacity(0.8),
                                   borderRadius: BorderRadius.circular(15),
                                   border: Border.all(
-                                      color: isSelected
-                                          ? const Color(0xFF4489D7)
-                                          : Colors.black12,
-                                      width: 1.5),
+                                    color: isSelected
+                                        ? const Color(0xFF4489D7)
+                                        : Colors.black12,
+                                    width: 1.5,
+                                  ),
                                 ),
-                                child: Image.asset(item['img']!, fit: BoxFit.contain),
+                                child: Image.asset(
+                                  item['img']!,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              Text(item['name']!,
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF5D4037),
-                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                item['name']!,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Color(0xFF5D4037),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 24),
-
-                    // [ใหม่] Notes
-                    _SectionLabel(label: "บันทึกเพิ่มเติม"),
-                    const SizedBox(height: 10),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF90CAF9), width: 1.5),
-                      ),
-                      child: TextField(
-                        controller: controller.notesController,
-                        maxLines: 3,
-                        style: const TextStyle(color: Color(0xFF5D4037), fontSize: 14),
-                        decoration: const InputDecoration(
-                          hintText: "จดโน้ตอะไรก็ได้สำหรับวันนี้...",
-                          hintStyle: TextStyle(color: Color(0xFFBDBDBD)),
-                          contentPadding:
-                          EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          border: InputBorder.none,
-                        ),
-                      ),
-                    ),
                     const SizedBox(height: 25),
-
-                    // ปุ่มบันทึก
                     Align(
                       alignment: Alignment.centerRight,
                       child: ElevatedButton(
@@ -1539,15 +1573,16 @@ class ProfilePage extends StatelessWidget {
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2C5282),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 30, vertical: 12),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
-                        child: const Text("บันทึกข้อมูล",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
+                        child: const Text(
+                          "บันทึก",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -1561,10 +1596,15 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusButton(ProfileController controller, String title,
-      Color activeColor, Color activeTextColor, bool isPeriodTab) {
+  Widget _buildStatusButton(
+    ProfileController controller,
+    String title,
+    Color activeColor,
+    bool isPeriodTab,
+  ) {
     return Obx(() {
-      bool isSelected = controller.getPeriodStatusForSelectedDay() == isPeriodTab;
+      bool isSelected =
+          controller.getPeriodStatusForSelectedDay() == isPeriodTab;
       return GestureDetector(
         onTap: () => controller.setPeriodStatus(isPeriodTab),
         child: Container(
@@ -1573,16 +1613,14 @@ class ProfilePage extends StatelessWidget {
           decoration: BoxDecoration(
             color: isSelected ? activeColor : Colors.white,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-                color: isSelected ? activeColor : const Color(0xFF757575),
-                width: 1.5),
+            border: Border.all(color: const Color(0xFF757575), width: 1.5),
           ),
           child: Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? activeTextColor : const Color(0xFF424242),
-              fontSize: 15,
+            style: const TextStyle(
+              color: Color(0xFF424242),
+              fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1606,7 +1644,9 @@ class _SectionLabel extends StatelessWidget {
       label,
       style: GoogleFonts.mitr(
         textStyle: const TextStyle(
-            color: Color(0xFF4489D7), fontSize: 16, fontWeight: FontWeight.w500),
+            color: Color(0xFF4489D7),
+            fontSize: 16,
+            fontWeight: FontWeight.w500),
       ),
     );
   }
@@ -1618,7 +1658,12 @@ class _FlowLevelSelector extends StatelessWidget {
   const _FlowLevelSelector({required this.controller});
 
   static const _levels = [
-    {'value': 'spotting', 'label': 'Spotting', 'emoji': '🩷', 'desc': 'กระปิดกระปอย'},
+    {
+      'value': 'spotting',
+      'label': 'Spotting',
+      'emoji': '🩷',
+      'desc': 'กระปิดกระปอย'
+    },
     {'value': 'light', 'label': 'Light', 'emoji': '🩸', 'desc': 'น้อย'},
     {'value': 'medium', 'label': 'Medium', 'emoji': '🩸🩸', 'desc': 'ปานกลาง'},
     {'value': 'heavy', 'label': 'Heavy', 'emoji': '🩸🩸🩸', 'desc': 'มาก'},
@@ -1642,11 +1687,17 @@ class _FlowLevelSelector extends StatelessWidget {
                 color: isSelected ? const Color(0xFFF05A42) : Colors.white,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: isSelected ? const Color(0xFFF05A42) : const Color(0xFFE0E0E0),
+                  color: isSelected
+                      ? const Color(0xFFF05A42)
+                      : const Color(0xFFE0E0E0),
                   width: 1.5,
                 ),
                 boxShadow: isSelected
-                    ? [BoxShadow(color: const Color(0xFFF05A42).withOpacity(0.3), blurRadius: 8)]
+                    ? [
+                        BoxShadow(
+                            color: const Color(0xFFF05A42).withOpacity(0.3),
+                            blurRadius: 8)
+                      ]
                     : [],
               ),
               child: Column(
@@ -1658,7 +1709,8 @@ class _FlowLevelSelector extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : const Color(0xFF757575),
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF757575),
                     ),
                   ),
                 ],
@@ -1676,7 +1728,13 @@ class _PainLevelSelector extends StatelessWidget {
   final ProfileController controller;
   const _PainLevelSelector({required this.controller});
 
-  static const _painLabels = ['แทบไม่เจ็บ', 'เล็กน้อย', 'พอทน', 'เจ็บมาก', 'ทนไม่ได้'];
+  static const _painLabels = [
+    'แทบไม่เจ็บ',
+    'เล็กน้อย',
+    'พอทน',
+    'เจ็บมาก',
+    'ทนไม่ได้'
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -1699,11 +1757,17 @@ class _PainLevelSelector extends StatelessWidget {
                     color: isSelected ? _painColor(level) : Colors.white,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: isSelected ? _painColor(level) : const Color(0xFFE0E0E0),
+                      color: isSelected
+                          ? _painColor(level)
+                          : const Color(0xFFE0E0E0),
                       width: 2,
                     ),
                     boxShadow: isSelected
-                        ? [BoxShadow(color: _painColor(level).withOpacity(0.35), blurRadius: 8)]
+                        ? [
+                            BoxShadow(
+                                color: _painColor(level).withOpacity(0.35),
+                                blurRadius: 8)
+                          ]
                         : [],
                   ),
                   alignment: Alignment.center,
@@ -1712,7 +1776,8 @@ class _PainLevelSelector extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : const Color(0xFF9E9E9E),
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF9E9E9E),
                     ),
                   ),
                 ),
@@ -1758,9 +1823,7 @@ class _ConfidenceBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: isHigh
-            ? const Color(0xFFE8F5E9)
-            : const Color(0xFFFFF3E0),
+        color: isHigh ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isHigh ? const Color(0xFF66BB6A) : const Color(0xFFFF9800),
@@ -1861,8 +1924,8 @@ class _MenstrualStatsCard extends StatelessWidget {
               Text(
                 "อาการที่พบบ่อย",
                 style: GoogleFonts.mitr(
-                  textStyle: const TextStyle(
-                      color: Color(0xFF9E9E9E), fontSize: 12),
+                  textStyle:
+                      const TextStyle(color: Color(0xFF9E9E9E), fontSize: 12),
                 ),
               ),
               const SizedBox(height: 6),
@@ -1871,7 +1934,8 @@ class _MenstrualStatsCard extends StatelessWidget {
                 children: controller.statCommonSymptoms.map((s) {
                   return Chip(
                     label: Text(s,
-                        style: const TextStyle(fontSize: 12, color: Color(0xFF5D4037))),
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF5D4037))),
                     backgroundColor: const Color(0xFFFFF8E1),
                     side: const BorderSide(color: Color(0xFFFFD348)),
                     padding: const EdgeInsets.symmetric(horizontal: 4),
