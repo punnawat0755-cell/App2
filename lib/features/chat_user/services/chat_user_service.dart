@@ -1,13 +1,10 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
 
+import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/features/chat_user/models/usermessage.model.dart';
 
 /// สถานะผลลัพธ์หลังการพยายามส่งข้อความจาก UI
@@ -29,7 +26,8 @@ class SendMessageResult {
 enum MatchRole {
   seeker('seeker'),
   listener('listener'), // ใน DB ใช้คำว่า listener
-  counselor('listener'); // เผื่อ Controller ส่ง counselor มา ให้ค่าเป็น listener
+  counselor(
+      'listener'); // เผื่อ Controller ส่ง counselor มา ให้ค่าเป็น listener
 
   const MatchRole(this.value);
   final String value;
@@ -41,142 +39,12 @@ enum MatchRole {
 class ChatUserService extends GetxService {
   // Dependencies หลักของ service
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  late final http.Client _httpClient;
+  final ContentModerationService _moderationService =
+      ContentModerationService.instance;
 
   // Firestore collections
   static const String _chatCollection = 'Chats';
   static const String _queueCollection = 'RandomQueue';
-
-  // Config ของการเรียก n8n moderation
-  static const String _n8nModerationWebhook = String.fromEnvironment(
-    'N8N_MODERATION_WEBHOOK',
-    defaultValue: 'https://n8n.tgstack.dev/webhook/HowAreYou',
-  );
-  // true = ถ้า n8n ล่มให้ปล่อยผ่าน (ยกเว้น local fallback พบคำหยาบ)
-  static const bool _moderationFailOpen = bool.fromEnvironment(
-    'N8N_MODERATION_FAIL_OPEN',
-    defaultValue: true,
-  );
-  // true = ยอมรับ cert ที่ไม่สมบูรณ์สำหรับ host ที่ whitelist ไว้
-  static const bool _allowBadCertificate = bool.fromEnvironment(
-    'N8N_ALLOW_BAD_CERT',
-    defaultValue: true,
-  );
-  // รายชื่อ host ที่อนุญาต bad certificate
-  static const String _allowBadCertificateHosts = String.fromEnvironment(
-    'N8N_ALLOW_BAD_CERT_HOSTS',
-    defaultValue: 'n8n.tgstack.dev',
-  );
-  // timeout ตอนเรียก webhook moderation
-  static const Duration _moderationTimeout = Duration(seconds: 6);
-  // คลังคำหยาบฝั่งแอป ใช้เมื่อ n8n ไม่พร้อมใช้งาน
-  static const List<String> _localProfanityTokens = [
-    // TH
-    'เหี้ย',
-    'ไอ้เหี้ย',
-    'อีเหี้ย',
-    'ควย',
-    'ไอ้ควย',
-    'อีควย',
-    'หี',
-    'หำ',
-    'กระหรี่',
-    'อีกะหรี่',
-    'สัส',
-    'ไอ้สัส',
-    'อีสัส',
-    'ไอสัส',
-    'ไอสาด',
-    'สัตว์',
-    'สัด',
-    'ส้นตีน',
-    'ตีน',
-    'ตรีน',
-    'ตายห่า',
-    'ห่า',
-    'ห่าน',
-    'หน้าหี',
-    'หน้าควย',
-    'เสือก',
-    'กู',
-    'เย็ด',
-    'เย็ดแม่',
-    'เย็ดพ่อ',
-    'แม่ง',
-    'มรึง',
-    'มึง',
-    'ควาย',
-    'ไอ้ควาย',
-    'อีควาย',
-    'ควายเอ๊ย',
-    'โง่สัส',
-    'ค-ว-ย',
-    'ห-ี',
-    'เ-ห-ี้-ย',
-    // EN
-    'fuck',
-    'f*ck',
-    'fuk',
-    'fuc',
-    'fucking',
-    'fk',
-    'wtf',
-    'shit',
-    'sh1t',
-    'bullshit',
-    'dipshit',
-    'bitch',
-    'b1tch',
-    'son of bitch',
-    'son of a bitch',
-    'asshole',
-    'ass hole',
-    'arsehole',
-    'jackass',
-    'bastard',
-    'motherfucker',
-    'mother fucker',
-    'mf',
-    'mfer',
-    'dick',
-    'd1ck',
-    'cock',
-    'prick',
-    'pussy',
-    'pussyhole',
-    'cunt',
-    'slut',
-    'whore',
-    'hoe',
-    'retard',
-    'idiot',
-    'stupid',
-    'kys',
-    'kill yourself',
-    'nigga',
-    'nigger',
-    'faggot',
-    'tranny',
-    'rape',
-    'raped',
-    'rapist',
-    'porn',
-    'xxx',
-    'blowjob',
-    'handjob',
-  ];
-
-  /// Constructor: สร้าง http client ตาม config ปัจจุบัน
-  ChatUserService() {
-    _httpClient = _buildHttpClient();
-  }
-
-  /// Dispose http client เมื่อ service ถูกปิด
-  @override
-  void onClose() {
-    _httpClient.close();
-    super.onClose();
-  }
 
   // ----------------------------------------------------------------
   // 1. Firebase Basic Chat Operations (รับ-ส่งข้อความ)
@@ -238,11 +106,14 @@ class ChatUserService extends GetxService {
       return const SendMessageResult(status: SendMessageStatus.skipped);
     }
 
-    final moderation = await _moderateMessage(
-      chatId: chatId,
-      senderId: currentUserId,
-      receiverId: recipientUserId ?? '',
+    final moderation = await _moderationService.moderateText(
+      source: 'chat_message',
       text: text,
+      metadata: {
+        'chatId': chatId,
+        'senderId': currentUserId,
+        'receiverId': recipientUserId ?? '',
+      },
     );
 
     if (!moderation.allow) {
@@ -272,306 +143,6 @@ class ChatUserService extends GetxService {
 
     messageController.clear();
     return const SendMessageResult(status: SendMessageStatus.sent);
-  }
-
-  /// เรียก n8n เพื่อตรวจ moderation และตีความผลลัพธ์ให้เป็น allow/block
-  Future<_ModerationResult> _moderateMessage({
-    required String chatId,
-    required String senderId,
-    required String receiverId,
-    required String text,
-  }) async {
-    if (_n8nModerationWebhook.trim().isEmpty) {
-      return _ModerationResult.allow(text);
-    }
-    final webhookUri = Uri.tryParse(_n8nModerationWebhook);
-    debugPrint(
-      'n8n moderation request url=$_n8nModerationWebhook host=${webhookUri?.host ?? '-'}',
-    );
-
-    try {
-      final response = await _httpClient
-          .post(
-            webhookUri ?? Uri.parse(_n8nModerationWebhook),
-            headers: const {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'action': 'content_moderate',
-              'chatId': chatId,
-              'senderId': senderId,
-              'receiverId': receiverId,
-              'message': text,
-              'text': text,
-              'timestamp': DateTime.now().toUtc().toIso8601String(),
-            }),
-          )
-          .timeout(_moderationTimeout);
-
-      debugPrint(
-        'n8n moderation http=${response.statusCode} body=${response.body}',
-      );
-
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        return _fallbackOnModerationError(text, 'http-${response.statusCode}');
-      }
-
-      if (response.body.trim().isEmpty) {
-        return _fallbackOnModerationError(text, 'empty-body');
-      }
-
-      final payload = _parseModerationPayload(response.body);
-      if (payload == null) {
-        return _fallbackOnModerationError(text, 'invalid-payload');
-      }
-
-      final status = (payload['status'] ?? '').toString().trim().toLowerCase();
-      final allowed = _readBool(payload, const ['allowed', 'allow']);
-      final explicitProfanity = _readBool(
-            payload,
-            const ['isProfane', 'profanity', 'containsProfanity'],
-          ) ==
-          true;
-      final safeText = _readSafeText(payload, text);
-
-      debugPrint('n8n moderation payload=$payload');
-
-      if (allowed != null) {
-        if (allowed) {
-          return _ModerationResult.allow(safeText);
-        }
-        return const _ModerationResult.block('moderation-blocked-by-n8n');
-      }
-
-      if (explicitProfanity ||
-          status == 'block' ||
-          status == 'blocked' ||
-          status == 'reject') {
-        return const _ModerationResult.block('moderation-blocked-by-n8n');
-      }
-
-      if (status == 'mask' ||
-          status == 'sanitize' ||
-          status == 'sanitized' ||
-          status == 'allow' ||
-          status == 'allowed' ||
-          status == 'ok') {
-        return _ModerationResult.allow(safeText);
-      }
-
-      return _fallbackOnModerationError(text, 'unknown-status:$status');
-    } on TimeoutException {
-      debugPrint('n8n moderation timeout');
-      return _fallbackOnModerationError(text, 'timeout');
-    } catch (e) {
-      debugPrint('n8n moderation failed: $e');
-      return _fallbackOnModerationError(text, 'exception');
-    }
-  }
-
-  /// fallback เมื่อ n8n ไม่พร้อมใช้งาน
-  /// - ถ้า local ตรวจเจอคำหยาบ => block
-  /// - ถ้าไม่เจอ => allow/block ตาม `_moderationFailOpen`
-  _ModerationResult _fallbackOnModerationError(String text, String reason) {
-    final blockedByLocal = _containsLocalProfanity(text);
-    debugPrint(
-      'n8n moderation fallback(local) reason=$reason blocked=$blockedByLocal',
-    );
-
-    if (blockedByLocal) {
-      return const _ModerationResult.block('moderation-blocked-local-fallback');
-    }
-
-    // n8n unavailable but local fallback found no profanity => allow sending.
-    if (_moderationFailOpen) {
-      return _ModerationResult.allow(text);
-    }
-    return _ModerationResult.block('moderation-unavailable:$reason');
-  }
-
-  /// ตรวจคำหยาบจากข้อความฝั่งแอป
-  /// ตรวจทั้งข้อความเดิมและข้อความที่ลบช่องว่าง/สัญลักษณ์แล้ว
-  bool _containsLocalProfanity(String input) {
-    final lowered = input.toLowerCase();
-    final compact = lowered
-        .replaceAll(RegExp(r'\s+'), '')
-        .replaceAll(RegExp(r'[^a-zA-Z0-9\u0E00-\u0E7F]'), '');
-
-    for (final token in _localProfanityTokens) {
-      final t = token.toLowerCase();
-      if (lowered.contains(t) || compact.contains(t.replaceAll(' ', ''))) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /// แปลง decoded json ให้เป็น `Map<String, dynamic>` ที่อ่านต่อได้
-  Map<String, dynamic>? _asMapPayload(dynamic decoded) {
-    if (decoded is Map) return Map<String, dynamic>.from(decoded);
-    if (decoded is List && decoded.isNotEmpty) {
-      final first = decoded.first;
-      if (first is Map) return Map<String, dynamic>.from(first);
-    }
-    return null;
-  }
-
-  /// parse response body จาก n8n
-  /// รองรับทั้ง JSON object/list และ plain text สั้นๆ เช่น allow/block
-  Map<String, dynamic>? _parseModerationPayload(String body) {
-    final trimmed = body.trim();
-
-    try {
-      final decoded = jsonDecode(trimmed);
-      final payload = _asMapPayload(decoded);
-      if (payload != null) {
-        return payload;
-      }
-    } catch (_) {
-      // fallback to lightweight parser for plain-text webhook responses
-    }
-
-    final normalized = trimmed.toLowerCase();
-    if (normalized == 'ok' ||
-        normalized == 'allow' ||
-        normalized == 'allowed' ||
-        normalized == 'true' ||
-        normalized == 'pass') {
-      return {'allowed': true};
-    }
-    if (normalized == 'block' ||
-        normalized == 'blocked' ||
-        normalized == 'false' ||
-        normalized == 'reject') {
-      return {'allowed': false};
-    }
-
-    return null;
-  }
-
-  /// สร้าง HTTP client สำหรับเรียก webhook moderation
-  /// รองรับ bad cert เฉพาะ host ที่ whitelist
-  http.Client _buildHttpClient() {
-    if (!_allowBadCertificate) {
-      return http.Client();
-    }
-
-    final configuredHosts = _allowBadCertificateHosts
-        .split(',')
-        .map((e) => e.trim().toLowerCase())
-        .where((e) => e.isNotEmpty)
-        .toSet();
-    final webhookHost = Uri.tryParse(_n8nModerationWebhook)?.host.toLowerCase();
-    if (webhookHost != null && webhookHost.isNotEmpty) {
-      configuredHosts.add(webhookHost);
-    }
-
-    final ioClient = HttpClient()
-      ..badCertificateCallback = (X509Certificate cert, String host, int port) {
-        final isAllowed = configuredHosts.contains(host.toLowerCase());
-        if (isAllowed) {
-          debugPrint(
-            'n8n moderation warning: accepting untrusted cert from $host:$port',
-          );
-        } else {
-          debugPrint(
-            'n8n moderation blocked untrusted cert from non-allowed host $host:$port',
-          );
-        }
-        return isAllowed;
-      };
-
-    return IOClient(ioClient);
-  }
-
-  /// อ่านค่าบูลีนจาก payload
-  /// - เช็ค top-level ก่อน
-  /// - ถ้าไม่เจอ ค่อยไล่ recursive ลงไปใน object/list
-  bool? _readBool(Map<String, dynamic> payload, List<String> keys) {
-    final keySet = keys.map((e) => e.toLowerCase()).toSet();
-    // Priority 1: respect top-level field first (the direct webhook contract).
-    for (final entry in payload.entries) {
-      if (!keySet.contains(entry.key.toLowerCase())) continue;
-      final parsed = _parseDynamicBool(entry.value);
-      if (parsed != null) return parsed;
-    }
-
-    // Priority 2: scan nested payloads.
-    // If both true/false appear in different branches, false should win.
-    return _readBoolRecursive(payload, keySet);
-  }
-
-  /// helper recursive สำหรับค้นค่า bool ในโครงสร้าง nested
-  /// ถ้าพบทั้ง true/false ให้ false ชนะ (strict mode)
-  bool? _readBoolRecursive(dynamic node, Set<String> keys) {
-    bool foundTrue = false;
-
-    if (node is Map) {
-      final map = Map<String, dynamic>.from(node);
-
-      for (final entry in map.entries) {
-        final key = entry.key.toLowerCase();
-        if (keys.contains(key)) {
-          final parsed = _parseDynamicBool(entry.value);
-          if (parsed != null) {
-            if (!parsed) return false;
-            foundTrue = true;
-          }
-        }
-      }
-
-      for (final value in map.values) {
-        final nested = _readBoolRecursive(value, keys);
-        if (nested != null) {
-          if (!nested) return false;
-          foundTrue = true;
-        }
-      }
-      return foundTrue ? true : null;
-    }
-
-    if (node is List) {
-      for (final item in node) {
-        final nested = _readBoolRecursive(item, keys);
-        if (nested != null) {
-          if (!nested) return false;
-          foundTrue = true;
-        }
-      }
-    }
-    return foundTrue ? true : null;
-  }
-
-  /// แปลง dynamic เป็น bool
-  /// รองรับ bool/num/string (`true`, `1`, `yes`, ...)
-  bool? _parseDynamicBool(dynamic raw) {
-    if (raw is bool) return raw;
-    if (raw is num) return raw != 0;
-    if (raw is String) {
-      final value = raw.trim().toLowerCase();
-      if (value == 'true' || value == '1' || value == 'yes') return true;
-      if (value == 'false' || value == '0' || value == 'no') return false;
-    }
-    return null;
-  }
-
-  /// อ่านข้อความที่ผ่านการ sanitize จาก payload
-  /// ถ้าไม่มี field ที่รองรับ จะใช้ fallback (ข้อความเดิม)
-  String _readSafeText(Map<String, dynamic> payload, String fallback) {
-    const keys = [
-      'cleanMessage',
-      'sanitizedText',
-      'safeText',
-      'maskedText',
-      'message',
-      'text',
-    ];
-
-    for (final key in keys) {
-      final raw = payload[key];
-      if (raw is String && raw.trim().isNotEmpty) {
-        return raw.trim();
-      }
-    }
-    return fallback;
   }
 
   /// ลบข้อความเดียวในห้องแชท
@@ -607,7 +178,7 @@ class ChatUserService extends GetxService {
       'updatedAt': FieldValue.serverTimestamp(),
       'joinedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
-    
+
     // (Optional) อาจจะเรียก Supabase RPC เพื่อบันทึก Log การเข้าคิวได้
   }
 
@@ -768,7 +339,8 @@ class ChatUserService extends GetxService {
     final chatRef = _firestore.collection(_chatCollection).doc(chatId);
     final chatSnap = await chatRef.get();
     final data = chatSnap.data();
-    final users = (data?['users'] as List<dynamic>? ?? []).whereType<String>().toList();
+    final users =
+        (data?['users'] as List<dynamic>? ?? []).whereType<String>().toList();
 
     // ✅ ปรับปรุง: อัปเดตสถานะเป็น 'ended' ก่อน แต่ "อย่าเพิ่งลบข้อความ"
     // เพื่อให้ Frontend สามารถดึงข้อความมานับคำ (Word Count) ได้ก่อนส่ง Feedback
@@ -796,7 +368,7 @@ class ChatUserService extends GetxService {
           SetOptions(merge: true));
     }
     await batch.commit();
-    
+
     // หมายเหตุ: การลบข้อความจริง (deleteAllMessages) ควรทำหลังจาก Submit Feedback เสร็จสิ้น
     // หรือปล่อยให้เป็นหน้าที่ของ Admin script ก็ได้
   }
@@ -863,31 +435,4 @@ class ChatUserService extends GetxService {
     // ลบห้องแชททิ้งท้าย
     await _firestore.collection(_chatCollection).doc(chatId).delete();
   }
-}
-
-/// ผลลัพธ์ภายในของ moderation pipeline
-/// - allow: อนุญาตให้ส่งหรือไม่
-/// - safeText: ข้อความที่ sanitize แล้ว (ถ้ามี)
-/// - reason: รหัสสาเหตุเวลา block
-class _ModerationResult {
-  const _ModerationResult({
-    required this.allow,
-    required this.safeText,
-    required this.reason,
-  });
-
-  factory _ModerationResult.allow(String text) => _ModerationResult(
-        allow: true,
-        safeText: text,
-        reason: '',
-      );
-
-  const _ModerationResult.block(String reasonCode)
-      : allow = false,
-        safeText = '',
-        reason = reasonCode;
-
-  final bool allow;
-  final String safeText;
-  final String reason;
 }

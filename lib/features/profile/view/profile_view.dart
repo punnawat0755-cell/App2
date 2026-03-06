@@ -641,7 +641,7 @@ class ProfileController extends GetxController {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "คำแนะนำการดูแลตัวเอง (จาก n8n)",
+                    "คำแนะนำการดูแลตัวเอง ",
                     style: TextStyle(
                       color: Color(0xFF4489D7),
                       fontFamily: 'Kanit',
