@@ -23,16 +23,18 @@ class ArticleDetailPage extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            children: [
+              // 👉 1. เปิดวงเล็บ children ตรงนี้
               GestureDetector(
-                onTap: () => Navigator.pop(context), // เปลี่ยนจาก onPressed มาใส่ onTap ตรงนี้แทน
+                onTap: () => Navigator.pop(context),
                 child: Image.asset(
                   'assets/images/back.png',
                   width: 25,
                   height: 25,
                 ),
               ),
-            ],
+
+              // ❌ ลบ ], ที่เคยอยู่ตรงนี้ออกไปแล้วครับ
               const SizedBox(height: 10),
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
@@ -70,7 +72,7 @@ class ArticleDetailPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40),
-            ],
+            ], // 👉 2. ปิดวงเล็บ children ตรงนี้ที่เดียวพอครับ
           ),
         ),
       ),

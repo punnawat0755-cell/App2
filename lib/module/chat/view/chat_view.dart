@@ -54,10 +54,6 @@ class ChatPage extends StatelessWidget {
         toolbarHeight: 80,
         backgroundColor: const Color(0xFFD3ECF8),
         elevation: 0,
-        leading: IconButton(
-          icon: Image.asset('assets/images/back.png', width: 23, height: 23),
-          onPressed: () => Get.back(),
-        ),
         title: const Text(
           "แชท",
           style: TextStyle(
@@ -67,7 +63,7 @@ class ChatPage extends StatelessWidget {
           ),
         ),
         centerTitle: false,
-        titleSpacing: -7,
+        titleSpacing: 20,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 15),
@@ -219,3 +215,6 @@ class ChatPage extends StatelessWidget {
     );
   }
 }
+
+
+bu
