@@ -4,6 +4,7 @@ import 'package:flutter_application_1/module/home/view/test_view.dart';
 import 'package:flutter_application_1/module/home/view/widget/home_widgets.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_card.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_detail.dart';
+import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:get/get.dart';
 
 class HomeController extends GetxController {
@@ -109,17 +110,20 @@ class HomePage extends StatelessWidget {
                       children: [
                         const SizedBox(width: 8),
                         // รูปโปรไฟล์
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                            image: const DecorationImage(
-                              image: NetworkImage(
-                                'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                        GestureDetector(
+                          onTap: () => Get.to(() => const SettingPage()),
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                              image: const DecorationImage(
+                                image: NetworkImage(
+                                  'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                                ),
+                                fit: BoxFit.cover,
                               ),
-                              fit: BoxFit.cover,
                             ),
                           ),
                         ),
@@ -228,7 +232,7 @@ class HomePage extends StatelessWidget {
                       child: ArticleCard(
                         title: 'วาฬ 52Hz\nไม่ได้อยู่คนเดียว',
                         subtitle: '1 Month Ago',
-                        imagePath: 'assets/images/article1.png',
+                        imagePath: 'assets/images/52Hz.png',
                         // [เพิ่ม] ใส่ onTap เพื่อลิ้งค์ไปหน้าเนื้อหา
                         onTap: () {
                           Navigator.push(
@@ -268,7 +272,7 @@ class HomePage extends StatelessWidget {
                             MaterialPageRoute(
                               builder: (context) => const ArticleDetailPage(
                                 title: 'อยู่คนเดียวก็มีความสุขดีนะ',
-                                imagePath: 'assets/images/article2.png',
+                                imagePath: 'assets/images/alon.png',
                                 content:
                                     """การอยู่คนเดียวไม่ได้หมายความว่าต้องเหงาเสมอไป การได้ใช้เวลากับตัวเองคือโอกาสที่ดีในการทำความเข้าใจความต้องการของตัวเอง พัฒนาทักษะใหม่ๆ และเติมพลังให้กับจิตใจ
 

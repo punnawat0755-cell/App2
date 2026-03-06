@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 
 // ==========================================
 // 1. Controller: จัดการข้อมูลแยกตาม ปี-เดือน-วัน
@@ -243,10 +244,13 @@ class ProfilePage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const CircleAvatar(
-                    radius: 25,
-                    backgroundImage: NetworkImage(
-                      'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                  GestureDetector(
+                    onTap: () => Get.to(() => const SettingPage()),
+                    child: const CircleAvatar(
+                      radius: 25,
+                      backgroundImage: NetworkImage(
+                        'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                      ),
                     ),
                   ),
                 ],

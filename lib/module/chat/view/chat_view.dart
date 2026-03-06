@@ -1,12 +1,6 @@
-export 'chatselectionpage.dart';
-export 'conversationsummarypage.dart';
-export 'halfcirclebutton.dart';
-export 'waitingchatpage.dart';
-
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-
-import 'conversationsummarypage.dart';
+import 'package:flutter_application_1/module/chat/view/conversationsummarypage.dart';
 
 class ChatPageController extends GetxController {
   final TextEditingController textController = TextEditingController();
@@ -26,7 +20,9 @@ class ChatPageController extends GetxController {
     textController.clear();
   }
 
-  void endConversation() {
+  // 💡 แก้ไขฟังก์ชันนี้: ให้ปิด Popup ก่อน แล้วค่อยเปลี่ยนหน้า
+  void confirmEndConversation() {
+    Get.back(); // ปิดหน้าต่าง Popup
     Get.to(() => ConversationSummaryPage());
   }
 
@@ -69,7 +65,8 @@ class ChatPage extends StatelessWidget {
             padding: const EdgeInsets.only(right: 15),
             child: UnconstrainedBox(
               child: GestureDetector(
-                onTap: controller.endConversation,
+                // 💡 เปลี่ยนจากไปหน้าอื่นทันที มาเป็นการเรียกโชว์ Popup แทน
+                onTap: () => _showEndConversationDialog(context),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -211,6 +208,93 @@ class ChatPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ==============================================================
+  // 💡 เพิ่มฟังก์ชันสำหรับโชว์ Popup ยืนยัน (ออกแบบตามรูปเป๊ะๆ)
+  // ==============================================================
+  void _showEndConversationDialog(BuildContext context) {
+    Get.dialog(
+      Dialog(
+        backgroundColor: Colors.transparent, // ให้กรอบใส เพื่อวาด Container เอง
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFCDEEFE), // สีพื้นหลังฟ้าอ่อน
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min, // ให้กรอบหดพอดีกับเนื้อหา
+            children: [
+              const Text(
+                "คุณต้องการที่จะออกจากบทสนทนา\nใช่หรือไม่",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Color(0xFF4489D7), // สีตัวอักษรน้ำเงิน
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 35),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // --- ปุ่ม ยืนยัน ---
+                  SizedBox(
+                    width: 110,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () => controller
+                          .confirmEndConversation(), // เรียกคำสั่งจบแชท
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF5CD9FF), // สีปุ่มฟ้า
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        "ยืนยัน",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // --- ปุ่ม ยกเลิก ---
+                  SizedBox(
+                    width: 110,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: () => Get.back(), // ปิด Popup เฉยๆ
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF5CD9FF), // สีปุ่มฟ้า
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: const Text(
+                        "ยกเลิก",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

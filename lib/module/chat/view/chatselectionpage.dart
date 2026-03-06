@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:get/get.dart';
 
 import 'halfcirclebutton.dart';
@@ -98,17 +99,20 @@ class _ProfileHeader extends StatelessWidget {
     return Positioned(
       top: 20,
       right: 35,
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 2),
-          image: const DecorationImage(
-            image: NetworkImage(
-              'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+      child: GestureDetector(
+        onTap: () => Get.to(() => const SettingPage()),
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            image: const DecorationImage(
+              image: NetworkImage(
+                'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+              ),
+              fit: BoxFit.cover,
             ),
-            fit: BoxFit.cover,
           ),
         ),
       ),

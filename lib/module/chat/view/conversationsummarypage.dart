@@ -6,7 +6,13 @@ import 'chatselectionpage.dart';
 class ConversationSummaryController extends GetxController {
   final RxBool isFollowed = false.obs;
   final RxBool isBlocked = false.obs;
-  final RxInt currentRating = 3.obs;
+  final RxInt currentRating = 1.obs;
+
+  void resetState() {
+    isFollowed.value = false;
+    isBlocked.value = false;
+    currentRating.value = 1;
+  }
 
   void showBlockDialog(BuildContext context) {
     showDialog(
@@ -96,7 +102,9 @@ class ConversationSummaryController extends GetxController {
 }
 
 class ConversationSummaryPage extends StatelessWidget {
-  ConversationSummaryPage({super.key});
+  ConversationSummaryPage({super.key}) {
+    controller.resetState();
+  }
 
   final ConversationSummaryController controller =
       Get.isRegistered<ConversationSummaryController>()

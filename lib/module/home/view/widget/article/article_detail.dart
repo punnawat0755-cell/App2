@@ -34,8 +34,7 @@ class ArticleDetailPage extends StatelessWidget {
                 ),
               ),
 
-              // ❌ ลบ ], ที่เคยอยู่ตรงนี้ออกไปแล้วครับ
-              const SizedBox(height: 10),
+              const SizedBox(height: 30),
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: isNetworkImage
@@ -47,6 +46,7 @@ class ArticleDetailPage extends StatelessWidget {
                     : Image.asset(
                         imagePath,
                         width: double.infinity,
+                        height: 250,
                         fit: BoxFit.cover,
                       ),
               ),
@@ -57,7 +57,7 @@ class ArticleDetailPage extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF4489D7),
-                    fontSize: 24,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -72,7 +72,7 @@ class ArticleDetailPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 40),
-            ], // 👉 2. ปิดวงเล็บ children ตรงนี้ที่เดียวพอครับ
+            ], 
           ),
         ),
       ),

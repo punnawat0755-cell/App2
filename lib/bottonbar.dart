@@ -1,6 +1,7 @@
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
+import 'package:flutter_application_1/module/chat/view/chatselectionpage.dart';
 import 'package:flutter_application_1/module/encouragement/view/encouragement_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home_view.dart';
@@ -33,6 +34,11 @@ class BottomNavController extends GetxController {
 
   // Keep page ordering the same as before to preserve behavior.
   final List<Widget> pages = [
+    HomePage(),
+    FeedPage(),
+    ChatSelectionPage(),
+    PetPage(),
+    ProfilePage(),
     // RoleSelection(),
     // Pulsecheck(),
     // Encouragement(),
@@ -40,11 +46,7 @@ class BottomNavController extends GetxController {
     // ChatSelectionPage(),
     // Signup(),
     // LoginPagetwo(),
-    HomePage(),
-    FeedPage(),
     // FeedProfilePage(),
-    ProfilePage(),
-    PetPage(),
     // ShopPage(),
     // PrivacyPolicyPage(),
     // PrivacyDetailPage(),
@@ -61,7 +63,7 @@ class BottomNavController extends GetxController {
     // WaitingChatPage(),
     // ChatPage(),
     // ConversationSummaryPage(),
-    ChatPage(),
+    // ChatPage(),
     // LoginPagetwo(),
     // Signup(),
   ];
