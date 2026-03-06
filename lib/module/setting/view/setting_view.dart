@@ -95,11 +95,11 @@ class SettingPage extends StatelessWidget {
   Widget _buildSettingItem(Widget leading, String title, VoidCallback onTap) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFFD9EFFA).withOpacity(0.8),
+        color: const Color(0xFFCEEFFE),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 4,
             offset: const Offset(0, 4),
           ),

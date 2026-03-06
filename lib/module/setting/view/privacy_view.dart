@@ -26,7 +26,9 @@ class PrivacyController extends GetxController {
     originalPhone = phoneValue.value;
 
     passwordController = TextEditingController(text: passwordValue.value);
-    emailController = TextEditingController(text: emailFull.value.split('@')[0]);
+    emailController = TextEditingController(
+      text: emailFull.value.split('@')[0],
+    );
     phoneController = TextEditingController(text: phoneValue.value);
   }
 
@@ -69,8 +71,9 @@ class PrivacyController extends GetxController {
 
   void save() {
     if (activeField.value == 'password') {
-      passwordValue.value =
-          passwordController.text.isEmpty ? originalPassword : passwordController.text;
+      passwordValue.value = passwordController.text.isEmpty
+          ? originalPassword
+          : passwordController.text;
       originalPassword = passwordValue.value;
     } else if (activeField.value == 'email') {
       final prefix = emailController.text.trim();
@@ -79,8 +82,9 @@ class PrivacyController extends GetxController {
         originalEmail = emailFull.value;
       }
     } else if (activeField.value == 'phone') {
-      phoneValue.value =
-          phoneController.text.isEmpty ? originalPhone : phoneController.text;
+      phoneValue.value = phoneController.text.isEmpty
+          ? originalPhone
+          : phoneController.text;
       originalPhone = phoneValue.value;
     }
     activeField.value = null;
@@ -135,14 +139,27 @@ class PrivacyPage extends StatelessWidget {
                           controller: controller.passwordController,
                           autofocus: true,
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-zA-Z0-9]'),
+                            ),
                           ],
-                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
-                          decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 18,
+                          ),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
                         )
                       : Text(
-                          controller.formatPassword(controller.passwordValue.value),
-                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                          controller.formatPassword(
+                            controller.passwordValue.value,
+                          ),
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 18,
+                          ),
                         ),
                 ),
                 const SizedBox(height: 20),
@@ -154,19 +171,30 @@ class PrivacyPage extends StatelessWidget {
                           controller: controller.emailController,
                           autofocus: true,
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'[a-z0-9._]')),
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[a-z0-9._]'),
+                            ),
                           ],
-                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 18,
+                          ),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             isDense: true,
                             suffixText: '@gmail.com',
-                            suffixStyle: TextStyle(color: Color(0xFF6A99D3), fontSize: 16),
+                            suffixStyle: TextStyle(
+                              color: Color(0xFF6A99D3),
+                              fontSize: 16,
+                            ),
                           ),
                         )
                       : Text(
                           controller.formatEmail(controller.emailFull.value),
-                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 18,
+                          ),
                         ),
                 ),
                 const SizedBox(height: 20),
@@ -178,13 +206,24 @@ class PrivacyPage extends StatelessWidget {
                           controller: controller.phoneController,
                           autofocus: true,
                           keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
-                          decoration: const InputDecoration(border: InputBorder.none, isDense: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 18,
+                          ),
+                          decoration: const InputDecoration(
+                            border: InputBorder.none,
+                            isDense: true,
+                          ),
                         )
                       : Text(
                           controller.formatPhone(controller.phoneValue.value),
-                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 18,
+                          ),
                         ),
                 ),
                 const SizedBox(height: 30),
@@ -196,12 +235,20 @@ class PrivacyPage extends StatelessWidget {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF2D4983),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 25,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
                       ),
                       child: const Text(
                         'บันทึก',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
@@ -223,7 +270,7 @@ class PrivacyPage extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
-        color: const Color(0xFFD9EFFA),
+        color: const Color(0xFFCEEFFE),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import 'chatconfirmdialog.dart';
 import 'chatselectionpage.dart';
 
 class ConversationSummaryController extends GetxController {
@@ -15,87 +16,11 @@ class ConversationSummaryController extends GetxController {
   }
 
   void showBlockDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: const Color(0xFFC3F3FF),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-            height: 220,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  "คุณต้องการที่จะบล็อกใช่หรือไม่",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF537895),
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Get.back();
-                        isBlocked.value = true;
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF8AD4F5),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: const Text(
-                          "ยืนยัน",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    GestureDetector(
-                      onTap: () {
-                        Get.back();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF8AD4F5),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: const Text(
-                          "ยกเลิก",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
+    showChatConfirmDialog(
+      title: "คุณต้องการที่จะบล็อกใช่หรือไม่",
+      onConfirm: () {
+        Get.back();
+        isBlocked.value = true;
       },
     );
   }

@@ -55,7 +55,8 @@ class EditProfileController extends GetxController {
 class EditProfilePage extends StatelessWidget {
   EditProfilePage({super.key});
 
-  final EditProfileController controller = Get.isRegistered<EditProfileController>()
+  final EditProfileController controller =
+      Get.isRegistered<EditProfileController>()
       ? Get.find<EditProfileController>()
       : Get.put(EditProfileController());
 
@@ -127,7 +128,11 @@ class EditProfilePage extends StatelessWidget {
                               height: 32,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) =>
-                                  const Icon(Icons.refresh, color: Colors.grey, size: 20),
+                                  const Icon(
+                                    Icons.refresh,
+                                    color: Colors.grey,
+                                    size: 20,
+                                  ),
                             ),
                           ),
                         ),
@@ -155,18 +160,24 @@ class EditProfilePage extends StatelessWidget {
                       ? TextField(
                           controller: controller.nameController,
                           autofocus: true,
-                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 18,
+                          ),
                           decoration: const InputDecoration(
                             border: InputBorder.none,
                             isDense: true,
                             contentPadding: EdgeInsets.zero,
                           ),
-                          onChanged: (val) =>
-                              controller.username.value = val.isEmpty ? controller.originalName : val,
+                          onChanged: (val) => controller.username.value =
+                              val.isEmpty ? controller.originalName : val,
                         )
                       : Text(
                           controller.username.value,
-                          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 18,
+                          ),
                         ),
                 ),
                 const SizedBox(height: 20),
@@ -176,7 +187,10 @@ class EditProfilePage extends StatelessWidget {
                   fieldKey: 'gender',
                   content: Text(
                     controller.gender.value,
-                    style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                    style: const TextStyle(
+                      color: Color(0xFF4489D7),
+                      fontSize: 18,
+                    ),
                   ),
                 ),
                 if (controller.activeField.value == 'gender')
@@ -201,7 +215,10 @@ class EditProfilePage extends StatelessWidget {
                     onTap: () => controller.selectDate(context),
                     child: Text(
                       controller.birthday.value,
-                      style: const TextStyle(color: Color(0xFF4489D7), fontSize: 18),
+                      style: const TextStyle(
+                        color: Color(0xFF4489D7),
+                        fontSize: 18,
+                      ),
                     ),
                   ),
                 ),
@@ -229,11 +246,17 @@ class EditProfilePage extends StatelessWidget {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 25,
+                            vertical: 8,
+                          ),
                         ),
                         child: const Text(
                           'บันทึก',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
@@ -258,7 +281,7 @@ class EditProfilePage extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 15),
       decoration: BoxDecoration(
-        color: const Color(0xFFD9EFFA),
+        color: const Color(0xFFCEEFFE),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -283,7 +306,11 @@ class EditProfilePage extends StatelessWidget {
           GestureDetector(
             onTap: onIconTap ?? () => controller.activeField.value = fieldKey,
             child: fieldKey == 'birth'
-                ? Image.asset('assets/images/calendar.png', width: 30, height: 30)
+                ? Image.asset(
+                    'assets/images/calendar.png',
+                    width: 30,
+                    height: 30,
+                  )
                 : Image.asset('assets/images/pen.png', width: 25, height: 25),
           ),
         ],

@@ -264,7 +264,7 @@ class HomePage extends StatelessWidget {
                       child: ArticleCard(
                         title: 'อยู่คนเดียวก็มีความ\nสุขดีนะ',
                         subtitle: '3 Month Ago',
-                        imagePath: 'assets/images/article2.png',
+                        imagePath: 'assets/images/alon.png',
                         // [เพิ่ม] ใส่ onTap สำหรับการ์ดใบที่ 2
                         onTap: () {
                           Navigator.push(

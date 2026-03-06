@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import 'chatconfirmdialog.dart';
 import 'chat_view.dart';
 
 class WaitingChatController extends GetxController
@@ -29,89 +30,16 @@ class WaitingChatController extends GetxController
 
   void showExitDialog(BuildContext context) {
     timer?.cancel();
-    showDialog(
-      context: context,
+    showChatConfirmDialog(
+      title: "คุณต้องการที่จะออกจากการจับคู่\nใช่หรือไม่",
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        return Dialog(
-          backgroundColor: const Color(0xFFC3F3FF),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 50),
-            height: 220,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text(
-                  "คุณต้องการที่จะออกจากการจับคู่ใช่หรือไม่",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 30),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Get.back();
-                        Get.back();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF8AD4F5),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: const Text(
-                          "ยืนยัน",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 20),
-                    GestureDetector(
-                      onTap: () {
-                        Get.back();
-                        startTimer();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 30,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF8AD4F5),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: const Text(
-                          "ยกเลิก",
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
+      onConfirm: () {
+        Get.back();
+        Get.back();
+      },
+      onCancel: () {
+        Get.back();
+        startTimer();
       },
     );
   }
@@ -145,9 +73,17 @@ class WaitingChatPage extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[700]),
-            onPressed: () => controller.showExitDialog(context),
+          leading: GestureDetector(
+            onTap: () => controller.showExitDialog(context),
+            child: Padding(
+              padding: const EdgeInsets.all(15.0),
+              child: Image.asset(
+                'assets/images/back.png',
+                width: 25,
+                height: 25,
+                color: Colors.grey[700],
+              ),
+            ),
           ),
         ),
         body: Center(
@@ -212,8 +148,8 @@ class WaitingChatPage extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller.animationController,
       builder: (context, child) {
-        final double t = (controller.animationController.value + startDelay) %
-            1.0;
+        final double t =
+            (controller.animationController.value + startDelay) % 1.0;
         final double currentSize = 240 + (180 * t);
         final double opacity = 0.4 * (1.0 - t);
         return Container(
