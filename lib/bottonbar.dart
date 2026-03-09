@@ -38,7 +38,7 @@ class BottomNavController extends GetxController {
     FeedPage(),
     ChatSelectionPage(),
     PetPage(),
-    ProfilePage(),
+    // ProfilePage(),
     // RoleSelection(),
     // Pulsecheck(),
     // Encouragement(),
@@ -57,7 +57,7 @@ class BottomNavController extends GetxController {
     // ResetPasswordPage(),
     // ResetSentPage(),
     // NewPasswordPage(),
-    // SplashScreenpage(),
+    SplashScreenpage(),
     // RegisterPage(),
     // ArticleDetailPage(
     // WaitingChatPage(),
