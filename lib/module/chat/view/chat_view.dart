@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:flutter_application_1/module/chat/view/conversationsummarypage.dart';
 import 'package:flutter_application_1/module/chat/view/chatconfirmdialog.dart';
+import 'package:flutter_application_1/module/chat/view/chatselectionpage.dart';
+import 'package:flutter_application_1/module/chat/view/conversationsummarypage.dart';
 
 class ChatPageController extends GetxController {
   final TextEditingController textController = TextEditingController();
@@ -52,22 +53,36 @@ class ChatPage extends StatelessWidget {
         toolbarHeight: 80,
         backgroundColor: const Color(0xFFD3ECF8),
         elevation: 0,
+        leadingWidth: 40,
+        leading: GestureDetector(
+          // onTap: () => Get.off(() => const ChatSelectionPage()),
+          child: Padding(
+            padding: const EdgeInsets.only(left: 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Image.asset(
+                'assets/images/back.png',
+                width: 25,
+                height: 25,
+              ),
+            ),
+          ),
+        ),
         title: const Text(
           "แชท",
           style: TextStyle(
-            color: darkBlue,
+            color: Color(0xff1C4D8D),
             fontSize: 24,
             fontWeight: FontWeight.bold,
           ),
         ),
         centerTitle: false,
-        titleSpacing: 20,
+        titleSpacing: 5,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 15),
             child: UnconstrainedBox(
               child: GestureDetector(
-                // 💡 เปลี่ยนจากไปหน้าอื่นทันที มาเป็นการเรียกโชว์ Popup แทน
                 onTap: () => _showEndConversationDialog(context),
                 child: Container(
                   padding: const EdgeInsets.symmetric(

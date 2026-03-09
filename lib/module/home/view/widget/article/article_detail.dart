@@ -27,10 +27,13 @@ class ArticleDetailPage extends StatelessWidget {
               // 👉 1. เปิดวงเล็บ children ตรงนี้
               GestureDetector(
                 onTap: () => Navigator.pop(context),
-                child: Image.asset(
-                  'assets/images/back.png',
-                  width: 25,
-                  height: 25,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Image.asset(
+                    'assets/images/back.png',
+                    width: 25,
+                    height: 25,
+                  ),
                 ),
               ),
 

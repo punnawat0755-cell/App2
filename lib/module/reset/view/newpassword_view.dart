@@ -62,9 +62,22 @@ class NewPasswordPage extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF757575)),
-            onPressed: () => Get.back(),
+          leadingWidth: 40,
+          titleSpacing: 2,
+          leading: GestureDetector(
+            onTap: () => Get.back(),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Image.asset(
+                  'assets/images/back.png',
+                  width: 25,
+                  height: 25,
+                  color: const Color(0xFF757575),
+                ),
+              ),
+            ),
           ),
         ),
         body: SingleChildScrollView(

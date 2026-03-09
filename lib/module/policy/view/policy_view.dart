@@ -192,12 +192,20 @@ class PrivacyDetailPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        titleSpacing: -9,
+        leadingWidth: 40,
+        titleSpacing: 2,
         leading: GestureDetector(
           onTap: () => Get.back(),
           child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Image.asset('assets/images/back.png', width: 24, height: 24),
+            padding: const EdgeInsets.only(left: 10),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Image.asset(
+                'assets/images/back.png',
+                width: 24,
+                height: 24,
+              ),
+            ),
           ),
         ),
         title: const Text(

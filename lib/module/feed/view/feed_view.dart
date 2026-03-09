@@ -264,9 +264,22 @@ class FeedProfilePage extends StatelessWidget {
           appBar: AppBar(
             backgroundColor: Colors.white,
             elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, color: Colors.grey),
-              onPressed: () => Navigator.pop(context),
+            leadingWidth: 40,
+            titleSpacing: 2,
+            leading: GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 10),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Image.asset(
+                    'assets/images/back.png',
+                    width: 25,
+                    height: 25,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
             ),
           ),
           body: SingleChildScrollView(

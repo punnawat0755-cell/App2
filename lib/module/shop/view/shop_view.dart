@@ -107,11 +107,14 @@ class ShopPage extends StatelessWidget {
                       children: [
                         InkWell(
                           onTap: () => Get.back(),
-                          child: Image.asset(
-                            'assets/images/back.png',
-                            width: 25,
-                            height: 25,
-                            fit: BoxFit.contain,
+                          child: Padding(
+                            padding: const EdgeInsets.only(left: 10),
+                            child: Image.asset(
+                              'assets/images/back.png',
+                              width: 25,
+                              height: 25,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                         Transform.translate(

@@ -52,11 +52,11 @@ class ResetPasswordPage extends StatelessWidget {
         leading: GestureDetector(
           onTap: () => Get.back(),
           child: Padding(
-            padding: const EdgeInsets.only(left: 15),
+            padding: const EdgeInsets.only(left: 10),
             child: Image.asset('assets/images/back.png', width: 32, height: 32),
           ),
         ),
-        titleSpacing: 0,
+        titleSpacing: 2,
         centerTitle: false,
         title: const Text(
           'ลืมรหัสผ่าน',

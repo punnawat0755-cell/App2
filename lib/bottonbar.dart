@@ -2,6 +2,9 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/chat/view/chatselectionpage.dart';
+import 'package:flutter_application_1/module/chat/view/conversationsummarypage.dart';
+import 'package:flutter_application_1/module/chat/view/pausechat.dart';
+import 'package:flutter_application_1/module/chat/view/waitingchatpage.dart';
 import 'package:flutter_application_1/module/encouragement/view/encouragement_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home_view.dart';
@@ -25,7 +28,6 @@ import 'package:flutter_application_1/module/setting/view/privacy_view.dart';
 import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:flutter_application_1/module/shop/view/shop_view.dart';
 import 'package:flutter_application_1/module/test/view/test_view.dart';
-import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:get/get.dart';
 
 class BottomNavController extends GetxController {
@@ -34,11 +36,16 @@ class BottomNavController extends GetxController {
 
   // Keep page ordering the same as before to preserve behavior.
   final List<Widget> pages = [
+    // ChatSelectionPage(),
+    // WaitingChatPage(),
+    // ChatPage(),
+    // PauseChatPage(),
+    // ConversationSummaryPage(),
     HomePage(),
     FeedPage(),
-    ChatSelectionPage(),
     PetPage(),
-    // ProfilePage(),
+   ChatSelectionPage(),
+    ProfilePage(),
     // RoleSelection(),
     // Pulsecheck(),
     // Encouragement(),
@@ -57,7 +64,7 @@ class BottomNavController extends GetxController {
     // ResetPasswordPage(),
     // ResetSentPage(),
     // NewPasswordPage(),
-    SplashScreenpage(),
+    // SplashScreenpage(),
     // RegisterPage(),
     // ArticleDetailPage(
     // WaitingChatPage(),

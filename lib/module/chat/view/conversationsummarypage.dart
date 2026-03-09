@@ -42,12 +42,9 @@ class ConversationSummaryPage extends StatelessWidget {
       () => Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
+          automaticallyImplyLeading: false,
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, color: Colors.grey[700]),
-            onPressed: () => Get.back(),
-          ),
         ),
         body: Center(
           child: Column(

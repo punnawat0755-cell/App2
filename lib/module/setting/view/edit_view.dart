@@ -68,15 +68,22 @@ class EditProfilePage extends StatelessWidget {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          titleSpacing: -8,
-          leading: IconButton(
-            icon: Image.asset(
-              'assets/images/back.png',
-              width: 25,
-              height: 25,
-              fit: BoxFit.contain,
+          leadingWidth: 40,
+          titleSpacing: 2,
+          leading: GestureDetector(
+            onTap: () => Get.to(() => const SettingPage()),
+            child: Padding(
+              padding: const EdgeInsets.only(left: 10),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Image.asset(
+                  'assets/images/back.png',
+                  width: 25,
+                  height: 25,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
-            onPressed: () => Get.to(() => const SettingPage()),
           ),
           title: const Text(
             'แก้ไขข้อมูล',

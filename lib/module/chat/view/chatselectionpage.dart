@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:get/get.dart';
 
 import 'halfcirclebutton.dart';
-import 'pausechat.dart';
+import 'waitingchatpage.dart';
 
 class ChatSelectionController extends GetxController {
   void goToStartChat() {
-    Get.to(() => PauseChatPage());
+    Get.to(() => WaitingChatPage());
   }
 
-  void goToCounseling() {}
+  void goToCounseling() {
+    Get.to(() => ChatPage());
+  }
 }
 
 class ChatSelectionPage extends StatelessWidget {
