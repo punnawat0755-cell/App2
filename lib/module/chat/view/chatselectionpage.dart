@@ -3,11 +3,11 @@ import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:get/get.dart';
 
 import 'halfcirclebutton.dart';
-import 'waitingchatpage.dart';
+import 'pausechat.dart';
 
 class ChatSelectionController extends GetxController {
   void goToStartChat() {
-    Get.to(() => WaitingChatPage());
+    Get.to(() => PauseChatPage());
   }
 
   void goToCounseling() {}
