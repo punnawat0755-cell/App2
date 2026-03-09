@@ -1,100 +1,104 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/Dashboard/dashboard.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter_application_1/Dashboard/dashboard.dart';
+import 'package:intl/intl.dart';
 
 // ==========================================
 // 1. Controller
 // ==========================================
 class ProfileController extends GetxController {
   final supabase = Supabase.instance.client;
+  late final http.Client _httpClient;
+
+  static const String _n8nPeriodWebhook = String.fromEnvironment(
+    'N8N_PERIOD_WEBHOOK',
+    defaultValue: 'https://n8n.tgstack.dev/webhook/HowAreYou',
+  );
+  static const String _n8nPeriodToken = String.fromEnvironment(
+    'N8N_PERIOD_TOKEN',
+    defaultValue: 'CHANGE_ME_TOKEN',
+  );
+  // true = ยอมรับ cert ที่ไม่สมบูรณ์สำหรับ host ที่ whitelist ไว้ (แนะนำใช้เฉพาะ debug/profile)
+  static const bool _allowBadCertificate = bool.fromEnvironment(
+    'N8N_ALLOW_BAD_CERT',
+    defaultValue: true,
+  );
+  static const String _allowBadCertificateHosts = String.fromEnvironment(
+    'N8N_ALLOW_BAD_CERT_HOSTS',
+    defaultValue: 'n8n.tgstack.dev',
+  );
+  static const Duration _predictionTimeout = Duration(seconds: 8);
+  static const Duration _selfcareTimeout = Duration(seconds: 25);
 
   var coins = 138.obs;
   var today = DateTime.now().day.obs;
   var selectedMonth = DateTime.now().month.obs;
   var selectedYear = DateTime.now().year.obs;
-  var selectedDate = DateTime.now().day.obs;
+  var selectedDate = DateTime.now().day.obs; // ตั้งค่าเริ่มต้นให้เป็นวันนี้
 
   var isLoading = false.obs;
-  var predictionText = "".obs;
-  var predictionConfidence = "".obs; // [ใหม่] 'high' หรือ 'low'
-  var avgCycleLength = 0.obs;        // [ใหม่] รอบเฉลี่ยจริง
-  var latestCycleText = "".obs;
-
-  // [ใหม่] สถิติรวม
-  var statTotalCycles = 0.obs;
-  var statAvgCycleLength = 0.obs;
-  var statAvgPeriodDuration = 0.obs;
-  var statCommonSymptoms = <String>[].obs;
+  var predictionText = "".obs; // เก็บข้อความคาดการณ์รอบเดือน
 
   // ข้อมูลจาก Database (รายวัน)
   var dailyPeriodStatus = <String, bool>{}.obs;
   var dailySymptoms = <String, List<String>>{}.obs;
   var dailyWhaleMoods = <String, String>{}.obs;
-  var dailyFlowLevel = <String, String?>{}.obs;   // [ใหม่]
-  var dailyPainLevel = <String, int?>{}.obs;       // [ใหม่]
-  var dailyNotes = <String, String?>{}.obs;        // [ใหม่]
-
-  // State สำหรับ Input ที่กำลังแก้อยู่
-  var currentFlowLevel = Rxn<String>();  // [ใหม่]
-  var currentPainLevel = Rxn<int>();     // [ใหม่]
-  var currentNotes = "".obs;            // [ใหม่]
-
-  final TextEditingController notesController = TextEditingController(); // [ใหม่]
 
   @override
   void onInit() {
     super.onInit();
+    // โหลดข้อมูลเมื่อเปิดหน้า
     loadMonthData();
     fetchPeriodPrediction();
-    fetchLatestCycle();
-    fetchMenstrualStats(); // [ใหม่]
   }
 
-  @override
-  void onClose() {
-    notesController.dispose();
-    super.onClose();
+  // สร้าง Key ให้ตรงกับรูปแบบ Database (YYYY-MM-DD)
+  String getDateKey(int year, int month, int day) {
+    return "$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
   }
 
-  String getDateKey(int year, int month, int day) =>
-      "$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}";
-
-  String get dateKey => getDateKey(selectedYear.value, selectedMonth.value, selectedDate.value);
+  String get dateKey =>
+      getDateKey(selectedYear.value, selectedMonth.value, selectedDate.value);
 
   final List<String> monthNames = [
-    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม",
+    "มกราคม",
+    "กุมภาพันธ์",
+    "มีนาคม",
+    "เมษายน",
+    "พฤษภาคม",
+    "มิถุนายน",
+    "กรกฎาคม",
+    "สิงหาคม",
+    "กันยายน",
+    "ตุลาคม",
+    "พฤศจิกายน",
+    "ธันวาคม",
   ];
 
-  int get daysInMonth => DateTime(selectedYear.value, selectedMonth.value + 1, 0).day;
-  int get firstDayOffset => DateTime(selectedYear.value, selectedMonth.value, 1).weekday % 7;
+  int get daysInMonth =>
+      DateTime(selectedYear.value, selectedMonth.value + 1, 0).day;
+  int get firstDayOffset =>
+      DateTime(selectedYear.value, selectedMonth.value, 1).weekday % 7;
 
   void changeMonth(String? monthName) {
     if (monthName != null) {
       selectedMonth.value = monthNames.indexOf(monthName) + 1;
-      selectedDate.value = 1;
-      _syncInputStateForDate();
-      loadMonthData();
+      selectedDate.value = 1; // รีเซ็ตไปวันที่ 1 ของเดือนนั้น
+      loadMonthData(); // โหลดข้อมูลของเดือนใหม่
     }
   }
 
-  // Sync input fields เมื่อ selectedDate เปลี่ยน
-  void selectDay(int day) {
-    selectedDate.value = day;
-    _syncInputStateForDate();
-  }
-
-  void _syncInputStateForDate() {
-    final key = dateKey;
-    currentFlowLevel.value = dailyFlowLevel[key];
-    currentPainLevel.value = dailyPainLevel[key];
-    currentNotes.value = dailyNotes[key] ?? "";
-    notesController.text = currentNotes.value;
-  }
-
+  // ==========================================
+  // ดึงข้อมูลจาก Supabase
+  // ==========================================
   Future<void> loadMonthData() async {
     try {
       isLoading.value = true;
@@ -109,9 +113,6 @@ class ProfileController extends GetxController {
       dailyPeriodStatus.clear();
       dailySymptoms.clear();
       dailyWhaleMoods.clear();
-      dailyFlowLevel.clear();  // [ใหม่]
-      dailyPainLevel.clear();  // [ใหม่]
-      dailyNotes.clear();      // [ใหม่]
 
       if (response != null) {
         for (var row in response) {
@@ -149,43 +150,21 @@ class ProfileController extends GetxController {
     }
   }
 
-  Future<void> fetchLatestCycle() async {
-    try {
-      final response = await supabase.rpc('get_my_menstrual_cycles');
-      if (response != null && response is List && response.isNotEmpty) {
-        var latest = response.first;
-        DateTime start = DateTime.parse(latest['start_date'].toString());
-        DateTime end = DateTime.parse(latest['end_date'].toString());
-        int days = latest['duration_days'];
-        String startStr = "${start.day} ${monthNames[start.month - 1]}";
-        String endStr = "${end.day} ${monthNames[end.month - 1]}";
-        if (startStr == endStr) {
-          latestCycleText.value = "รอบเดือนล่าสุด: $startStr (รวม 1 วัน)";
-        } else {
-          latestCycleText.value = "รอบเดือนล่าสุด: $startStr ถึง $endStr (รวม $days วัน)";
-        }
-      } else {
-        latestCycleText.value = "ยังไม่มีประวัติรอบเดือน";
-      }
-    } catch (e) {
-      latestCycleText.value = "ยังไม่มีประวัติรอบเดือน";
-    }
-  }
-
+  // ==========================================
+  // คาดการณ์รอบเดือนถัดไป (เรียกใช้ SQL Function)
+  // ==========================================
   Future<void> fetchPeriodPrediction() async {
     try {
       final response = await supabase.rpc('predict_next_period');
+      
       if (response != null && response is List && response.isNotEmpty) {
         var data = response[0];
-        // [ใหม่] รับ avg_cycle_length และ confidence
-        avgCycleLength.value = data['avg_cycle_length'] ?? 28;
-        predictionConfidence.value = data['confidence'] ?? 'low';
-
-        if (data['predicted_start_date'] != null) {
-          DateTime predictedDate = DateTime.parse(data['predicted_start_date'].toString());
+        if (data['predicted_next_period'] != null) {
+          DateTime predictedDate = DateTime.parse(data['predicted_next_period'].toString());
           int daysLeft = predictedDate.difference(DateTime.now()).inDays;
+          
           String thaiDate = "${predictedDate.day} ${monthNames[predictedDate.month - 1]}";
-
+          
           if (daysLeft == 0) {
             predictionText.value = "คาดว่าประจำเดือนจะมา 🩸 วันนี้";
           } else if (daysLeft > 0) {
@@ -195,33 +174,24 @@ class ProfileController extends GetxController {
           }
         }
       } else {
-        predictionText.value = "บันทึกข้อมูลเพื่อคำนวณรอบเดือนถัดไป 🌸";
-        predictionConfidence.value = "";
+         predictionText.value = "บันทึกข้อมูลเพื่อคำนวณรอบเดือนถัดไป 🌸";
       }
+      if (redFlags.isEmpty) {
+        redFlags = _extractSelfcareRedFlagsFromCareBySymptom(payload);
+      }
+
+      if (advice.isEmpty && redFlags.isEmpty) return;
+
+      _showSelfcarePopup(advice: advice, redFlags: redFlags);
     } catch (e) {
+      print("Error predicting period: $e");
       predictionText.value = "บันทึกข้อมูลเพื่อคำนวณรอบเดือนถัดไป 🌸";
-      predictionConfidence.value = "";
     }
   }
 
-  // [ใหม่] ดึงสถิติรวม
-  Future<void> fetchMenstrualStats() async {
-    try {
-      final response = await supabase.rpc('get_menstrual_stats');
-      if (response != null && response is List && response.isNotEmpty) {
-        var data = response[0];
-        statTotalCycles.value = data['total_cycles_recorded'] ?? 0;
-        statAvgCycleLength.value = data['avg_cycle_length'] ?? 0;
-        statAvgPeriodDuration.value = data['avg_period_duration'] ?? 0;
-        if (data['most_common_symptoms'] != null) {
-          statCommonSymptoms.value = List<String>.from(data['most_common_symptoms']);
-        }
-      }
-    } catch (e) {
-      print("Error fetching stats: $e");
-    }
-  }
-
+  // ==========================================
+  // จัดการ State บนหน้าจอ
+  // ==========================================
   bool getPeriodStatusForSelectedDay() => dailyPeriodStatus[dateKey] ?? false;
   List<String> getSymptomsForSelectedDay() => dailySymptoms[dateKey] ?? [];
 
@@ -229,11 +199,6 @@ class ProfileController extends GetxController {
     if (selectedDate.value != 0) {
       dailyPeriodStatus[dateKey] = status;
       dailyPeriodStatus.refresh();
-      // ถ้าเปลี่ยนเป็น "ไม่เป็น" ให้ reset flow และ pain
-      if (!status) {
-        currentFlowLevel.value = null;
-        currentPainLevel.value = null;
-      }
     }
   }
 
@@ -249,52 +214,46 @@ class ProfileController extends GetxController {
     dailySymptoms.refresh();
   }
 
+  // ==========================================
+  // บันทึกข้อมูลลง Supabase
+  // ==========================================
   Future<void> saveDailyData() async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) {
-      Get.snackbar("ข้อผิดพลาด", "กรุณาเข้าสู่ระบบก่อน",
-          backgroundColor: Colors.redAccent, colorText: Colors.white);
+      Get.snackbar("ข้อผิดพลาด", "กรุณาเข้าสู่ระบบก่อน", backgroundColor: Colors.redAccent, colorText: Colors.white);
       return;
     }
 
     try {
-      bool isPeriod = getPeriodStatusForSelectedDay();
-      await supabase.rpc(
-        'save_calendar_health_log',
-        params: {
-          'p_log_date': dateKey,
-          'p_is_menstruating': isPeriod,
-          'p_symptoms': getSymptomsForSelectedDay(),
-          // [ใหม่] ส่งค่าใหม่ทั้งหมด (null ถ้าไม่เป็นประจำเดือน)
-          'p_flow_level': isPeriod ? currentFlowLevel.value : null,
-          'p_pain_level': isPeriod ? currentPainLevel.value : null,
-          'p_notes': notesController.text.trim().isEmpty ? null : notesController.text.trim(),
-        },
-      );
-
-      // อัปเดต local state
-      dailyFlowLevel[dateKey] = isPeriod ? currentFlowLevel.value : null;
-      dailyPainLevel[dateKey] = isPeriod ? currentPainLevel.value : null;
-      dailyNotes[dateKey] = notesController.text.trim().isEmpty ? null : notesController.text.trim();
+      // สร้าง Timestamp ของวันที่เลือก (เช่น 2026-03-04 12:00:00)
+      DateTime recordDate = DateTime(selectedYear.value, selectedMonth.value, selectedDate.value, 12, 0, 0);
+      
+      await supabase.from('daily_mood_entries').upsert({
+        'user_id': userId,
+        'window_start': recordDate.toIso8601String(),
+        'is_menstruating': getPeriodStatusForSelectedDay(),
+        'symptoms': getSymptomsForSelectedDay(),
+      }, onConflict: 'user_id, window_start');
 
       Get.snackbar(
-        "สำเร็จ ✨",
+        "สำเร็จ",
         "บันทึกข้อมูลวันที่ ${selectedDate.value} เรียบร้อยแล้ว",
         backgroundColor: const Color(0xFF2C5282),
         colorText: Colors.white,
       );
 
+      // รีเฟรชการคาดการณ์ใหม่ เผื่อผู้ใช้เพิ่งบันทึกวันแรกของรอบเดือน
       fetchPeriodPrediction();
-      fetchLatestCycle();
-      fetchMenstrualStats(); // [ใหม่] รีเฟรชสถิติ
 
-      if (isPeriod) showAdviceModal();
+      if (getPeriodStatusForSelectedDay()) {
+        showAdviceModal();
+      }
     } catch (e) {
-      Get.snackbar("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลได้: $e",
-          backgroundColor: Colors.redAccent, colorText: Colors.white);
+      Get.snackbar("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลได้: $e", backgroundColor: Colors.redAccent, colorText: Colors.white);
     }
   }
 
+  // --- Modal คำแนะนำ ---
   void showAdviceModal() {
     Get.dialog(
       Dialog(
@@ -303,7 +262,7 @@ class ProfileController extends GetxController {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: const Color(0xFFCEEFFE),
-            borderRadius: BorderRadius.circular(40),
+            borderRadius: BorderRadius.circular(30),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -319,10 +278,10 @@ class ProfileController extends GetxController {
                 ),
               ),
               const SizedBox(height: 20),
-              _buildAdviceItem("- พักผ่อนและขยับกายเบาๆ: นอนหลับให้เพียงพอ และอาจโยคะหรือเดินเล่นเบาๆ เพื่อช่วยให้ร่างกายหลั่งสารเอ็นดอร์ฟิน ลดความเครียด"),
+              _buildAdviceItem("- พักผ่อนและขยับกายเบาๆ: นอนหลับให้เพียงพอ และอาจโยคะหรือเดินเล่นเบาๆเพื่อช่วยให้ร่างกายหลั่งสารเอ็นดอร์ฟิน ลดความเครียด"),
               _buildAdviceItem("- รักษาความสะอาด: เปลี่ยนผ้าอนามัยทุก 3-4 ชั่วโมง เพื่อป้องกันความอับชื้นและการสะสมของเชื้อแบคทีเรีย"),
-              _buildAdviceItem("- ดื่มน้ำอุ่นและเลี่ยงคาเฟอีน: น้ำอุ่นช่วยให้เลือดไหลเวียนดีขึ้น ส่วนการงดกาแฟหรือชาจะช่วยลดอาการคัดตึงหน้าอก"),
-              _buildAdviceItem("- เลือกอาหารย่อยง่าย: เน้นทานผัก ผลไม้ และอาหารที่มีธาตุเหล็ก เพื่อทดแทนเลือดที่เสียไป"),
+              _buildAdviceItem("- ดื่มน้ำอุ่นและเลี่ยงคาเฟอีน: น้ำอุ่นช่วยให้เลือดไหลเวียนดีขึ้น ส่วนการงดกาแฟหรือชาจะช่วยลดอาการคัดตึงหน้าอกและอาการหงุดหงิด"),
+              _buildAdviceItem("- เลือกอาหารย่อยง่าย: เน้นทานผัก ผลไม้ และอาหารที่มีธาตุเหล็ก (เช่น ตับ ไข่แดง) เพื่อทดแทนเลือดที่เสียไป และเลี่ยงอาหารรสจัดที่ทำให้ท้องอืด"),
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () => Get.back(),
@@ -331,8 +290,7 @@ class ProfileController extends GetxController {
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                   padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 10),
                 ),
-                child: const Text("ปิด",
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                child: const Text("ปิด", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -344,16 +302,20 @@ class ProfileController extends GetxController {
   Widget _buildAdviceItem(String text) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: Text(text,
-          textAlign: TextAlign.left,
-          style: const TextStyle(color: Color(0xFF4489D7), fontSize: 13, height: 1.4)),
+      child: Text(
+        text,
+        textAlign: TextAlign.left,
+        style: const TextStyle(color: Color(0xFF4489D7), fontSize: 13, height: 1.4),
+      ),
     );
   }
 
   String getWhaleImage(int day) {
-    String dk = getDateKey(selectedYear.value, selectedMonth.value, day);
-    String? type = dailyWhaleMoods[dk];
-    if (dailyPeriodStatus[dk] == true) return 'assets/images/whale_cry.png';
+    String dateKey = getDateKey(selectedYear.value, selectedMonth.value, day);
+    String? type = dailyWhaleMoods[dateKey];
+    
+    // สำหรับ Demo ถ้าระบุว่าเป็นประจำเดือน ให้หน้าน้องวาฬดูเหนื่อยๆ (cry)
+    if (dailyPeriodStatus[dateKey] == true) return 'assets/images/whale_cry.png';
     if (type == 'whale_love') return 'assets/images/whale_love.png';
     if (type == 'whale_cry') return 'assets/images/whale_cry.png';
     return 'assets/images/whale_happy.png';
@@ -371,10 +333,7 @@ class ProfileController extends GetxController {
   ];
 }
 
-// ==========================================
-// 2. ProfilePage
-// ==========================================
-class ProfilePage extends StatefulWidget {
+class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
   @override
@@ -423,7 +382,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFE6F7FF),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
@@ -435,57 +394,27 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFDA7B),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Row(
                       children: [
-                        Image.asset('assets/images/k1.png', width: 35, height: 30),
-                        const SizedBox(width: 5),
+                        Image.asset('assets/images/k1.png',
+                            width: 35, height: 30),
+                        const SizedBox(width: 1),
                         Obx(() => Text(
                           "${controller.coins}",
-                          style: const TextStyle(
-                              color: Color(0xFF5D4037), fontWeight: FontWeight.bold, fontSize: 16),
+                          style: const TextStyle(color: Color(0xFF5D4037), fontWeight: FontWeight.bold, fontSize: 16),
                         )),
                       ],
                     ),
                   ),
-                  // ปุ่มกราฟ + Avatar
-                  Row(
-                    children: [
-                      // [ใหม่] ปุ่มเข้าหน้า Dashboard
-                      GestureDetector(
-                        onTap: () => Get.to(() => const HealthDashboardPage()),
-                        child: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF4489D7).withOpacity(0.18),
-                                blurRadius: 8,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            Icons.bar_chart_rounded,
-                            color: Color(0xFF4489D7),
-                            size: 24,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      const CircleAvatar(
-                        radius: 25,
-                        backgroundImage: NetworkImage(
-                            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg'),
-                      ),
-                    ],
+                  const CircleAvatar(
+                    radius: 25,
+                    backgroundImage: NetworkImage('https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg'),
                   ),
                 ],
               ),
@@ -498,8 +427,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                   Text(
                     "รอบเดือนและอาการ",
                     style: GoogleFonts.mitr(
-                      textStyle: const TextStyle(
-                          color: Color(0xFF4489D7), fontSize: 22, fontWeight: FontWeight.w500),
+                      textStyle: const TextStyle(color: Color(0xFF4489D7), fontSize: 22, fontWeight: FontWeight.w500),
                     ),
                   ),
                   Obx(() => DropdownButton<String>(
@@ -507,54 +435,21 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                     icon: const Icon(Icons.arrow_drop_down, color: Color(0xFF757575)),
                     underline: const SizedBox(),
                     style: GoogleFonts.mitr(
-                      textStyle: const TextStyle(
-                          color: Color(0xFF757575), fontSize: 16, fontWeight: FontWeight.bold),
+                      textStyle: const TextStyle(color: Color(0xFF757575), fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                     onChanged: (val) => controller.changeMonth(val),
-                    items: controller.monthNames
-                        .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                        .toList(),
+                    items: controller.monthNames.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
                   )),
                 ],
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 15),
 
-              // ─── Banner: รอบเดือนล่าสุด ────────────────────────────
-              Obx(() {
-                final text = controller.latestCycleText.value;
-                if (text.isEmpty || text == "ยังไม่มีประวัติรอบเดือน") return const SizedBox();
-                return Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF8E1),
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(color: const Color(0xFFFFD348), width: 1.5),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_month, color: Color(0xFFF05A42), size: 22),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          text,
-                          style: const TextStyle(
-                              color: Color(0xFF5D4037), fontSize: 14, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-
-              // ─── Banner: การทำนาย + Confidence ────────────────────
+              // Banner แจ้งเตือน AI คำนวณรอบเดือน
               Obx(() {
                 final prediction = controller.predictionText.value;
-                if (prediction.isEmpty || prediction.contains('🌸')) return const SizedBox();
-                final confidence = controller.predictionConfidence.value;
-                final avgCycle = controller.avgCycleLength.value;
-
+                if (prediction.isEmpty || prediction.contains('🌸')) {
+                  return const SizedBox();
+                }
                 return Container(
                   width: double.infinity,
                   margin: const EdgeInsets.only(bottom: 15),
@@ -562,122 +457,78 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4))
-                    ],
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.auto_awesome, color: Color(0xFFF05A42)),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              prediction,
-                              style: const TextStyle(
-                                  color: Color(0xFF5D4037),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // [ใหม่] แสดง confidence และรอบเฉลี่ย
-                      if (confidence.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const SizedBox(width: 34),
-                            _ConfidenceBadge(confidence: confidence),
-                            const SizedBox(width: 8),
-                            if (avgCycle > 0)
-                              Text(
-                                "รอบเฉลี่ย $avgCycle วัน",
-                                style: const TextStyle(
-                                    color: Color(0xFF9E9E9E), fontSize: 12),
-                              ),
-                          ],
+                      const Icon(Icons.auto_awesome, color: Color(0xFFF05A42)),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          prediction,
+                          style: const TextStyle(color: Color(0xFF5D4037), fontSize: 14, fontWeight: FontWeight.w600),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 );
               }),
 
-              // ─── Calendar ─────────────────────────────────────────
+              // 3. ปฏิทิน
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFCEEFFE).withAlpha(128),
+                  color: const Color(0xFFCEEFFE).withOpacity(0.5),
                   borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: const Color(0xFF90CAF9), width: 1.5),
+                  border:
+                      Border.all(color: const Color(0xFF90CAF9), width: 1.5),
                 ),
                 child: Column(
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"]
-                          .map((day) => SizedBox(
+                      children: ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"].map((day) => SizedBox(
                         width: 35,
-                        child: Text(day,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                                color: Color(0xFF4489D7),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
-                      ))
-                          .toList(),
+                        child: Text(
+                          day,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Color(0xFF4489D7), fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                      )).toList(),
                     ),
                     const SizedBox(height: 10),
                     Obx(() {
                       if (controller.isLoading.value) {
                         return const Padding(
                           padding: EdgeInsets.all(20.0),
-                          child: Center(
-                              child: CircularProgressIndicator(color: Color(0xFF4489D7))),
+                          child: Center(child: CircularProgressIndicator(color: Color(0xFF4489D7))),
                         );
                       }
                       return GridView.builder(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        itemCount:
-                        controller.daysInMonth + controller.firstDayOffset,
-                        gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 7,
-                          childAspectRatio: 0.65,
-                          mainAxisSpacing: 5,
-                          crossAxisSpacing: 0,
+                        itemCount: controller.daysInMonth + controller.firstDayOffset,
+                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 7, childAspectRatio: 0.65, mainAxisSpacing: 5, crossAxisSpacing: 0,
                         ),
                         itemBuilder: (context, index) {
                           int day = index - controller.firstDayOffset + 1;
-                          if (day < 1 || day > controller.daysInMonth) {
-                            return const SizedBox();
-                          }
+                          if (day < 1 || day > controller.daysInMonth) return const SizedBox();
 
                           return Obx(() {
-                            String dayKey = controller.getDateKey(
-                                controller.selectedYear.value,
-                                controller.selectedMonth.value,
-                                day);
+                            String dayKey = controller.getDateKey(controller.selectedYear.value, controller.selectedMonth.value, day);
                             bool isSelected = controller.selectedDate.value == day;
-                            bool isToday = controller.today.value == day &&
-                                controller.selectedMonth.value == DateTime.now().month;
-                            bool isPeriodDay =
-                                controller.dailyPeriodStatus[dayKey] ?? false;
+                            bool isToday = controller.today.value == day && controller.selectedMonth.value == DateTime.now().month;
+                            bool isPeriodDay = controller.dailyPeriodStatus[dayKey] ?? false;
 
                             Color bgColor = Colors.transparent;
                             Color textColor = const Color(0xFF4489D7);
 
+                            //ส่วนการบันทึกประจำเดือนและการคาดเดาวันประจำเดือน
                             if (isSelected) {
-                              bgColor = const Color(0xFFFFD348);
+                              bgColor = const Color(0xFFFFD348); // สีเหลืองเมื่อจิ้ม
                             } else if (isPeriodDay) {
-                              bgColor = const Color(0xFFF05A42);
+                              bgColor = const Color(0xFFF05A42); // สีแดงเมื่อบันทึกว่ามีรอบเดือน
                               textColor = Colors.white;
                             } else if (isToday) {
                               bgColor = const Color(0xFFCCCCCC);
@@ -689,69 +540,52 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                               child: Column(
                                 children: [
                                   Container(
-                                    width: 36,
-                                    height: 36,
-                                    alignment: Alignment.center,
-                                    decoration: BoxDecoration(
-                                        color: bgColor, shape: BoxShape.circle),
-                                    child: Text("$day",
-                                        style: TextStyle(
-                                            color: textColor,
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16)),
+                                    width: 36, height: 36, alignment: Alignment.center,
+                                    decoration: BoxDecoration(color: bgColor, shape: BoxShape.circle),
+                                    child: Text(
+                                      "$day",
+                                      style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16),
+                                    ),
                                   ),
                                   const SizedBox(height: 4),
                                   Image.asset(
                                     controller.getWhaleImage(day),
-                                    width: 32,
-                                    height: 32,
-                                    fit: BoxFit.contain,
-                                    errorBuilder: (c, e, s) =>
-                                    const SizedBox(height: 32),
+                                    width: 32, height: 32, fit: BoxFit.contain,
+                                    errorBuilder: (c, e, s) => const SizedBox(height: 32),
                                   ),
                                 ],
                               ),
                             );
                           });
                         },
-                      );
-                    }),
+                      ),
+                    ),
                   ],
                 ),
               ),
               const SizedBox(height: 25),
 
-              // ─── [ใหม่] สถิติรวม ──────────────────────────────────
-              _MenstrualStatsCard(controller: controller),
-              const SizedBox(height: 25),
-
-              // ─── บันทึกอาการ ──────────────────────────────────────
+              // 4. บันทึกอาการ
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
                     "บันทึกอาการ",
                     style: GoogleFonts.mitr(
-                      textStyle: const TextStyle(
-                          color: Color(0xFF4489D7),
-                          fontSize: 22,
-                          fontWeight: FontWeight.w500),
+                      textStyle: const TextStyle(color: Color(0xFF4489D7), fontSize: 22, fontWeight: FontWeight.w500),
                     ),
                   ),
                   Obx(() => Text(
                     "วันที่ ${controller.selectedDate.value} ${controller.monthNames[controller.selectedMonth.value - 1]}",
-                    style: const TextStyle(
-                        color: Color(0xFF757575), fontWeight: FontWeight.bold),
-                  )),
+                    style: const TextStyle(color: Color(0xFF757575), fontWeight: FontWeight.bold),
+                  ))
                 ],
               ),
               const SizedBox(height: 20),
 
               Obx(() {
-                if (controller.selectedDate.value == 0) return const SizedBox();
-
-                bool isPeriod = controller.getPeriodStatusForSelectedDay();
-
+                if (controller.selectedDate.value == 0) return const SizedBox(); // ซ่อนไว้ถ้าไม่ได้เลือกวัน
+                
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -759,11 +593,9 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _buildStatusButton("เป็นประจำเดือน",
-                            const Color(0xFFF05A42), Colors.white, true),
+                        _buildStatusButton(controller, "เป็นประจำเดือน", const Color(0xFFF05A42), Colors.white, true),
                         const SizedBox(width: 15),
-                        _buildStatusButton("ไม่เป็นประจำเดือน",
-                            const Color(0xFFA6E3F9), const Color(0xFF424242), false),
+                        _buildStatusButton(controller, "ไม่เป็นประจำเดือน", const Color(0xFFA6E3F9), const Color(0xFF424242), false),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -790,9 +622,7 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                       runSpacing: 20,
                       alignment: WrapAlignment.center,
                       children: controller.symptomsList.map((item) {
-                        bool isSelected = controller
-                            .getSymptomsForSelectedDay()
-                            .contains(item['name']);
+                        bool isSelected = controller.getSymptomsForSelectedDay().contains(item['name']);
                         return GestureDetector(
                           onTap: () => controller.toggleSymptom(item['name']!),
                           child: Column(
@@ -802,24 +632,20 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                                 height: 70,
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? const Color(0xFFA6E3F9)
-                                      : const Color(0xFFFFDA7B).withAlpha(204),
+                                  color: isSelected ? const Color(0xFFA6E3F9) : const Color(0xFFFFDA7B).withAlpha(204),
                                   borderRadius: BorderRadius.circular(15),
-                                  border: Border.all(
-                                      color: isSelected
-                                          ? const Color(0xFF4489D7)
-                                          : Colors.black12,
-                                      width: 1.5),
+                                  border: Border.all(color: isSelected ? const Color(0xFF4489D7) : Colors.black12, width: 1.5),
                                 ),
-                                child: Image.asset(item['img']!, fit: BoxFit.contain),
+                                child: Image.asset(
+                                  item['img']!,
+                                  fit: BoxFit.contain,
+                                ),
                               ),
                               const SizedBox(height: 8),
-                              Text(item['name']!,
-                                  style: const TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF5D4037),
-                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                item['name']!,
+                                style: const TextStyle(fontSize: 13, color: Color(0xFF5D4037), fontWeight: FontWeight.w600),
+                              ),
                             ],
                           ),
                         );
@@ -858,16 +684,10 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
                         onPressed: () => controller.saveDailyData(),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFF2C5282),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20)),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 30, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12)
                         ),
-                        child: const Text("บันทึกข้อมูล",
-                            style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16)),
+                        child: const Text("บันทึกข้อมูล", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                     ),
                   ],
@@ -881,10 +701,10 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildStatusButton(String title,
-      Color activeColor, Color activeTextColor, bool isPeriodTab) {
+  Widget _buildStatusButton(ProfileController controller, String title, Color activeColor, Color activeTextColor, bool isPeriodTab) {
     return Obx(() {
-      bool isSelected = controller.getPeriodStatusForSelectedDay() == isPeriodTab;
+      bool isSelected =
+          controller.getPeriodStatusForSelectedDay() == isPeriodTab;
       return GestureDetector(
         onTap: () => controller.setPeriodStatus(isPeriodTab),
         child: Container(
@@ -893,22 +713,381 @@ class _ProfilePageState extends State<ProfilePage> with WidgetsBindingObserver {
           decoration: BoxDecoration(
             color: isSelected ? activeColor : Colors.white,
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(
-                color: isSelected ? activeColor : const Color(0xFF757575),
-                width: 1.5),
+            border: Border.all(color: isSelected ? activeColor : const Color(0xFF757575), width: 1.5),
           ),
           child: Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(
-              color: isSelected ? activeTextColor : const Color(0xFF424242),
-              fontSize: 15,
+            style: const TextStyle(
+              color: Color(0xFF424242),
+              fontSize: 16,
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
       );
     });
+  }
+}
+
+// ==========================================
+// Widgets แยกย่อย
+// ==========================================
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: GoogleFonts.mitr(
+        textStyle: const TextStyle(
+            color: Color(0xFF4489D7),
+            fontSize: 16,
+            fontWeight: FontWeight.w500),
+      ),
+    );
+  }
+}
+
+// ─── [ใหม่] Flow Level Selector ──────────────────────────────────────────────
+class _FlowLevelSelector extends StatelessWidget {
+  final ProfileController controller;
+  const _FlowLevelSelector({required this.controller});
+
+  static const _levels = [
+    {
+      'value': 'spotting',
+      'label': 'Spotting',
+      'emoji': '🩷',
+      'desc': 'กระปิดกระปอย'
+    },
+    {'value': 'light', 'label': 'Light', 'emoji': '🩸', 'desc': 'น้อย'},
+    {'value': 'medium', 'label': 'Medium', 'emoji': '🩸🩸', 'desc': 'ปานกลาง'},
+    {'value': 'heavy', 'label': 'Heavy', 'emoji': '🩸🩸🩸', 'desc': 'มาก'},
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final selected = controller.currentFlowLevel.value;
+      return Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: _levels.map((level) {
+          final isSelected = selected == level['value'];
+          return GestureDetector(
+            onTap: () => controller.currentFlowLevel.value = level['value'],
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: 75,
+              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 6),
+              decoration: BoxDecoration(
+                color: isSelected ? const Color(0xFFF05A42) : Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected
+                      ? const Color(0xFFF05A42)
+                      : const Color(0xFFE0E0E0),
+                  width: 1.5,
+                ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                            color: const Color(0xFFF05A42).withOpacity(0.3),
+                            blurRadius: 8)
+                      ]
+                    : [],
+              ),
+              child: Column(
+                children: [
+                  Text(level['emoji']!, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(height: 4),
+                  Text(
+                    level['desc']!,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF757575),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    });
+  }
+}
+
+// ─── [ใหม่] Pain Level Selector ──────────────────────────────────────────────
+class _PainLevelSelector extends StatelessWidget {
+  final ProfileController controller;
+  const _PainLevelSelector({required this.controller});
+
+  static const _painLabels = [
+    'แทบไม่เจ็บ',
+    'เล็กน้อย',
+    'พอทน',
+    'เจ็บมาก',
+    'ทนไม่ได้'
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final selected = controller.currentPainLevel.value;
+      return Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(5, (i) {
+              final level = i + 1;
+              final isSelected = selected == level;
+              return GestureDetector(
+                onTap: () => controller.currentPainLevel.value = level,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: isSelected ? _painColor(level) : Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: isSelected
+                          ? _painColor(level)
+                          : const Color(0xFFE0E0E0),
+                      width: 2,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                            BoxShadow(
+                                color: _painColor(level).withOpacity(0.35),
+                                blurRadius: 8)
+                          ]
+                        : [],
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$level',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF9E9E9E),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          if (selected != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _painLabels[selected - 1],
+              style: TextStyle(
+                color: _painColor(selected),
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ],
+      );
+    });
+  }
+
+  Color _painColor(int level) {
+    const colors = [
+      Color(0xFF66BB6A), // 1 - เขียว
+      Color(0xFFFFEB3B), // 2 - เหลือง
+      Color(0xFFFF9800), // 3 - ส้ม
+      Color(0xFFF44336), // 4 - แดง
+      Color(0xFF880E4F), // 5 - แดงเข้มมาก
+    ];
+    return colors[level - 1];
+  }
+}
+
+// ─── [ใหม่] Confidence Badge ──────────────────────────────────────────────────
+class _ConfidenceBadge extends StatelessWidget {
+  final String confidence;
+  const _ConfidenceBadge({required this.confidence});
+
+  @override
+  Widget build(BuildContext context) {
+    final isHigh = confidence == 'high';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isHigh ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isHigh ? const Color(0xFF66BB6A) : const Color(0xFFFF9800),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isHigh ? Icons.verified : Icons.info_outline,
+            size: 12,
+            color: isHigh ? const Color(0xFF66BB6A) : const Color(0xFFFF9800),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            isHigh ? "แม่นยำสูง" : "ข้อมูลน้อย",
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isHigh ? const Color(0xFF388E3C) : const Color(0xFFE65100),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── [ใหม่] Menstrual Stats Card ─────────────────────────────────────────────
+class _MenstrualStatsCard extends StatelessWidget {
+  final ProfileController controller;
+  const _MenstrualStatsCard({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      if (controller.statTotalCycles.value == 0) return const SizedBox();
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4))
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "สถิติรอบเดือนของคุณ",
+              style: GoogleFonts.mitr(
+                textStyle: const TextStyle(
+                    color: Color(0xFF4489D7),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                _StatItem(
+                  icon: Icons.loop,
+                  value: "${controller.statTotalCycles.value}",
+                  label: "รอบที่บันทึก",
+                  color: const Color(0xFF4489D7),
+                ),
+                _StatDivider(),
+                _StatItem(
+                  icon: Icons.date_range,
+                  value: controller.statAvgCycleLength.value > 0
+                      ? "${controller.statAvgCycleLength.value} วัน"
+                      : "-",
+                  label: "รอบเฉลี่ย",
+                  color: const Color(0xFFF05A42),
+                ),
+                _StatDivider(),
+                _StatItem(
+                  icon: Icons.water_drop,
+                  value: controller.statAvgPeriodDuration.value > 0
+                      ? "${controller.statAvgPeriodDuration.value} วัน"
+                      : "-",
+                  label: "ประจำเดือนเฉลี่ย",
+                  color: const Color(0xFFFF9800),
+                ),
+              ],
+            ),
+            // อาการที่พบบ่อย
+            if (controller.statCommonSymptoms.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              const Divider(color: Color(0xFFF0F0F0)),
+              const SizedBox(height: 8),
+              Text(
+                "อาการที่พบบ่อย",
+                style: GoogleFonts.mitr(
+                  textStyle:
+                      const TextStyle(color: Color(0xFF9E9E9E), fontSize: 12),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 8,
+                children: controller.statCommonSymptoms.map((s) {
+                  return Chip(
+                    label: Text(s,
+                        style: const TextStyle(
+                            fontSize: 12, color: Color(0xFF5D4037))),
+                    backgroundColor: const Color(0xFFFFF8E1),
+                    side: const BorderSide(color: Color(0xFFFFD348)),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      );
+    });
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  const _StatItem({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 22),
+          const SizedBox(height: 6),
+          Text(value,
+              style: TextStyle(
+                  color: color, fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 2),
+          Text(label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 50, color: const Color(0xFFF0F0F0));
   }
 }
 

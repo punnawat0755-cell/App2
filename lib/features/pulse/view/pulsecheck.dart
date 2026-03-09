@@ -263,7 +263,7 @@ class _PulsecheckState extends State<Pulsecheck> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Image.asset(
-                          "assets/images/heartpulse.png",
+                          "assets/images/heart.png",
                           height: 40,
                           width: 40,
                         ),

@@ -1,312 +1,314 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
-class FeedPage extends StatelessWidget {
+import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/services/content_moderation_service.dart';
+import 'package:flutter_application_1/features/feed/model/feed_post.dart';
+import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
+import 'package:flutter_application_1/supabase_client.dart';
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class FeedPage extends StatefulWidget {
   const FeedPage({super.key});
 
   @override
+  State<FeedPage> createState() => _FeedPageState();
+}
+
+class _FeedPageState extends State<FeedPage> {
+  static const _brandBlue = Color(0xFF4A89D8);
+
+  final FeedRepository _repository = FeedRepository();
+  final User? _currentUser = supabase.auth.currentUser;
+
+  String _composerName = 'คุณ';
+  bool _isLoadingComposer = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComposerIdentity();
+  }
+
+  Future<void> _loadComposerIdentity() async {
+    if (_currentUser == null) {
+      if (!mounted) return;
+      setState(() {
+        _composerName = 'คุณ';
+        _isLoadingComposer = false;
+      });
+      return;
+    }
+
+    try {
+      final identity = await _repository.getComposerIdentity();
+      if (!mounted) return;
+      setState(() {
+        _composerName = identity.authorName;
+        _isLoadingComposer = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _composerName = _currentUser.email?.split('@').first ?? 'คุณ';
+        _isLoadingComposer = false;
+      });
+    }
+  }
+
+  Future<void> _openComposer() async {
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => _FeedComposerPage(
+          repository: _repository,
+          composerName: _composerName,
+        ),
+      ),
+    );
+    if (!mounted || created != true) return;
+    _showSnackBar('โพสต์ของคุณถูกเผยแพร่แล้ว');
+  }
+
+  Future<void> _toggleLike(FeedPost post, bool isLiked) async {
+    try {
+      if (isLiked) {
+        await _repository.unlikePost(post.id);
+      } else {
+        await _repository.likePost(post.id);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar('อัปเดตการกดถูกใจไม่สำเร็จ: $error', isError: true);
+    }
+  }
+
+  Future<void> _deletePost(FeedPost post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ลบโพสต์นี้?'),
+        content: const Text('โพสต์นี้จะถูกลบออกจากชุมชนทันที'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('ลบ'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await _repository.deletePost(post.id);
+      if (!mounted) return;
+      _showSnackBar('ลบโพสต์เรียบร้อย');
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar('ลบโพสต์ไม่สำเร็จ: $error', isError: true);
+    }
+  }
+
+  void _openAuthorProfile(FeedPost post) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FeedProfilePage(
+          repository: _repository,
+          authorId: post.authorId,
+          authorName: post.authorName,
+          currentUserId: _currentUser?.id,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _refreshFeed() async {
+    await _loadComposerIdentity();
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+  }
+
+  void _showSnackBar(String text, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(text),
+        backgroundColor: isError ? Colors.red : _brandBlue,
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final currentUser = _currentUser;
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(child: Text('กรุณาเข้าสู่ระบบเพื่อใช้งาน feed')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // --- 1. ส่วนโลโก้ด้านบน ---
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
-                child: Center(
-                  child: Image.asset(
-                    'assets/images/How 1.png',
-                    width: 65,
-                    height: 88,
-                  ),
-                ),
-              ),
-              Divider(thickness: 1, color: Colors.grey.shade200),
+        child: Column(
+          children: [
+            _FeedHeader(
+              composerName: _composerName,
+              isLoadingComposer: _isLoadingComposer,
+              onComposerTap: _openComposer,
+            ),
+            Expanded(
+              child: StreamBuilder<List<FeedPost>>(
+                stream: _repository.watchPosts(),
+                builder: (context, postSnapshot) {
+                  if (postSnapshot.hasError) {
+                    return _FeedMessageState(
+                      icon: Icons.cloud_off_rounded,
+                      title: 'โหลด feed ไม่สำเร็จ',
+                      subtitle: '${postSnapshot.error}',
+                      actionLabel: 'ลองใหม่',
+                      onAction: _refreshFeed,
+                    );
+                  }
 
-              // --- 2. ส่วนช่อง "คุณกำลังคิดอะไรอยู่" ---
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16.0,
-                  vertical: 10,
-                ),
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 20,
-                      backgroundImage: NetworkImage(
-                        'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                      ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Text(
-                        'คุณกำลังคิดอะไรอยู่.....',
-                        style: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: 16,
+                  if (!postSnapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  return StreamBuilder<Set<String>>(
+                    stream: _repository.watchLikedPostIds(currentUser.id),
+                    builder: (context, likeSnapshot) {
+                      final likedPostIds =
+                          likeSnapshot.data ?? const <String>{};
+                      final posts = postSnapshot.data ?? const <FeedPost>[];
+
+                      if (posts.isEmpty) {
+                        return RefreshIndicator(
+                          onRefresh: _refreshFeed,
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.fromLTRB(24, 48, 24, 120),
+                            children: [
+                              _FeedEmptyState(onCreatePost: _openComposer),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return RefreshIndicator(
+                        onRefresh: _refreshFeed,
+                        child: ListView.separated(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 120),
+                          itemCount: posts.length,
+                          separatorBuilder: (context, index) => Divider(
+                              thickness: 1, color: Colors.grey.shade200),
+                          itemBuilder: (context, index) {
+                            final post = posts[index];
+                            final isLiked = likedPostIds.contains(post.id);
+
+                            return FeedPostCard(
+                              post: post,
+                              isLiked: isLiked,
+                              isOwnPost: post.authorId == currentUser.id,
+                              onAuthorTap: () => _openAuthorProfile(post),
+                              onToggleLike: _repository.supportsLikeActions
+                                  ? () => _toggleLike(post, isLiked)
+                                  : null,
+                              onDelete: post.authorId == currentUser.id
+                                  ? () => _deletePost(post)
+                                  : null,
+                            );
+                          },
                         ),
-                      ),
-                    ),
-                    Image.asset(
-                      'assets/images/Picture.png', // <-- ใส่ path รูปของคุณตรงนี้
-                      width: 40, // กำหนดขนาด (ปกติ Icon จะประมาณ 24)
-                      height: 35,
-                      fit: BoxFit.contain, // จัดวางรูปให้พอดี
-                      color: Colors.grey,
-                    ),
-                  ],
-                ),
+                      );
+                    },
+                  );
+                },
               ),
-
-              Divider(thickness: 1, color: Colors.grey.shade200),
-
-              // --- 3. รายการโพสต์ ---
-              const PostItem(
-                name: "seal",
-                avatarUrl:
-                    "https://api.dicebear.com/9.x/adventurer/png?seed=Felix",
-                content:
-                    "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา...",
-                likes: 15,
-                showImage: false,
-              ),
-
-              Divider(thickness: 1, color: Colors.grey.shade200),
-
-              const PostItem(
-                name: "seal2",
-                avatarUrl:
-                    "https://api.dicebear.com/9.x/adventurer/png?seed=Felix",
-                content:
-                    "คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น...",
-                likes: 8,
-                showImage: false,
-              ),
-
-              Divider(thickness: 1, color: Colors.grey.shade200),
-
-              const PostItem(
-                name: "puffer",
-                avatarUrl:
-                    "https://api.dicebear.com/9.x/adventurer/png?seed=Buddy",
-                content: "สุขใจเมื่อได้เจอ",
-                likes: 138,
-                showImage: true,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ---------------------------------------------------------
-//  Widget: PostItem (เพิ่มระบบกดไลก์ +1)
-// ---------------------------------------------------------
-class PostItem extends StatefulWidget {
-  final String name;
-  final String content;
-  final int likes;
-  final bool showImage;
-  final String avatarUrl;
-  final bool showFollowButton;
-
-  const PostItem({
+class FeedProfilePage extends StatelessWidget {
+  const FeedProfilePage({
     super.key,
-    required this.name,
-    required this.content,
-    required this.likes,
-    required this.showImage,
-    required this.avatarUrl,
-    this.showFollowButton = true,
+    required this.repository,
+    required this.authorId,
+    required this.authorName,
+    required this.currentUserId,
   });
 
-  @override
-  State<PostItem> createState() => _PostItemState();
-}
+  final FeedRepository repository;
+  final String authorId;
+  final String authorName;
+  final String? currentUserId;
 
-class _PostItemState extends State<PostItem> {
-  // สถานะติดตาม
-  bool isFollowing = false;
-
-  // สถานะไลก์ (เพิ่มใหม่)
-  bool isLiked = false;
-  late int likeCount; // ตัวแปรเก็บจำนวนไลก์ปัจจุบัน
-
-  @override
-  void initState() {
-    super.initState();
-    // เริ่มต้นให้จำนวนไลก์เท่ากับค่าที่ส่งเข้ามา (เช่น 15)
-    likeCount = widget.likes;
+  Future<void> _toggleLike(
+    BuildContext context,
+    FeedPost post,
+    bool isLiked,
+  ) async {
+    try {
+      if (isLiked) {
+        await repository.unlikePost(post.id);
+      } else {
+        await repository.likePost(post.id);
+      }
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('อัปเดตการกดถูกใจไม่สำเร็จ: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // กดรูปแล้วไปหน้า Profile
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => FeedProfilePage(
-                        name: widget.name,
-                        avatarUrl: widget.avatarUrl,
-                      ),
-                    ),
-                  );
-                },
-                child: CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.grey.shade200,
-                  backgroundImage: NetworkImage(widget.avatarUrl),
-                ),
-              ),
-
-              const SizedBox(width: 10),
-
-              Text(
-                widget.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: Colors.grey,
-                ),
-              ),
-
-              if (widget.showFollowButton) ...[
-                const SizedBox(width: 10),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      isFollowing = !isFollowing;
-                    });
-                  },
-                  child: isFollowing
-                      ? const Icon(Icons.verified, color: Colors.grey, size: 20)
-                      : Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.lightBlue.shade50,
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            "ติดตาม",
-                            style: TextStyle(
-                              color: Color(0xFF8D8D8D),
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                ),
-              ],
-            ],
+  Future<void> _deletePost(BuildContext context, FeedPost post) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('ลบโพสต์นี้?'),
+        content: const Text('โพสต์นี้จะถูกลบออกจากชุมชนทันที'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('ยกเลิก'),
           ),
-
-          const SizedBox(height: 10),
-
-          Text(
-            widget.content,
-            style: const TextStyle(color: Colors.grey, height: 1.5),
-          ),
-
-          const SizedBox(height: 10),
-
-          if (widget.showImage)
-            Container(
-              height: 200,
-              width: double.infinity,
-              margin: const EdgeInsets.only(bottom: 10),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-                image: const DecorationImage(
-                  image: NetworkImage(
-                    'https://i.pinimg.com/736x/b7/ac/ba/b7acba5c729ea828c9ed398f21248681.jpg',
-                  ),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: const Center(
-                child: Icon(
-                  Icons.play_circle_fill,
-                  color: Colors.white,
-                  size: 50,
-                ),
-              ),
-            ),
-
-          // --- ส่วนปุ่ม Like (แก้ไขใหม่) ---
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                isLiked = !isLiked; // สลับสถานะ กด/เลิกกด
-                if (isLiked) {
-                  likeCount++; // ถ้ากดไลก์ -> บวก 1
-                } else {
-                  likeCount--; // ถ้ากดซ้ำ (เลิกไลก์) -> ลบ 1
-                }
-              });
-            },
-            child: Row(
-              mainAxisSize: MainAxisSize.min, // ให้พื้นที่ปุ่มแค่พอดีคำ
-              children: [
-                Icon(
-                  isLiked
-                      ? Icons.favorite
-                      : Icons.favorite_border, // เปลี่ยนรูปหัวใจ ทึบ/โปร่ง
-                  color: isLiked
-                      ? Color(0xFF4489D7)
-                      : Colors.grey, // เปลี่ยนสี แดง/ฟ้า
-                  size: 32,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  likeCount.toString(),
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontWeight: isLiked ? FontWeight.bold : FontWeight.normal,
-                  ),
-                ),
-              ],
-            ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('ลบ'),
           ),
         ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    try {
+      await repository.deletePost(post.id);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ลบโพสต์เรียบร้อย')),
+      );
+    } catch (error) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ลบโพสต์ไม่สำเร็จ: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
-}
-
-// ---------------------------------------------------------
-//  Widget: ProfilePage
-// ---------------------------------------------------------
-class FeedProfilePage extends StatefulWidget {
-  final String name;
-  final String avatarUrl;
-
-  const FeedProfilePage({
-    super.key,
-    required this.name,
-    required this.avatarUrl,
-  });
-
-  @override
-  State<FeedProfilePage> createState() => _ProfilePageState();
-}
-
-class _ProfilePageState extends State<FeedProfilePage> {
-  bool isFollowing = false;
 
   @override
   Widget build(BuildContext context) {
@@ -314,115 +316,635 @@ class _ProfilePageState extends State<FeedProfilePage> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.grey),
-          onPressed: () => Navigator.pop(context),
+        surfaceTintColor: Colors.white,
+        title: Text(authorName),
+      ),
+      body: StreamBuilder<List<FeedPost>>(
+        stream: repository.watchPostsByAuthor(authorId),
+        builder: (context, postSnapshot) {
+          if (postSnapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  'โหลดโปรไฟล์ไม่สำเร็จ\n${postSnapshot.error}',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
+
+          if (!postSnapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          return StreamBuilder<Set<String>>(
+            stream: currentUserId == null
+                ? Stream<Set<String>>.value(const <String>{})
+                : repository.watchLikedPostIds(currentUserId!),
+            builder: (context, likeSnapshot) {
+              final posts = postSnapshot.data ?? const <FeedPost>[];
+              final likedPostIds = likeSnapshot.data ?? const <String>{};
+              final totalLikes =
+                  posts.fold<int>(0, (sum, post) => sum + post.likeCount);
+              final items = <Widget>[
+                _ProfileHeader(
+                  authorName: authorName,
+                  postCount: posts.length,
+                  totalLikes: totalLikes,
+                ),
+                if (posts.isEmpty)
+                  const _FeedMessageState(
+                    icon: Icons.article_outlined,
+                    title: 'ยังไม่มีโพสต์',
+                    subtitle: 'เมื่อผู้ใช้คนนี้เริ่มโพสต์ ข้อความจะขึ้นที่นี่',
+                  )
+                else
+                  ...posts.map(
+                    (post) => FeedPostCard(
+                      post: post,
+                      isLiked: likedPostIds.contains(post.id),
+                      isOwnPost: post.authorId == currentUserId,
+                      onAuthorTap: null,
+                      onToggleLike: repository.supportsLikeActions
+                          ? () => _toggleLike(
+                                context,
+                                post,
+                                likedPostIds.contains(post.id),
+                              )
+                          : null,
+                      onDelete: post.authorId == currentUserId
+                          ? () => _deletePost(context, post)
+                          : null,
+                    ),
+                  ),
+              ];
+
+              return ListView.separated(
+                padding: const EdgeInsets.only(bottom: 32),
+                separatorBuilder: (context, index) =>
+                    Divider(thickness: 1, color: Colors.grey.shade200),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  return items[index];
+                },
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FeedComposerPage extends StatefulWidget {
+  const _FeedComposerPage({
+    required this.repository,
+    required this.composerName,
+  });
+
+  final FeedRepository repository;
+  final String composerName;
+
+  @override
+  State<_FeedComposerPage> createState() => _FeedComposerPageState();
+}
+
+class _FeedComposerPageState extends State<_FeedComposerPage> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isSubmitting = false;
+
+  String _messageForModerationReason(String reason) {
+    final normalizedReason = reason.toLowerCase();
+    if (normalizedReason.contains('moderation-blocked-by-n8n')) {
+      return 'ระบบตรวจพบว่าโพสต์นี้ไม่เหมาะสม จึงไม่อนุญาตให้เผยแพร่';
+    }
+    return 'ไม่สามารถโพสต์ข้อความนี้ได้ เนื่องจากผลคำไม่เหมาะสม';
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final content = _controller.text.trim();
+    if (content.isEmpty || _isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await widget.repository.createPost(content);
+      if (!mounted) return;
+      FocusScope.of(context).unfocus();
+      Navigator.of(context).pop(true);
+    } on ContentModerationBlockedException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_messageForModerationReason(error.reason)),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _isSubmitting = false);
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _isSubmitting = false);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('สร้างโพสต์ไม่สำเร็จ: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _isSubmitting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.white,
+        title: const Text('เขียนโพสต์'),
+      ),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _AuthorAvatar(name: widget.composerName, radius: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.composerName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF25527A),
+                          ),
+                        ),
+                        const Text(
+                          'แชร์ความรู้สึกหรือเรื่องที่อยากเล่าได้เลย',
+                          style: TextStyle(color: Color(0xFF6D8BA3)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              TextField(
+                controller: _controller,
+                maxLines: 8,
+                minLines: 6,
+                maxLength: 500,
+                decoration: InputDecoration(
+                  hintText:
+                      'วันนี้คุณกำลังรู้สึกยังไง หรืออยากแบ่งปันอะไรกับชุมชน?',
+                  filled: true,
+                  fillColor: const Color(0xFFF5FBFF),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'โพสต์จะปรากฏบน feed แบบ realtime',
+                      style: TextStyle(color: Color(0xFF7E96AC)),
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: _controller.text.trim().isEmpty || _isSubmitting
+                        ? null
+                        : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF4A89D8),
+                      foregroundColor: Colors.white,
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('โพสต์'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            Center(
-              child: Column(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundImage: NetworkImage(widget.avatarUrl),
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+    );
+  }
+}
+
+class FeedPostCard extends StatelessWidget {
+  const FeedPostCard({
+    super.key,
+    required this.post,
+    required this.isLiked,
+    required this.isOwnPost,
+    required this.onToggleLike,
+    required this.onAuthorTap,
+    this.onDelete,
+  });
+
+  final FeedPost post;
+  final bool isLiked;
+  final bool isOwnPost;
+  final VoidCallback? onToggleLike;
+  final VoidCallback? onAuthorTap;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      color: Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              InkWell(
+                onTap: onAuthorTap,
+                borderRadius: BorderRadius.circular(40),
+                child: _AuthorAvatar(name: post.authorName, radius: 20),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: InkWell(
+                  onTap: onAuthorTap,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        widget.name,
-                        style: TextStyle(
-                          fontSize: 24,
+                        post.authorName,
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.grey.shade600,
+                          fontSize: 16,
+                          color: Colors.grey,
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            isFollowing = !isFollowing;
-                          });
-                        },
-                        child: isFollowing
-                            ? const Icon(
-                                Icons.verified,
-                                color: Colors.grey,
-                                size: 28,
-                              )
-                            : Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.lightBlue.shade100,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  "ติดตาม",
-                                  style: TextStyle(
-                                    color: Colors.blue.shade600,
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _formatPostTime(post.createdAt),
+                        style: TextStyle(
+                          color: Colors.grey.shade400,
+                          fontSize: 12,
+                        ),
                       ),
                     ],
+                  ),
+                ),
+              ),
+              if (isOwnPost)
+                Text(
+                  'โพสต์ของคุณ',
+                  style: TextStyle(
+                    color: Colors.grey.shade500,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              if (onDelete != null)
+                PopupMenuButton<String>(
+                  color: Colors.white,
+                  icon: const Icon(Icons.more_horiz, color: Colors.grey),
+                  onSelected: (value) {
+                    if (value == 'delete') onDelete?.call();
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Text('ลบโพสต์'),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            post.content,
+            style: const TextStyle(color: Colors.grey, height: 1.5),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: onToggleLike,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isLiked ? Icons.favorite : Icons.favorite_border,
+                      color: isLiked ? const Color(0xFF4489D7) : Colors.grey,
+                      size: 32,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      post.likeCount.toString(),
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontWeight:
+                            isLiked ? FontWeight.bold : FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 18),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.mode_comment_outlined,
+                    color: Colors.grey,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    post.commentCount.toString(),
+                    style: const TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeedHeader extends StatelessWidget {
+  const _FeedHeader({
+    required this.composerName,
+    required this.isLoadingComposer,
+    required this.onComposerTap,
+  });
+
+  final String composerName;
+  final bool isLoadingComposer;
+  final VoidCallback onComposerTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Center(
+            child: Image.asset(
+              'assets/images/How 1.png',
+              width: 65,
+              height: 88,
+            ),
+          ),
+        ),
+        Divider(thickness: 1, color: Colors.grey.shade200),
+        Material(
+          color: Colors.white,
+          child: InkWell(
+            onTap: onComposerTap,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              child: Row(
+                children: [
+                  _AuthorAvatar(name: composerName, radius: 20),
+                  const SizedBox(width: 15),
+                  Expanded(
+                    child: Text(
+                      isLoadingComposer
+                          ? 'กำลังโหลด...'
+                          : '$composerName กำลังคิดอะไรอยู่.....',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  Image.asset(
+                    'assets/images/Picture.png',
+                    width: 40,
+                    height: 35,
+                    fit: BoxFit.contain,
+                    color: Colors.grey,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            Divider(thickness: 1, color: Colors.grey.shade200),
-            PostItem(
-              name: widget.name,
-              avatarUrl: widget.avatarUrl,
-              content:
-                  "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา 24 ชม. หรอกนะ...",
-              likes: 15,
-              showImage: false,
-              showFollowButton: false,
+          ),
+        ),
+        Divider(thickness: 1, color: Colors.grey.shade200),
+      ],
+    );
+  }
+}
+
+class _FeedEmptyState extends StatelessWidget {
+  const _FeedEmptyState({required this.onCreatePost});
+
+  final VoidCallback onCreatePost;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(Icons.forum_outlined, size: 44, color: Colors.grey.shade400),
+        const SizedBox(height: 12),
+        const Text(
+          'ยังไม่มีโพสต์ในชุมชน',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'เริ่มโพสต์แรกเพื่อให้ feed นี้เริ่มใช้งานได้จริง',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.grey, height: 1.5),
+        ),
+        const SizedBox(height: 18),
+        OutlinedButton(
+          onPressed: onCreatePost,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFF4489D7),
+          ),
+          child: const Text('สร้างโพสต์แรก'),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedMessageState extends StatelessWidget {
+  const _FeedMessageState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String? actionLabel;
+  final FutureOr<void> Function()? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 48, color: Colors.grey.shade400),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
             ),
-            Divider(thickness: 1, color: Colors.grey.shade200),
-            PostItem(
-              name: widget.name,
-              avatarUrl: widget.avatarUrl,
-              content:
-                  "ไม่ต้องพยายามยืนในจุดที่ 'สูงที่สุด' แค่พาตัวเองไปอยู่ในจุดที่ 'ดีกว่าเดิม' ก็พอแล้ว✌️🌱",
-              likes: 8,
-              showImage: false,
-              showFollowButton: false,
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey, height: 1.5),
             ),
-            Divider(thickness: 1, color: Colors.grey.shade200),
-            PostItem(
-              name: widget.name,
-              avatarUrl: widget.avatarUrl,
-              content:
-                  "อนุญาตให้ตัวเองมีความสุข... โดยไม่ต้องรอให้ใครมาอนุมัติ โลกโหดร้ายกับเราพอแล้ว อย่าลืมใจดีกับตัวเองบ้างนะ🤍✨",
-              likes: 10,
-              showImage: false,
-              showFollowButton: false,
+            if (actionLabel != null && onAction != null) ...[
+              const SizedBox(height: 18),
+              OutlinedButton(
+                onPressed: () => onAction?.call(),
+                child: Text(actionLabel!),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileHeader extends StatelessWidget {
+  const _ProfileHeader({
+    required this.authorName,
+    required this.postCount,
+    required this.totalLikes,
+  });
+
+  final String authorName;
+  final int postCount;
+  final int totalLikes;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Center(
+        child: Column(
+          children: [
+            _AuthorAvatar(name: authorName, radius: 50),
+            const SizedBox(height: 10),
+            Text(
+              authorName,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey.shade600,
+              ),
             ),
-            Divider(thickness: 1, color: Colors.grey.shade200),
-            PostItem(
-              name: widget.name,
-              avatarUrl: widget.avatarUrl,
-              content:
-                  "ชีวิตไม่ได้ต้องการคนเก่งที่สุด แต่ต้องการคนที่ 'อดทน' เก่งที่สุดต่างหาก กาแฟแก้วที่สามของวันจงสถิตอยู่กับท่าน☕💪",
-              likes: 2,
-              showImage: false,
-              showFollowButton: false,
+            const SizedBox(height: 10),
+            Text(
+              '$postCount โพสต์ • $totalLikes ถูกใจ',
+              style: TextStyle(
+                color: Colors.grey.shade500,
+                fontSize: 13,
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+class _AuthorAvatar extends StatelessWidget {
+  const _AuthorAvatar({
+    required this.name,
+    required this.radius,
+  });
+
+  final String name;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = [
+      const Color(0xFFE6F4FF),
+      const Color(0xFFF2F2F2),
+      const Color(0xFFEAF7F0),
+    ];
+    final color = palette[name.hashCode.abs() % palette.length];
+    final initial = name.trim().isEmpty ? '?' : name.trim().characters.first;
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: color,
+      child: Text(
+        initial.toUpperCase(),
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: const Color(0xFF25527A),
+          fontSize: radius * 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+String _formatPostTime(DateTime time) {
+  final now = DateTime.now();
+  final diff = now.difference(time);
+
+  if (diff.inSeconds < 60) return 'เมื่อสักครู่';
+  if (diff.inMinutes < 60) return '${diff.inMinutes} นาทีที่แล้ว';
+  if (diff.inHours < 24) return '${diff.inHours} ชั่วโมงที่แล้ว';
+  if (diff.inDays < 7) return '${diff.inDays} วันที่แล้ว';
+
+  return DateFormat('d/M/yyyy HH:mm').format(time);
 }
