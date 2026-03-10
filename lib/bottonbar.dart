@@ -8,6 +8,7 @@ import 'package:flutter_application_1/module/encouragement/view/encouragement_vi
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/feed/view/post.dart';
 import 'package:flutter_application_1/module/home/view/home_view.dart';
+import 'package:flutter_application_1/module/home/view/noti.dart';
 import 'package:flutter_application_1/module/home/view/test_view.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_detail.dart';
 import 'package:flutter_application_1/module/login/view/login2_view.dart';
@@ -41,7 +42,7 @@ class BottomNavController extends GetxController {
     // ChatPage(),
     // PauseChatPage(),
     // FeedbackPage(),
-    
+    NotiPage(),
     PostPage(),
     HomePage(),
     FeedPage(),

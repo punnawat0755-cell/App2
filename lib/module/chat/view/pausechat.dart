@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:get/get.dart';
 // อย่าลืมเช็ค path ของไฟล์เหล่านี้ให้ตรงกับโปรเจกต์ของคุณด้วยนะครับ
 import 'package:flutter_application_1/module/chat/view/feedback_page.dart';
@@ -29,7 +30,7 @@ class PauseChatController extends GetxController
   void startTimer() {
     timer?.cancel();
     timer = Timer(const Duration(seconds: 6), () {
-      // Get.off(() => ChatPage()); // ครบ 6 วิ ให้ไปหน้า Chat
+      Get.off(() => ChatPage()); // ครบ 6 วิ ให้ไปหน้า Chat
     });
   }
 
