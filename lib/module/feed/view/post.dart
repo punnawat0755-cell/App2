@@ -49,12 +49,13 @@ class PostPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FractionallySizedBox(
-      heightFactor: 0.88,
+      // heightFactor: 0.88,
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         child: Scaffold(
+          // 💡 1. เปิดให้ Scaffold จัดการดัน UI หนีคีย์บอร์ดอัตโนมัติ
+          resizeToAvoidBottomInset: false,
           backgroundColor: Colors.white,
-          // 💡 ปล่อยให้ Scaffold จัดการคีย์บอร์ดแบบ "ปกติ" (ไม่ต้องใช้ ViewInsets แล้ว)
           body: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -142,7 +143,12 @@ class PostPage extends StatelessWidget {
                             autofocus: true,
                             controller: controller.textController,
                             maxLines: null,
-                            maxLength: 200,
+                            maxLength: 120,
+
+                            // 💡 2. ปิดแถบเดาคำศัพท์สีขาวของคีย์บอร์ด
+                            autocorrect: false,
+                            enableSuggestions: false,
+
                             style: const TextStyle(fontSize: 16),
                             decoration: const InputDecoration(
                               hintText: 'คุณกำลังคิดอะไรอยู่.....',
@@ -210,12 +216,8 @@ class PostPage extends StatelessWidget {
 
                 // --- ส่วนที่ 4: Footer (ปุ่ม POST & ตัวนับ) ---
                 Padding(
-                  // 💡 คืนค่า bottom กลับมาเป็น 15 แบบปกติ ให้ปุ่มไม่ลอยสูงเกินไป
-                  padding: const EdgeInsets.only(
-                    right: 15,
-                    bottom: 130,
-                    top: 5,
-                  ),
+                  // ใช้ระยะห่างปกติได้เลย
+                  padding: const EdgeInsets.only(right: 15, top: 5, bottom: 5),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [

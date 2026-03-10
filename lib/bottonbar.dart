@@ -42,7 +42,7 @@ class BottomNavController extends GetxController {
     // ChatPage(),
     // PauseChatPage(),
     // FeedbackPage(),
-    NotiPage(),
+    // NotiPage(),
     PostPage(),
     HomePage(),
     FeedPage(),

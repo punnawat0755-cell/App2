@@ -35,7 +35,11 @@ class NotiPage extends StatelessWidget {
                 children: [
                   GestureDetector(
                     onTap: () => Get.back(),
-                    child: Image.asset("assets/images/back.png"),
+                    child: Image.asset(
+                      "assets/images/back.png",
+                      width: 25,
+                      height: 25,
+                    ),
                   ),
                   const SizedBox(width: 5),
                   Text(
