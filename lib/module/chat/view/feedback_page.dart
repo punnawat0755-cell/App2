@@ -4,7 +4,7 @@ import 'package:get/get.dart';
 import 'chatconfirmdialog.dart';
 import 'chatselectionpage.dart';
 
-class ConversationSummaryController extends GetxController {
+class FeedbackController extends GetxController {
   final RxBool isFollowed = false.obs;
   final RxBool isBlocked = false.obs;
   final RxInt currentRating = 1.obs;
@@ -26,15 +26,14 @@ class ConversationSummaryController extends GetxController {
   }
 }
 
-class ConversationSummaryPage extends StatelessWidget {
-  ConversationSummaryPage({super.key}) {
+class FeedbackPage extends StatelessWidget {
+  FeedbackPage({super.key}) {
     controller.resetState();
   }
 
-  final ConversationSummaryController controller =
-      Get.isRegistered<ConversationSummaryController>()
-      ? Get.find<ConversationSummaryController>()
-      : Get.put(ConversationSummaryController());
+  final FeedbackController controller = Get.isRegistered<FeedbackController>()
+      ? Get.find<FeedbackController>()
+      : Get.put(FeedbackController());
 
   @override
   Widget build(BuildContext context) {

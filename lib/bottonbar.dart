@@ -2,11 +2,11 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/chat/view/chatselectionpage.dart';
-import 'package:flutter_application_1/module/chat/view/conversationsummarypage.dart';
 import 'package:flutter_application_1/module/chat/view/pausechat.dart';
 import 'package:flutter_application_1/module/chat/view/waitingchatpage.dart';
 import 'package:flutter_application_1/module/encouragement/view/encouragement_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
+import 'package:flutter_application_1/module/feed/view/post.dart';
 import 'package:flutter_application_1/module/home/view/home_view.dart';
 import 'package:flutter_application_1/module/home/view/test_view.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_detail.dart';
@@ -40,12 +40,14 @@ class BottomNavController extends GetxController {
     // WaitingChatPage(),
     // ChatPage(),
     // PauseChatPage(),
-    // ConversationSummaryPage(),
+    // FeedbackPage(),
+    
+    PostPage(),
     HomePage(),
     FeedPage(),
     PetPage(),
-   ChatSelectionPage(),
-    ProfilePage(),
+    //  ChatSelectionPage(),
+    // ProfilePage(),
     // RoleSelection(),
     // Pulsecheck(),
     // Encouragement(),
@@ -69,7 +71,7 @@ class BottomNavController extends GetxController {
     // ArticleDetailPage(
     // WaitingChatPage(),
     // ChatPage(),
-    // ConversationSummaryPage(),
+    // FeedbackPage(),
     // ChatPage(),
     // LoginPagetwo(),
     // Signup(),

@@ -2,9 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 // อย่าลืมเช็ค path ของไฟล์เหล่านี้ให้ตรงกับโปรเจกต์ของคุณด้วยนะครับ
-import 'package:flutter_application_1/module/chat/view/conversationsummarypage.dart';
+import 'package:flutter_application_1/module/chat/view/feedback_page.dart';
 import 'package:flutter_application_1/module/chat/view/chatconfirmdialog.dart';
-import 'package:flutter_application_1/module/chat/view/chat_view.dart'; // 💡 นำเข้าหน้า Chat เพื่อให้ Timer เด้งไปได้
 
 // ==========================================
 // 1. Controller: นำระบบ Timer จากหน้าสีฟ้ามาใส่
@@ -42,7 +41,7 @@ class PauseChatController extends GetxController
       barrierDismissible: false, // บังคับให้ต้องกดปุ่มยืนยัน/ยกเลิกเท่านั้น
       onConfirm: () {
         Get.back(); // ปิด Popup
-        Get.to(() => ConversationSummaryPage()); // ยืนยันจบสนทนา ไปหน้าสรุป
+        Get.to(() => FeedbackPage()); // ยืนยันจบสนทนา ไปหน้า feedback
       },
       onCancel: () {
         Get.back(); // ปิด Popup
@@ -207,38 +206,6 @@ class PauseChatPage extends StatelessWidget {
               ),
 
               const SizedBox(height: 50),
-
-              // --- ส่วนที่ 4: ปุ่มจบสนทนา ---
-              GestureDetector(
-                onTap: () => controller.showExitDialog(
-                  context,
-                ), // 💡 ผูกปุ่มนี้กับ Popup ด้วย
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 40,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: buttonYellow,
-                    borderRadius: BorderRadius.circular(30),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 5,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                  child: const Text(
-                    "จบสนทนา",
-                    style: TextStyle(
-                      color: Color(0xFF7A7A7A),
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
             ],
           ),
         ),

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_application_1/module/chat/view/chatconfirmdialog.dart';
-import 'package:flutter_application_1/module/chat/view/chatselectionpage.dart';
-import 'package:flutter_application_1/module/chat/view/conversationsummarypage.dart';
+import 'package:flutter_application_1/module/chat/view/feedback_page.dart';
 
 class ChatPageController extends GetxController {
   final TextEditingController textController = TextEditingController();
@@ -25,7 +24,7 @@ class ChatPageController extends GetxController {
   // 💡 แก้ไขฟังก์ชันนี้: ให้ปิด Popup ก่อน แล้วค่อยเปลี่ยนหน้า
   void confirmEndConversation() {
     Get.back(); // ปิดหน้าต่าง Popup
-    Get.to(() => ConversationSummaryPage());
+    Get.to(() => FeedbackPage());
   }
 
   @override
