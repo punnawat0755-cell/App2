@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class PostPageController extends GetxController {
   final TextEditingController textController = TextEditingController();
   final FocusNode focusNode = FocusNode();
 
   var charCount = 0.obs;
-  var hasImage = true.obs;
+  var hasImage = false.obs;
+  var selectedImagePath = ''.obs;
+
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void onInit() {
@@ -22,20 +28,45 @@ class PostPageController extends GetxController {
     focusNode.requestFocus();
   }
 
+  Future<void> pickImage() async {
+    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+    if (image != null) {
+      selectedImagePath.value = image.path;
+      hasImage.value = true;
+    }
+  }
+
+  // 💡 1. เปิดฟังก์ชันลบรูปภาพ (เพื่อให้ปุ่มกากบาทกดได้)
   void removeImage() {
+    selectedImagePath.value = '';
     hasImage.value = false;
   }
 
   void createPost() {
-    print("Posting... ${textController.text}");
-    Get.back();
-  }
+    if (textController.text.trim().isEmpty && !hasImage.value) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "กรุณาพิมพ์ข้อความหรือเลือกรูปภาพก่อนโพสต์",
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
 
-  @override
-  void onClose() {
-    textController.dispose();
-    focusNode.dispose();
-    super.onClose();
+    if (Get.isRegistered<FeedController>()) {
+      final feedController = Get.find<FeedController>();
+
+      // 💡 2. ส่งข้อมูลไปยัง addNewPost (likes จะเริ่มที่ 0 อัตโนมัติใน Controller)
+      feedController.addNewPost(
+        textController.text,
+        hasImage.value ? selectedImagePath.value : null,
+      );
+    }
+
+    // 💡 3. แก้ไขตรงนี้: เปิดใช้งานการล้างค่า (ลบ // ออก)
+    textController.clear(); // ล้างข้อความในช่องพิมพ์
+    removeImage(); // ล้างรูปภาพที่เคยเลือกไว้
+
+    Get.back();
   }
 }
 
@@ -49,22 +80,33 @@ class PostPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FractionallySizedBox(
-      // heightFactor: 0.88,
+      heightFactor: 0.85,
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         child: Scaffold(
-          // 💡 1. เปิดให้ Scaffold จัดการดัน UI หนีคีย์บอร์ดอัตโนมัติ
           resizeToAvoidBottomInset: false,
           backgroundColor: Colors.white,
           body: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // --- ส่วนที่ 1: Header (Cancel & NewPost) ---
+                Center(
+                  child: Container(
+                    margin: const EdgeInsets.only(top: 12, bottom: 10),
+                    width: 45,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+
+                // --- ส่วนที่ 1: Header ---
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 15,
-                    vertical: 10,
+                    vertical: 5,
                   ),
                   child: Stack(
                     alignment: Alignment.center,
@@ -121,10 +163,14 @@ class PostPage extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      Image.asset(
-                        'assets/images/Picture.png',
-                        width: 50,
-                        height: 50,
+                      // 💡 5. เอา GestureDetector มาครอบไอคอนรูปภาพเพื่อให้กดเลือกรูปได้
+                      GestureDetector(
+                        onTap: controller.pickImage,
+                        child: Image.asset(
+                          'assets/images/Picture.png',
+                          width: 50,
+                          height: 50,
+                        ),
                       ),
                     ],
                   ),
@@ -144,11 +190,8 @@ class PostPage extends StatelessWidget {
                             controller: controller.textController,
                             maxLines: null,
                             maxLength: 120,
-
-                            // 💡 2. ปิดแถบเดาคำศัพท์สีขาวของคีย์บอร์ด
                             autocorrect: false,
                             enableSuggestions: false,
-
                             style: const TextStyle(fontSize: 16),
                             decoration: const InputDecoration(
                               hintText: 'คุณกำลังคิดอะไรอยู่.....',
@@ -166,7 +209,9 @@ class PostPage extends StatelessWidget {
 
                         // --- ส่วนรูปภาพแนบ ---
                         Obx(() {
-                          if (!controller.hasImage.value) {
+                          // 💡 6. เช็คว่ามีรูปให้โชว์ไหม ถ้าไม่มีก็ซ่อนไป
+                          if (!controller.hasImage.value ||
+                              controller.selectedImagePath.value.isEmpty) {
                             return const SizedBox.shrink();
                           }
                           return Center(
@@ -175,8 +220,9 @@ class PostPage extends StatelessWidget {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
-                                  child: Image.network(
-                                    'https://i.pinimg.com/736x/e5/30/78/e530785d780dd7486ef0593b147a1989.jpg',
+                                  // 💡 7. แสดงผลรูปจากไฟล์ในเครื่องแทน
+                                  child: Image.file(
+                                    File(controller.selectedImagePath.value),
                                     width: 250,
                                     height: 300,
                                     fit: BoxFit.cover,
@@ -216,7 +262,6 @@ class PostPage extends StatelessWidget {
 
                 // --- ส่วนที่ 4: Footer (ปุ่ม POST & ตัวนับ) ---
                 Padding(
-                  // ใช้ระยะห่างปกติได้เลย
                   padding: const EdgeInsets.only(right: 15, top: 5, bottom: 5),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -224,7 +269,6 @@ class PostPage extends StatelessWidget {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          // นับตัวอักษร 0/200
                           Obx(
                             () => Text(
                               "${controller.charCount.value}/200",
@@ -236,7 +280,6 @@ class PostPage extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          // ปุ่ม POST
                           GestureDetector(
                             onTap: controller.createPost,
                             child: Container(

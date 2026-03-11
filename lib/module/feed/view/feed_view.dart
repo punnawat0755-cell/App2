@@ -1,8 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:flutter_application_1/module/feed/view/post.dart';
+import 'dart:io';
 
+// ==========================================
+// 💡 1. Model เก็บข้อมูลโพสต์ (Perfect แล้ว!)
+// ==========================================
+class PostModel {
+  final String name;
+  final String avatarUrl;
+  final String content;
+  final RxInt likes;
+  final RxBool isLiked = false.obs;
+  final bool showImage;
+  final String? imagePath;
+  final bool isLocalImage;
+
+  PostModel({
+    required this.name,
+    required this.avatarUrl,
+    required this.content,
+    required int likes,
+    this.showImage = false,
+    this.imagePath,
+    this.isLocalImage = false,
+  }) : likes = likes.obs;
+}
+
+// ==========================================
+// 💡 2. FeedController (จัดการลิสต์โพสต์)
+// ==========================================
+class FeedController extends GetxController {
+  var posts = <PostModel>[
+    PostModel(
+      name: 'seal',
+      avatarUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Felix',
+      content:
+          "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา...",
+      likes: 15,
+    ),
+    PostModel(
+      name: 'seal2',
+      avatarUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Felix',
+      content:
+          'คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น...',
+      likes: 8,
+    ),
+    PostModel(
+      name: 'puffer',
+      avatarUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Buddy',
+      content: 'สุขใจเมื่อได้เจอ',
+      likes: 138,
+      showImage: true,
+      imagePath:
+          'https://i.pinimg.com/736x/b7/ac/ba/b7acba5c729ea828c9ed398f21248681.jpg',
+      isLocalImage: false,
+    ),
+  ].obs;
+
+  void addNewPost(String content, String? localImagePath) {
+    posts.insert(
+      0,
+      PostModel(
+        name: 'seal',
+        avatarUrl:
+            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+        content: content,
+        likes: 0,
+        showImage: localImagePath != null && localImagePath.isNotEmpty,
+        imagePath: localImagePath,
+        isLocalImage: true,
+      ),
+    );
+  }
+}
+
+// ==========================================
+// 💡 3. FeedPage (หน้าหลัก)
+// ==========================================
 class FeedPage extends StatelessWidget {
-  const FeedPage({super.key});
+  FeedPage({super.key});
+
+  final FeedController feedController = Get.put(FeedController());
 
   @override
   Widget build(BuildContext context) {
@@ -15,60 +94,69 @@ class FeedPage extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 20),
                 child: Center(
-                  child: Image.asset('assets/images/How 1.png', width: 65, height: 88),
+                  child: Image.asset(
+                    'assets/images/How 1.png',
+                    width: 65,
+                    height: 88,
+                  ),
                 ),
               ),
               Divider(thickness: 1, color: Colors.grey.shade200),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10),
-                child: Row(
-                  children: [
-                    const CircleAvatar(
-                      radius: 20,
-                      backgroundImage: NetworkImage(
-                        'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+              GestureDetector(
+                onTap: () => Get.bottomSheet(
+                  PostPage(),
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                ),
+                child: Container(
+                  color: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 10,
+                  ),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 20,
+                        backgroundImage: NetworkImage(
+                          'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 15),
-                    Expanded(
-                      child: Text(
-                        'คุณกำลังคิดอะไรอยู่.....',
-                        style: TextStyle(color: Colors.grey.shade400, fontSize: 16),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: Text(
+                          'คุณกำลังคิดอะไรอยู่.....',
+                          style: TextStyle(
+                            color: Colors.grey.shade400,
+                            fontSize: 16,
+                          ),
+                        ),
                       ),
-                    ),
-                    Image.asset(
-                      'assets/images/Picture.png',
-                      width: 40,
-                      height: 35,
-                      fit: BoxFit.contain,
-                      color: Colors.grey,
-                    ),
-                  ],
+                      Image.asset(
+                        'assets/images/Picture.png',
+                        width: 40,
+                        height: 35,
+                        color: Colors.grey,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               Divider(thickness: 1, color: Colors.grey.shade200),
-              const PostItem(
-                name: 'seal',
-                avatarUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Felix',
-                content: "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา...",
-                likes: 15,
-                showImage: false,
-              ),
-              Divider(thickness: 1, color: Colors.grey.shade200),
-              const PostItem(
-                name: 'seal2',
-                avatarUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Felix',
-                content: 'คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น...',
-                likes: 8,
-                showImage: false,
-              ),
-              Divider(thickness: 1, color: Colors.grey.shade200),
-              const PostItem(
-                name: 'puffer',
-                avatarUrl: 'https://api.dicebear.com/9.x/adventurer/png?seed=Buddy',
-                content: 'สุขใจเมื่อได้เจอ',
-                likes: 138,
-                showImage: true,
+
+              Obx(
+                () => Column(
+                  children: feedController.posts
+                      .map(
+                        (post) => Column(
+                          children: [
+                            PostItem(post: post), // ✅ ส่ง Model เข้าไปตรงๆ
+                            Divider(thickness: 1, color: Colors.grey.shade200),
+                          ],
+                        ),
+                      )
+                      .toList(),
+                ),
               ),
             ],
           ),
@@ -78,301 +166,192 @@ class FeedPage extends StatelessWidget {
   }
 }
 
-class PostItemController extends GetxController {
-  PostItemController({required this.initialLikes});
-
-  final int initialLikes;
-  bool isFollowing = false;
-  bool isLiked = false;
-  late int likeCount;
-
-  @override
-  void onInit() {
-    super.onInit();
-    likeCount = initialLikes;
-  }
-
-  void toggleFollow() {
-    isFollowing = !isFollowing;
-    update();
-  }
-
-  void toggleLike() {
-    isLiked = !isLiked;
-    if (isLiked) {
-      likeCount++;
-    } else {
-      likeCount--;
-    }
-    update();
-  }
-}
-
+// ==========================================
+// 💡 4. PostItem (แก้ไขให้รองรับข้อมูลทุกรูปแบบเพื่อกัน Error)
+// ==========================================
 class PostItem extends StatelessWidget {
-  final String name;
-  final String content;
-  final int likes;
-  final bool showImage;
-  final String avatarUrl;
-  final bool showFollowButton;
+  final PostModel? post; // รองรับแบบส่ง Model มา
+
+  // 💡 เพิ่มตรงนี้เผื่อหน้า FeedProfilePage ยังส่งค่าแยกกันอยู่ แอปจะได้ไม่พังครับ
+  final String? name;
+  final String? avatarUrl;
+  final String? content;
+  final int? likes;
+  final bool? showImage;
 
   const PostItem({
     super.key,
-    required this.name,
-    required this.content,
-    required this.likes,
-    required this.showImage,
-    required this.avatarUrl,
-    this.showFollowButton = true,
+    this.post,
+    this.name,
+    this.avatarUrl,
+    this.content,
+    this.likes,
+    this.showImage,
   });
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<PostItemController>(
-      init: PostItemController(initialLikes: likes),
-      global: false,
-      builder: (controller) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => FeedProfilePage(name: name, avatarUrl: avatarUrl),
-                        ),
-                      );
-                    },
-                    child: CircleAvatar(
-                      radius: 20,
-                      backgroundColor: Colors.grey.shade200,
-                      backgroundImage: NetworkImage(avatarUrl),
+    // 💡 ถ้าไม่ได้ส่ง post มา ให้สร้าง Model จำลองจากค่าที่ส่งแยกมาครับ (กัน Error int vs RxInt)
+    final PostModel displayPost =
+        post ??
+        PostModel(
+          name: name ?? 'Unknown',
+          avatarUrl: avatarUrl ?? '',
+          content: content ?? '',
+          likes: likes ?? 0,
+          showImage: showImage ?? false,
+        );
+
+    return Obx(
+      () => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                GestureDetector(
+                  onTap: () => Get.to(
+                    () => FeedProfilePage(
+                      name: displayPost.name,
+                      avatarUrl: displayPost.avatarUrl,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: Colors.grey,
-                    ),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundImage: NetworkImage(displayPost.avatarUrl),
                   ),
-                  if (showFollowButton) ...[
-                    const SizedBox(width: 10),
-                    GestureDetector(
-                      onTap: controller.toggleFollow,
-                      child: controller.isFollowing
-                          ? const Icon(Icons.verified, color: Colors.grey, size: 20)
-                          : Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.lightBlue.shade50,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: const Text(
-                                'ติดตาม',
-                                style: TextStyle(
-                                  color: Color(0xFF8D8D8D),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                    ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(content, style: const TextStyle(color: Colors.grey, height: 1.5)),
-              const SizedBox(height: 10),
-              if (showImage)
-                Container(
-                  height: 200,
-                  width: double.infinity,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  displayPost.name,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              displayPost.content,
+              style: const TextStyle(color: Colors.grey, height: 1.5),
+            ),
+            const SizedBox(height: 10),
+
+            if (displayPost.showImage)
+              Center(
+                child: Container(
+                  height: 300,
+                  width: 250,
                   margin: const EdgeInsets.only(bottom: 10),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(15),
-                    image: const DecorationImage(
-                      image: NetworkImage(
-                        'https://i.pinimg.com/736x/b7/ac/ba/b7acba5c729ea828c9ed398f21248681.jpg',
-                      ),
+                    image: DecorationImage(
+                      image:
+                          (displayPost.isLocalImage &&
+                              displayPost.imagePath != null)
+                          ? FileImage(File(displayPost.imagePath!))
+                                as ImageProvider
+                          : NetworkImage(
+                              displayPost.imagePath ??
+                                  'https://i.pinimg.com/736x/b7/ac/ba/b7acba5c729ea828c9ed398f21248681.jpg',
+                            ),
                       fit: BoxFit.cover,
                     ),
                   ),
-                  child: const Center(
-                    child: Icon(Icons.play_circle_fill, color: Colors.white, size: 50),
-                  ),
-                ),
-              GestureDetector(
-                onTap: controller.toggleLike,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      controller.isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: controller.isLiked ? const Color(0xFF4489D7) : Colors.grey,
-                      size: 32,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      controller.likeCount.toString(),
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontWeight: controller.isLiked ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                  ],
                 ),
               ),
-            ],
-          ),
-        );
-      },
+
+            GestureDetector(
+              onTap: () {
+                displayPost.isLiked.value = !displayPost.isLiked.value;
+                if (displayPost.isLiked.value) {
+                  displayPost.likes.value++;
+                } else {
+                  displayPost.likes.value--;
+                }
+              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    displayPost.isLiked.value
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    color: displayPost.isLiked.value
+                        ? const Color(0xFF4489D7)
+                        : Colors.grey,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 6),
+                  // 💡 สำคัญ: ต้องใช้ .value.toString() เสมอ!
+                  Text(
+                    displayPost.likes.value.toString(),
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontWeight: displayPost.isLiked.value
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class FeedProfileController extends GetxController {
-  bool isFollowing = false;
-
-  void toggleFollow() {
-    isFollowing = !isFollowing;
-    update();
-  }
-}
-
+// ==========================================
+// 💡 5. FeedProfilePage (หน้าโปรไฟล์)
+// ==========================================
 class FeedProfilePage extends StatelessWidget {
-  const FeedProfilePage({super.key, required this.name, required this.avatarUrl});
-
   final String name;
   final String avatarUrl;
 
+  const FeedProfilePage({
+    super.key,
+    required this.name,
+    required this.avatarUrl,
+  });
+
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<FeedProfileController>(
-      init: FeedProfileController(),
-      global: false,
-      builder: (controller) {
-        return Scaffold(
-          backgroundColor: Colors.white,
-          appBar: AppBar(
-            backgroundColor: Colors.white,
-            elevation: 0,
-            leadingWidth: 40,
-            titleSpacing: 2,
-            leading: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Padding(
-                padding: const EdgeInsets.only(left: 10),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Image.asset(
-                    'assets/images/back.png',
-                    width: 25,
-                    height: 25,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.grey),
+          onPressed: () => Get.back(),
+        ),
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+            CircleAvatar(radius: 50, backgroundImage: NetworkImage(avatarUrl)),
+            const SizedBox(height: 10),
+            Text(
+              name,
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-          ),
-          body: SingleChildScrollView(
-            child: Column(
-              children: [
-                Center(
-                  child: Column(
-                    children: [
-                      CircleAvatar(radius: 50, backgroundImage: NetworkImage(avatarUrl)),
-                      const SizedBox(height: 10),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            name,
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: controller.toggleFollow,
-                            child: controller.isFollowing
-                                ? const Icon(Icons.verified, color: Colors.grey, size: 28)
-                                : Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.lightBlue.shade100,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      'ติดตาม',
-                                      style: TextStyle(
-                                        color: Colors.blue.shade600,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Divider(thickness: 1, color: Colors.grey.shade200),
-                PostItem(
-                  name: name,
-                  avatarUrl: avatarUrl,
-                  content:
-                      "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา 24 ชม. หรอกนะ...",
-                  likes: 15,
-                  showImage: false,
-                  showFollowButton: false,
-                ),
-                Divider(thickness: 1, color: Colors.grey.shade200),
-                PostItem(
-                  name: name,
-                  avatarUrl: avatarUrl,
-                  content:
-                      "ไม่ต้องพยายามยืนในจุดที่ 'สูงที่สุด' แค่พาตัวเองไปอยู่ในจุดที่ 'ดีกว่าเดิม' ก็พอแล้ว✌️🌱",
-                  likes: 8,
-                  showImage: false,
-                  showFollowButton: false,
-                ),
-                Divider(thickness: 1, color: Colors.grey.shade200),
-                PostItem(
-                  name: name,
-                  avatarUrl: avatarUrl,
-                  content:
-                      'อนุญาตให้ตัวเองมีความสุข... โดยไม่ต้องรอให้ใครมาอนุมัติ โลกโหดร้ายกับเราพอแล้ว อย่าลืมใจดีกับตัวเองบ้างนะ🤍✨',
-                  likes: 10,
-                  showImage: false,
-                  showFollowButton: false,
-                ),
-                Divider(thickness: 1, color: Colors.grey.shade200),
-                PostItem(
-                  name: name,
-                  avatarUrl: avatarUrl,
-                  content:
-                      "ชีวิตไม่ได้ต้องการคนเก่งที่สุด แต่ต้องการคนที่ 'อดทน' เก่งที่สุดต่างหาก กาแฟแก้วที่สามของวันจงสถิตอยู่กับท่าน☕💪",
-                  likes: 2,
-                  showImage: false,
-                  showFollowButton: false,
-                ),
-              ],
+            const Divider(),
+            PostItem(
+              name: name,
+              avatarUrl: avatarUrl,
+              content: "ตัวอย่างโพสต์ในหน้าโปรไฟล์...",
+              likes: 10,
+              showImage: false,
             ),
-          ),
-        );
-      },
+          ],
+        ),
+      ),
     );
   }
 }
