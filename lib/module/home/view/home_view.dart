@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/feed/view/post.dart';
+import 'package:flutter_application_1/module/home/view/playvideo.dart';
 import 'package:flutter_application_1/module/home/view/test_view.dart';
 import 'package:flutter_application_1/module/home/view/widget/home_widgets.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_card.dart';
@@ -29,7 +30,7 @@ class HomeController extends GetxController {
       "subtitle": "2 week",
       "imagePath":
           "https://i.pinimg.com/1200x/10/fd/6c/10fd6c2086373b9007700b8f997545f1.jpg",
-      "page": () => VideoApp(),
+      "page": () => Null,
     },
     {
       "title": "starfish",
