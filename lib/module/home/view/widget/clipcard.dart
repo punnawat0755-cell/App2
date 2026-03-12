@@ -18,7 +18,7 @@ class ClipCard extends StatelessWidget {
 
     return Container(
       width: 110,
-      margin: const EdgeInsets.only(right: 12),
+      // margin: const EdgeInsets.only(right: 0),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         image: DecorationImage(
@@ -46,7 +46,10 @@ class ClipCard extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.bottomCenter,
                   end: Alignment.topCenter,
-                  colors: [Colors.black.withValues(alpha: 0.6), Colors.transparent],
+                  colors: [
+                    Colors.black.withValues(alpha: 0.6),
+                    Colors.transparent,
+                  ],
                 ),
               ),
             ),

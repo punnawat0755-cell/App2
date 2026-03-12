@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
+// 💡 Import HomeController เพื่อส่งข้อมูลคลิปสั้นกลับไป
+import 'package:flutter_application_1/module/home/view/home_view.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -11,6 +13,9 @@ class PostPageController extends GetxController {
   var charCount = 0.obs;
   var hasImage = false.obs;
   var selectedImagePath = ''.obs;
+
+  // 💡 เพิ่มตัวแปรเช็คว่าเป็นโหมดวิดีโอหรือไม่
+  var isVideoMode = false.obs;
 
   final ImagePicker _picker = ImagePicker();
 
@@ -29,17 +34,25 @@ class PostPageController extends GetxController {
   }
 
   Future<void> pickImage() async {
-    final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      selectedImagePath.value = image.path;
+    // 💡 ให้เลือกได้ทั้งรูปและวิดีโอ
+    final XFile? media = await _picker.pickMedia();
+    if (media != null) {
+      selectedImagePath.value = media.path;
       hasImage.value = true;
+
+      // เช็คว่าไฟล์ที่เลือกมาใหม่เป็นวิดีโอไหม
+      final path = media.path.toLowerCase();
+      isVideoMode.value =
+          path.endsWith('.mp4') ||
+          path.endsWith('.mov') ||
+          path.endsWith('.avi');
     }
   }
 
-  // 💡 1. เปิดฟังก์ชันลบรูปภาพ (เพื่อให้ปุ่มกากบาทกดได้)
   void removeImage() {
     selectedImagePath.value = '';
     hasImage.value = false;
+    isVideoMode.value = false;
   }
 
   void createPost() {
@@ -52,33 +65,59 @@ class PostPageController extends GetxController {
       return;
     }
 
-    if (Get.isRegistered<FeedController>()) {
-      final feedController = Get.find<FeedController>();
-
-      // 💡 2. ส่งข้อมูลไปยัง addNewPost (likes จะเริ่มที่ 0 อัตโนมัติใน Controller)
-      feedController.addNewPost(
-        textController.text,
-        hasImage.value ? selectedImagePath.value : null,
-      );
+    // 💡 เงื่อนไขแยกทาง: ถ่ายวิดีโอไปคลิปสั้น(Home) / รูปภาพไป Feed
+    if (isVideoMode.value) {
+      // --- 🔴 กรณีโพสต์วิดีโอ (คลิปสั้น) ---
+      if (Get.isRegistered<HomeController>()) {
+        Get.find<HomeController>().addNewClip(
+          selectedImagePath.value,
+          textController.text,
+        );
+      }
+    } else {
+      // --- 🔵 กรณีโพสต์รูปภาพ+ข้อความ (Feed) ---
+      if (Get.isRegistered<FeedController>()) {
+        Get.find<FeedController>().addNewPost(
+          textController.text,
+          hasImage.value ? selectedImagePath.value : null,
+        );
+      }
     }
 
-    // 💡 3. แก้ไขตรงนี้: เปิดใช้งานการล้างค่า (ลบ // ออก)
-    textController.clear(); // ล้างข้อความในช่องพิมพ์
-    removeImage(); // ล้างรูปภาพที่เคยเลือกไว้
-
+    textController.clear();
+    removeImage();
     Get.back();
   }
 }
 
 class PostPage extends StatelessWidget {
-  PostPage({super.key});
+  // 💡 1. เพิ่มการรับค่าไฟล์และสถานะวิดีโอจากหน้า Home
+  final XFile? mediaFile;
+  final bool isVideo;
 
-  final PostPageController controller = Get.isRegistered<PostPageController>()
-      ? Get.find<PostPageController>()
-      : Get.put(PostPageController());
+  PostPage({super.key, this.mediaFile, this.isVideo = false}) {
+    // 💡 2. เอาค่าที่ส่งมาจากหน้า Home ไปยัดใส่ Controller ก่อนวาด UI
+    final controller = Get.isRegistered<PostPageController>()
+        ? Get.find<PostPageController>()
+        : Get.put(PostPageController());
+
+    if (mediaFile != null) {
+      controller.selectedImagePath.value = mediaFile!.path;
+      controller.hasImage.value = true;
+      controller.isVideoMode.value = isVideo;
+    } else {
+      // รีเซ็ตค่าหากเปิดหน้า Post เปล่าๆ
+      controller.selectedImagePath.value = '';
+      controller.hasImage.value = false;
+      controller.isVideoMode.value = false;
+      controller.textController.clear();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final controller = Get.find<PostPageController>();
+
     return FractionallySizedBox(
       heightFactor: 0.85,
       child: ClipRRect(
@@ -114,7 +153,11 @@ class PostPage extends StatelessWidget {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: GestureDetector(
-                          onTap: () => Get.back(),
+                          onTap: () {
+                            controller.removeImage();
+                            controller.textController.clear();
+                            Get.back();
+                          },
                           child: const Text(
                             "Cancel",
                             style: TextStyle(
@@ -163,7 +206,6 @@ class PostPage extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      // 💡 5. เอา GestureDetector มาครอบไอคอนรูปภาพเพื่อให้กดเลือกรูปได้
                       GestureDetector(
                         onTap: controller.pickImage,
                         child: Image.asset(
@@ -209,7 +251,6 @@ class PostPage extends StatelessWidget {
 
                         // --- ส่วนรูปภาพแนบ ---
                         Obx(() {
-                          // 💡 6. เช็คว่ามีรูปให้โชว์ไหม ถ้าไม่มีก็ซ่อนไป
                           if (!controller.hasImage.value ||
                               controller.selectedImagePath.value.isEmpty) {
                             return const SizedBox.shrink();
@@ -217,17 +258,43 @@ class PostPage extends StatelessWidget {
                           return Center(
                             child: Stack(
                               clipBehavior: Clip.none,
+                              alignment: Alignment.center,
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
-                                  // 💡 7. แสดงผลรูปจากไฟล์ในเครื่องแทน
                                   child: Image.file(
                                     File(controller.selectedImagePath.value),
                                     width: 250,
                                     height: 300,
                                     fit: BoxFit.cover,
+                                    // 💡 3. ถ้าดึงปกวิดีโอไม่ได้ ให้โชว์กล่องสีเทาแทน
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
+                                              width: 250,
+                                              height: 300,
+                                              color: Colors.grey[200],
+                                              child: const Center(
+                                                child: Icon(
+                                                  Icons.video_library,
+                                                  size: 50,
+                                                  color: Colors.grey,
+                                                ),
+                                              ),
+                                            ),
                                   ),
                                 ),
+                                // 💡 4. ถ้าเป็นวิดีโอ ให้แปะปุ่ม Play ทับไว้ตรงกลาง
+                                if (controller.isVideoMode.value)
+                                  const CircleAvatar(
+                                    radius: 25,
+                                    backgroundColor: Colors.black45,
+                                    child: Icon(
+                                      Icons.play_arrow,
+                                      color: Colors.white,
+                                      size: 35,
+                                    ),
+                                  ),
                                 Positioned(
                                   top: -10,
                                   right: -10,
@@ -271,7 +338,7 @@ class PostPage extends StatelessWidget {
                         children: [
                           Obx(
                             () => Text(
-                              "${controller.charCount.value}/200",
+                              "${controller.charCount.value}/120", // อัปเดตให้ตรงกับ maxLength
                               style: const TextStyle(
                                 color: Color(0xffC3C3C3),
                                 fontSize: 13,
