@@ -2,18 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/module/setting/view/setting_view.dart';
+import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
 
 // ==========================================
 // 1. Controller: จัดการข้อมูลแยกตาม ปี-เดือน-วัน
 // ==========================================
 class ProfileController extends GetxController {
+  static const int maxSymptomsPerSave = 2;
+
   var coins = 138.obs;
   var today = DateTime.now().day.obs;
   var selectedMonth = DateTime.now().month.obs;
   var selectedYear = DateTime.now().year.obs;
   var selectedDate = 0.obs;
 
-  final List<int> periodDays = [29, 30, 31];
+  final List<int> periodDays = [1, 2, 3, 4, 5];
   var dailyPeriodStatus = <String, bool>{}.obs;
   var dailySymptoms = <String, List<String>>{}.obs;
 
@@ -57,19 +60,56 @@ class ProfileController extends GetxController {
   void toggleSymptom(String symptomName) {
     if (selectedDate.value == 0) return;
     List<String> currentList = List.from(getSymptomsForSelectedDay());
-    currentList.contains(symptomName)
-        ? currentList.remove(symptomName)
-        : currentList.add(symptomName);
+    if (currentList.contains(symptomName)) {
+      currentList.remove(symptomName);
+    } else {
+      if (currentList.length >= maxSymptomsPerSave) {
+        Get.snackbar(
+          "แจ้งเตือน",
+          "เลือกอาการได้ไม่เกิน $maxSymptomsPerSave รายการต่อการบันทึก",
+          backgroundColor: const Color(0xFF2C5282),
+          colorText: Colors.white,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+      currentList.add(symptomName);
+    }
     dailySymptoms[dateKey] = currentList;
   }
 
-  void saveDailyData() {
+  bool saveDailyData() {
+    if (selectedDate.value == 0) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "กรุณาเลือกวันที่ต้องการ",
+        backgroundColor: const Color(0xFF2C5282),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+      return false;
+    }
+
+    final selectedSymptoms = getSymptomsForSelectedDay();
+    if (selectedSymptoms.length > maxSymptomsPerSave) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "บันทึกได้ไม่เกิน $maxSymptomsPerSave อาการต่อครั้ง",
+        backgroundColor: const Color(0xFF2C5282),
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+      return false;
+    }
+
     Get.snackbar(
       "สำเร็จ",
       "บันทึกเรียบร้อย",
       backgroundColor: const Color(0xFF2C5282),
       colorText: Colors.white,
+      duration: const Duration(seconds: 3),
     );
+    return true;
   }
 
   // --- ฟังก์ชันแสดง Modal คำแนะนำ ---
@@ -91,7 +131,6 @@ class ProfileController extends GetxController {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Color(0xFF4489D7),
-                  fontFamily: 'Kanit',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -246,11 +285,9 @@ class ProfilePage extends StatelessWidget {
                   ),
                   GestureDetector(
                     onTap: () => Get.to(() => const SettingPage()),
-                    child: const CircleAvatar(
+                    child: const AppProfileAvatar(
                       radius: 25,
-                      backgroundImage: NetworkImage(
-                        'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                      ),
+                      showNotificationDot: true,
                     ),
                   ),
                 ],
@@ -540,8 +577,9 @@ class ProfilePage extends StatelessWidget {
                       alignment: Alignment.centerRight,
                       child: ElevatedButton(
                         onPressed: () {
-                          controller.saveDailyData();
-                          if (controller.getPeriodStatusForSelectedDay())
+                          final saved = controller.saveDailyData();
+                          if (saved &&
+                              controller.getPeriodStatusForSelectedDay())
                             controller.showAdviceModal();
                         },
                         style: ElevatedButton.styleFrom(

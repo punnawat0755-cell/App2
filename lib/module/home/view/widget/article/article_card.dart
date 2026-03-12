@@ -25,10 +25,12 @@ class ArticleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE9E9E9), width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withOpacity(0.07),
               blurRadius: 10,
+              spreadRadius: 0,
               offset: const Offset(0, 4),
             ),
           ],

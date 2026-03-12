@@ -287,6 +287,7 @@ class LoginPage extends StatelessWidget {
                                   errorText,
                                   backgroundColor: Colors.red,
                                   colorText: Colors.white,
+                                  duration: const Duration(seconds: 3),
                                 );
                               }
                             },

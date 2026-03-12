@@ -5,6 +5,21 @@ import 'package:flutter_application_1/module/home/view/home_view.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import 'package:video_player/video_player.dart';
+
+enum PostComposerMode { homeVideoOnly, feedTextImageOnly }
+
+void showPostSheet({
+  XFile? mediaFile,
+  bool isVideo = false,
+  PostComposerMode mode = PostComposerMode.feedTextImageOnly,
+}) {
+  Get.bottomSheet(
+    PostPage(mediaFile: mediaFile, isVideo: isVideo, mode: mode),
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+  );
+}
 
 class PostPageController extends GetxController {
   final TextEditingController textController = TextEditingController();
@@ -13,6 +28,7 @@ class PostPageController extends GetxController {
   var charCount = 0.obs;
   var hasImage = false.obs;
   var selectedImagePath = ''.obs;
+  var composerMode = PostComposerMode.feedTextImageOnly.obs;
 
   // 💡 เพิ่มตัวแปรเช็คว่าเป็นโหมดวิดีโอหรือไม่
   var isVideoMode = false.obs;
@@ -33,19 +49,19 @@ class PostPageController extends GetxController {
     focusNode.requestFocus();
   }
 
-  Future<void> pickImage() async {
-    // 💡 ให้เลือกได้ทั้งรูปและวิดีโอ
-    final XFile? media = await _picker.pickMedia();
+  Future<void> pickAttachment() async {
+    final XFile? media = composerMode.value == PostComposerMode.homeVideoOnly
+        ? await _picker.pickVideo(source: ImageSource.gallery)
+        : await _picker.pickImage(source: ImageSource.gallery);
     if (media != null) {
       selectedImagePath.value = media.path;
       hasImage.value = true;
 
-      // เช็คว่าไฟล์ที่เลือกมาใหม่เป็นวิดีโอไหม
-      final path = media.path.toLowerCase();
-      isVideoMode.value =
-          path.endsWith('.mp4') ||
-          path.endsWith('.mov') ||
-          path.endsWith('.avi');
+      if (composerMode.value == PostComposerMode.homeVideoOnly) {
+        isVideoMode.value = true;
+      } else {
+        isVideoMode.value = false;
+      }
     }
   }
 
@@ -56,13 +72,44 @@ class PostPageController extends GetxController {
   }
 
   void createPost() {
-    if (textController.text.trim().isEmpty && !hasImage.value) {
-      Get.snackbar(
-        "แจ้งเตือน",
-        "กรุณาพิมพ์ข้อความหรือเลือกรูปภาพก่อนโพสต์",
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return;
+    if (composerMode.value == PostComposerMode.homeVideoOnly) {
+      if (!hasImage.value || selectedImagePath.value.isEmpty) {
+        Get.snackbar(
+          "แจ้งเตือน",
+          "กรุณาเลือกวิดีโอก่อนโพสต์",
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+      if (!isVideoMode.value) {
+        Get.snackbar(
+          "แจ้งเตือน",
+          "โพสต์จากหน้า Home รองรับเฉพาะวิดีโอเท่านั้น",
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+    } else {
+      if (textController.text.trim().isEmpty && !hasImage.value) {
+        Get.snackbar(
+          "แจ้งเตือน",
+          "กรุณาพิมพ์ข้อความหรือเลือกรูปภาพก่อนโพสต์",
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
+      if (isVideoMode.value) {
+        Get.snackbar(
+          "แจ้งเตือน",
+          "โพสต์จากหน้า Feed รองรับเฉพาะข้อความหรือรูปภาพเท่านั้น",
+          snackPosition: SnackPosition.BOTTOM,
+          duration: const Duration(seconds: 3),
+        );
+        return;
+      }
     }
 
     // 💡 เงื่อนไขแยกทาง: ถ่ายวิดีโอไปคลิปสั้น(Home) / รูปภาพไป Feed
@@ -94,17 +141,42 @@ class PostPage extends StatelessWidget {
   // 💡 1. เพิ่มการรับค่าไฟล์และสถานะวิดีโอจากหน้า Home
   final XFile? mediaFile;
   final bool isVideo;
+  final PostComposerMode mode;
 
-  PostPage({super.key, this.mediaFile, this.isVideo = false}) {
+  PostPage({
+    super.key,
+    this.mediaFile,
+    this.isVideo = false,
+    this.mode = PostComposerMode.feedTextImageOnly,
+  }) {
     // 💡 2. เอาค่าที่ส่งมาจากหน้า Home ไปยัดใส่ Controller ก่อนวาด UI
     final controller = Get.isRegistered<PostPageController>()
         ? Get.find<PostPageController>()
         : Get.put(PostPageController());
 
+    controller.composerMode.value = mode;
+
     if (mediaFile != null) {
-      controller.selectedImagePath.value = mediaFile!.path;
-      controller.hasImage.value = true;
-      controller.isVideoMode.value = isVideo;
+      final path = mediaFile!.path.toLowerCase();
+      final looksLikeVideo =
+          path.endsWith('.mp4') || path.endsWith('.mov') || path.endsWith('.avi');
+
+      final allowVideo = mode == PostComposerMode.homeVideoOnly;
+      final allowImage = mode == PostComposerMode.feedTextImageOnly;
+
+      if ((looksLikeVideo || isVideo) && allowVideo) {
+        controller.selectedImagePath.value = mediaFile!.path;
+        controller.hasImage.value = true;
+        controller.isVideoMode.value = true;
+      } else if (!(looksLikeVideo || isVideo) && allowImage) {
+        controller.selectedImagePath.value = mediaFile!.path;
+        controller.hasImage.value = true;
+        controller.isVideoMode.value = false;
+      } else {
+        controller.selectedImagePath.value = '';
+        controller.hasImage.value = false;
+        controller.isVideoMode.value = false;
+      }
     } else {
       // รีเซ็ตค่าหากเปิดหน้า Post เปล่าๆ
       controller.selectedImagePath.value = '';
@@ -207,7 +279,7 @@ class PostPage extends StatelessWidget {
                       ),
                       const Spacer(),
                       GestureDetector(
-                        onTap: controller.pickImage,
+                        onTap: controller.pickAttachment,
                         child: Image.asset(
                           'assets/images/Picture.png',
                           width: 50,
@@ -262,27 +334,24 @@ class PostPage extends StatelessWidget {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(16),
-                                  child: Image.file(
-                                    File(controller.selectedImagePath.value),
-                                    width: 250,
-                                    height: 300,
-                                    fit: BoxFit.cover,
-                                    // 💡 3. ถ้าดึงปกวิดีโอไม่ได้ ให้โชว์กล่องสีเทาแทน
-                                    errorBuilder:
-                                        (context, error, stackTrace) =>
-                                            Container(
-                                              width: 250,
-                                              height: 300,
-                                              color: Colors.grey[200],
-                                              child: const Center(
-                                                child: Icon(
-                                                  Icons.video_library,
-                                                  size: 50,
-                                                  color: Colors.grey,
-                                                ),
-                                              ),
-                                            ),
-                                  ),
+                                  child: controller.isVideoMode.value
+                                      ? _VideoPreview(
+                                          videoPath:
+                                              controller.selectedImagePath.value,
+                                        )
+                                      : Image.file(
+                                          File(controller.selectedImagePath.value),
+                                          width: 250,
+                                          height: 300,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) =>
+                                                  Container(
+                                                    width: 250,
+                                                    height: 300,
+                                                    color: Colors.grey[200],
+                                                  ),
+                                        ),
                                 ),
                                 // 💡 4. ถ้าเป็นวิดีโอ ให้แปะปุ่ม Play ทับไว้ตรงกลาง
                                 if (controller.isVideoMode.value)
@@ -376,6 +445,65 @@ class PostPage extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoPreview extends StatefulWidget {
+  const _VideoPreview({required this.videoPath});
+
+  final String videoPath;
+
+  @override
+  State<_VideoPreview> createState() => _VideoPreviewState();
+}
+
+class _VideoPreviewState extends State<_VideoPreview> {
+  late final VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = VideoPlayerController.file(File(widget.videoPath))
+      ..initialize().then((_) async {
+        await _controller.setLooping(false);
+        await _controller.seekTo(Duration.zero);
+        await _controller.play();
+        await _controller.pause();
+        if (mounted) setState(() {});
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_controller.value.isInitialized) {
+      return Container(
+        width: 250,
+        height: 300,
+        color: Colors.grey[200],
+        child: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 250,
+      height: 300,
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: _controller.value.size.width,
+          height: _controller.value.size.height,
+          child: VideoPlayer(_controller),
         ),
       ),
     );

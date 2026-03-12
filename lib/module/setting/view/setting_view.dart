@@ -4,9 +4,9 @@ import 'package:flutter_application_1/module/setting/view/edit_view.dart';
 import 'package:flutter_application_1/module/setting/view/favorites_view.dart';
 // import 'package:flutter_application_1/module/setting/view/privacy_view.dart';
 import 'package:get/get.dart';
+import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart';
+import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
 
-// 💡 Import HomeController เพื่อใช้เคลียร์จุดแดงที่หน้า Home ตอนกดเมนู
-import 'package:flutter_application_1/module/home/view/home_view.dart';
 // import 'package:flutter_application_1/module/setting/view/notification_view.dart';
 
 class SettingPage extends StatelessWidget {
@@ -14,6 +14,10 @@ class SettingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final userController = Get.isRegistered<AppUserController>()
+        ? Get.find<AppUserController>()
+        : Get.put(AppUserController(), permanent: true);
+
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
@@ -56,26 +60,20 @@ class SettingPage extends StatelessWidget {
                 child: Column(
                   children: [
                     const SizedBox(height: 40),
-                    Container(
-                      width: 150,
-                      height: 150,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        image: DecorationImage(
-                          image: NetworkImage(
-                            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                          ),
-                          fit: BoxFit.cover,
-                        ),
-                      ),
+                    const AppProfileAvatar(
+                      radius: 75,
+                      borderWidth: 0,
+                      borderColor: Colors.transparent,
                     ),
                     const SizedBox(height: 20),
-                    const Text(
-                      "แมวน้ำ",
-                      style: TextStyle(
-                        color: Color(0xFF4489D7),
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
+                    Obx(
+                      () => Text(
+                        userController.displayName.value,
+                        style: const TextStyle(
+                          color: Color(0xFF4489D7),
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 30),
@@ -85,10 +83,7 @@ class SettingPage extends StatelessWidget {
                       Image.asset("assets/images/bell.png"),
                       "แจ้งเตือน",
                       () {
-                        if (Get.isRegistered<HomeController>()) {
-                          Get.find<HomeController>().hasNewNotification.value =
-                              false;
-                        }
+                        userController.hasNewNotification.value = false;
                         Get.to(() => NotiPage());
                       },
                     ),

@@ -251,7 +251,7 @@ class ShopPage extends StatelessWidget {
                     "เปลี่ยนไอเท็มเรียบร้อย!",
                     backgroundColor: Colors.blueAccent,
                     colorText: Colors.white,
-                    duration: const Duration(seconds: 1),
+                    duration: const Duration(seconds: 3),
                   );
                   // ใส่ Logic การเปลี่ยนชุดตรงนี้ได้เลย
                 },
@@ -293,7 +293,7 @@ class ShopPage extends StatelessWidget {
                       "ซื้อของเรียบร้อย!",
                       backgroundColor: Colors.green,
                       colorText: Colors.white,
-                      duration: const Duration(seconds: 1),
+                      duration: const Duration(seconds: 3),
                     );
                   } else {
                     // เงินไม่พอ
@@ -302,6 +302,7 @@ class ShopPage extends StatelessWidget {
                       "ไปเก็บเหรียญเพิ่มก่อนนะ",
                       backgroundColor: Colors.redAccent,
                       colorText: Colors.white,
+                      duration: const Duration(seconds: 3),
                     );
                   }
                 },

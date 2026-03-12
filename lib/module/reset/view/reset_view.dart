@@ -29,7 +29,7 @@ class ResetPasswordController extends GetxController {
       backgroundColor: Colors.orangeAccent,
       colorText: Colors.white,
       margin: const EdgeInsets.all(15),
-      duration: const Duration(seconds: 2),
+      duration: const Duration(seconds: 3),
     );
   }
 }

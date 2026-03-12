@@ -107,6 +107,7 @@ class RegisterController extends GetxController {
         'สมัครสำเร็จ! ถ้าเปิดยืนยันอีเมล ให้ไปกดยืนยันก่อนล็อกอิน',
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
       Get.off(() => LoginPage());
       return null;
@@ -412,6 +413,7 @@ class RegisterPage extends StatelessWidget {
                                   errorText,
                                   backgroundColor: Colors.red,
                                   colorText: Colors.white,
+                                  duration: const Duration(seconds: 3),
                                 );
                               }
                             },

@@ -6,6 +6,8 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart';
+
 import 'supabase_client.dart';
 import 'module/home/view/home_view.dart';
 import 'module/login/view/login_view.dart';
@@ -27,6 +29,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!Get.isRegistered<AppUserController>()) {
+      Get.put(AppUserController(), permanent: true);
+    }
+
     return GetMaterialApp(
       // locale: const Locale('th', 'TH'),
       debugShowCheckedModeBanner: false,

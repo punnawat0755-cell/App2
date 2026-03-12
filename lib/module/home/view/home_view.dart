@@ -7,6 +7,7 @@ import 'package:flutter_application_1/module/home/view/widget/home_widgets.dart'
 import 'package:flutter_application_1/module/home/view/widget/article/article_card.dart';
 import 'package:flutter_application_1/module/home/view/widget/article/article_detail.dart';
 import 'package:flutter_application_1/module/setting/view/setting_view.dart';
+import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -17,8 +18,6 @@ class HomeController extends GetxController {
   final RxInt currentBannerIndex = 0.obs;
   late final PageController pageController;
   Timer? timer;
-
-  var hasNewNotification = true.obs;
 
   final ImagePicker _picker = ImagePicker();
   final RxString selectedVideoPath = ''.obs;
@@ -60,33 +59,30 @@ class HomeController extends GetxController {
     clipList.insert(0, {
       "title": "seal",
       "subtitle": "Just now",
-      // ใช้ภาพจำลองเป็นปกวิดีโอชั่วคราว
-      "imagePath":
-          "https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg",
-      "page": null,
+      // ใช้ path วิดีโอจริงเป็น thumbnail (ดึงเฟรมแรกจากไฟล์)
+      "imagePath": videoPath,
+      "videoPath": videoPath,
+      "caption": caption,
     });
   }
 
   // 💡 4. แก้ไข pickMedia ให้เด้งไปหน้า Post
   Future<void> pickMedia() async {
     try {
-      // ใช้ pickMedia เพื่อให้รองรับได้ทั้งรูปและวิดีโอ
-      final XFile? file = await _picker.pickMedia();
+      // โพสต์จากหน้า Home รองรับเฉพาะวิดีโอ
+      final XFile? file = await _picker.pickVideo(source: ImageSource.gallery);
 
       if (file != null) {
         selectedVideoPath.value = file.path;
 
-        // เช็คว่าเป็นวิดีโอหรือรูป
-        final path = file.path.toLowerCase();
-        bool isVideo =
-            path.endsWith('.mp4') ||
-            path.endsWith('.mov') ||
-            path.endsWith('.avi');
-
         print("เลือกไฟล์สำเร็จ! ไปหน้าโพสต์...");
 
-        // เด้งไปหน้า PostPage พร้อมแนบไฟล์และสถานะไปให้
-        Get.to(() => PostPage(mediaFile: file, isVideo: isVideo));
+        // เปิดหน้า Post แบบ BottomSheet ให้ UI เหมือนกันทุกจุด
+        showPostSheet(
+          mediaFile: file,
+          isVideo: true,
+          mode: PostComposerMode.homeVideoOnly,
+        );
       } else {
         print("ผู้ใช้ยกเลิกการเลือก");
       }
@@ -176,49 +172,11 @@ class HomePage extends StatelessWidget {
                   Row(
                     children: [
                       const SizedBox(width: 8),
-                      Obx(
-                        () => Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            GestureDetector(
-                              onTap: () => Get.to(() => const SettingPage()),
-                              child: Container(
-                                width: 50,
-                                height: 50,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 2,
-                                  ),
-                                  image: const DecorationImage(
-                                    image: NetworkImage(
-                                      'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                                    ),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            // 🔴 จุดสีแดง
-                            if (controller.hasNewNotification.value)
-                              Positioned(
-                                top: -4,
-                                right: -5,
-                                child: Container(
-                                  width: 20,
-                                  height: 20,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFEE6855),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 2,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
+                      GestureDetector(
+                        onTap: () => Get.to(() => const SettingPage()),
+                        child: const AppProfileAvatar(
+                          radius: 25,
+                          showNotificationDot: true,
                         ),
                       ),
                     ],
@@ -324,8 +282,22 @@ class HomePage extends StatelessWidget {
 
                       final item = controller.clipList[index - 1];
                       return InkWell(
-                        onTap: () =>
-                            item['page'] != null ? Get.to(item['page']) : null,
+                        onTap: () {
+                          final String? videoPath = item['videoPath'];
+                          if (videoPath != null && videoPath.isNotEmpty) {
+                            Get.to(
+                              () => PlayVideo(
+                                videoPath: videoPath,
+                                uploaderName: item['title'] ?? 'Unknown',
+                                caption: item['caption'] ?? '',
+                              ),
+                            );
+                            return;
+                          }
+
+                          final page = item['page'];
+                          if (page != null) Get.to(page);
+                        },
                         child: ClipCard(
                           title: item['title'],
                           subtitle: item['subtitle'],

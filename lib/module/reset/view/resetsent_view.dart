@@ -40,6 +40,7 @@ class ResetSentController extends GetxController {
         'รหัสถูกต้อง',
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
       return;
     }
@@ -50,6 +51,7 @@ class ResetSentController extends GetxController {
       backgroundColor: Colors.redAccent,
       colorText: Colors.white,
       snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 3),
     );
   }
 }

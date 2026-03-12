@@ -7,6 +7,9 @@ import 'package:get/get.dart';
 // 1. Class Pet (Logic Controller) - แก้ไขแล้ว
 // ==========================================
 class Pet extends GetxController {
+  static const int maxFoodCount = 5;
+  static const int refillSeconds = 5 * 60 * 60; // 5 ชั่วโมง/ปลา 1 ตัว
+
   var ownedItems = <int>[].obs;
 
   // --- ตัวแปรทั่วไป ---
@@ -17,10 +20,11 @@ class Pet extends GetxController {
   var showFrame = false.obs;
 
   // --- ตัวแปรระบบอาหาร (ปลาซ้าย) ---
-  var foodCount = 3.obs;
+  var foodCount = maxFoodCount.obs;
   var remainingTime = "00:00:00".obs;
   var isTimerRunning = false.obs;
   Timer? _timer;
+  int _secondsLeft = 0;
 
   @override
   void onClose() {
@@ -44,6 +48,7 @@ class Pet extends GetxController {
         backgroundColor: Colors.redAccent,
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 3),
         margin: const EdgeInsets.all(10),
       );
       return;
@@ -67,14 +72,12 @@ class Pet extends GetxController {
       backgroundColor: Colors.green,
       colorText: Colors.white,
       snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 1),
+      duration: const Duration(seconds: 3),
       margin: const EdgeInsets.all(10),
     );
 
-    // 3. เริ่มจับเวลาถ้าของหมด
-    if (foodCount.value == 0) {
-      _startTimer(6 * 60 * 60);
-    }
+    // 3. เมื่อปลาไม่เต็ม 5 ให้เริ่ม/เดินเวลาถอยหลัง (5 ชม./ปลา 1 ตัว)
+    _ensureRefillTimer();
   }
 
   // -----------------------------------------------------------------------
@@ -97,7 +100,7 @@ class Pet extends GetxController {
         backgroundColor: Colors.amber,
         colorText: Colors.black,
         snackPosition: SnackPosition.TOP,
-        duration: const Duration(milliseconds: 800),
+        duration: const Duration(seconds: 3),
         margin: const EdgeInsets.all(10),
       );
     } else {
@@ -107,9 +110,27 @@ class Pet extends GetxController {
         backgroundColor: Colors.redAccent,
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 3),
         margin: const EdgeInsets.all(10),
       );
     }
+  }
+
+  void _ensureRefillTimer() {
+    if (foodCount.value >= maxFoodCount) {
+      _stopRefillTimer();
+      return;
+    }
+    if (isTimerRunning.value) return;
+    _startTimer(refillSeconds);
+  }
+
+  void _stopRefillTimer() {
+    _timer?.cancel();
+    _timer = null;
+    isTimerRunning.value = false;
+    _secondsLeft = 0;
+    remainingTime.value = "00:00:00";
   }
 
   // --- Logic การนับเวลา ---
@@ -117,27 +138,39 @@ class Pet extends GetxController {
     _timer?.cancel();
     isTimerRunning.value = true;
 
-    var duration = Duration(seconds: seconds);
-    remainingTime.value = _printDuration(duration);
+    _secondsLeft = seconds;
+    remainingTime.value = _printDuration(Duration(seconds: _secondsLeft));
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (duration.inSeconds > 0) {
-        duration = duration - const Duration(seconds: 1);
-        remainingTime.value = _printDuration(duration);
-      } else {
-        timer.cancel();
-        isTimerRunning.value = false;
-
-        foodCount.value++;
-        remainingTime.value = "00:00:00";
-
-        Get.snackbar(
-          "ปลามาแล้ว!",
-          "ได้รับปลาฟรี 1 ตัวจากการรอ",
-          backgroundColor: Colors.blueAccent,
-          colorText: Colors.white,
-        );
+      if (foodCount.value >= maxFoodCount) {
+        _stopRefillTimer();
+        return;
       }
+
+      if (_secondsLeft > 0) {
+        _secondsLeft--;
+        remainingTime.value = _printDuration(Duration(seconds: _secondsLeft));
+        return;
+      }
+
+      // ครบเวลา: เติมปลา 1 ตัว แล้ววนต่อจนเต็ม 5
+      foodCount.value =
+          (foodCount.value + 1).clamp(0, maxFoodCount).toInt();
+      Get.snackbar(
+        "ปลามาแล้ว!",
+        "ได้รับปลาฟรี 1 ตัวจากการรอ",
+        backgroundColor: Colors.blueAccent,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 3),
+      );
+
+      if (foodCount.value >= maxFoodCount) {
+        _stopRefillTimer();
+        return;
+      }
+
+      _secondsLeft = refillSeconds;
+      remainingTime.value = _printDuration(Duration(seconds: _secondsLeft));
     });
   }
 
@@ -503,16 +536,18 @@ class PetPage extends StatelessWidget {
         children: [
           // 1. ปุ่มซ้าย (Fish 1 - ใช้จำนวนตัว)
           Obx(() {
-            bool isOutOfFood = controller.foodCount.value == 0;
+            final bool showTimer =
+                controller.isTimerRunning.value &&
+                controller.foodCount.value < Pet.maxFoodCount;
 
             return _buildItemCard(
               imagePath: 'assets/images/fish1.png',
               customImageSize: 90,
               customImageBottom: 10,
               labelWidget: Text(
-                isOutOfFood ? controller.remainingTime.value : "00:00:00",
+                showTimer ? controller.remainingTime.value : "00:00:00",
                 style: TextStyle(
-                  color: isOutOfFood ? Colors.grey : const Color(0xFF1565C0),
+                  color: showTimer ? Colors.grey : const Color(0xFF1565C0),
                   fontWeight: FontWeight.w900,
                   fontSize: 16,
                 ),
@@ -643,8 +678,6 @@ class PetPage extends StatelessWidget {
             ),
             Positioned(
               bottom: imageBottom,
-              left: 0,
-              right: 0,
               child: Center(
                 child: Image.asset(
                   imagePath,
@@ -657,12 +690,7 @@ class PetPage extends StatelessWidget {
               ),
             ),
             if (topBadgeWidget != null)
-              Positioned(
-                top: 25,
-                left: 0,
-                right: 0,
-                child: Center(child: topBadgeWidget),
-              ),
+              Positioned(top: 25, child: Center(child: topBadgeWidget)),
             if (badgeCount > 0)
               Positioned(
                 top: 23,

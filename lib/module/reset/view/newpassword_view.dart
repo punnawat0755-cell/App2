@@ -32,6 +32,7 @@ class NewPasswordController extends GetxController {
         snackPosition: SnackPosition.TOP,
         backgroundColor: Colors.green,
         colorText: Colors.white,
+        duration: const Duration(seconds: 3),
       );
       Get.offAll(() => LoginPagetwo());
       return;
@@ -43,6 +44,7 @@ class NewPasswordController extends GetxController {
       snackPosition: SnackPosition.TOP,
       backgroundColor: Colors.redAccent,
       colorText: Colors.white,
+      duration: const Duration(seconds: 3),
     );
   }
 }

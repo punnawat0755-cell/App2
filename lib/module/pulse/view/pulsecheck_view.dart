@@ -115,6 +115,7 @@ class PulsecheckController extends GetxController {
         backgroundColor: Colors.redAccent,
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 3),
         margin: const EdgeInsets.all(15),
       );
       return;

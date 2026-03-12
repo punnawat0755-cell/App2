@@ -103,11 +103,8 @@ class FeedPage extends StatelessWidget {
               ),
               Divider(thickness: 1, color: Colors.grey.shade200),
               GestureDetector(
-                onTap: () => Get.bottomSheet(
-                  PostPage(),
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                ),
+                onTap: () =>
+                    showPostSheet(mode: PostComposerMode.feedTextImageOnly),
                 child: Container(
                   color: Colors.white,
                   padding: const EdgeInsets.symmetric(

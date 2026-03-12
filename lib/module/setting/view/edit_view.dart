@@ -5,12 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart'; // 💡 2. Import สำหรับเลือกรูปจากเครื่อง
+import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart';
 
 // ==========================================
 // 💡 Controller
 // ==========================================
 class EditProfileController extends GetxController {
   final RxnString activeField = RxnString();
+  late final AppUserController userController;
 
   // --- ข้อมูลรูปโปรไฟล์ ---
   final RxString profileImagePath = ''.obs; // 💡 เก็บ path รูปที่เลือก
@@ -40,6 +42,15 @@ class EditProfileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    userController = Get.isRegistered<AppUserController>()
+        ? Get.find<AppUserController>()
+        : Get.put(AppUserController(), permanent: true);
+
+    if (userController.avatarLocalPath.value.isNotEmpty) {
+      profileImagePath.value = userController.avatarLocalPath.value;
+    }
+    username.value = userController.displayName.value;
+
     originalName = username.value;
     originalPassword = passwordValue.value;
     originalEmail = emailFull.value;
@@ -67,6 +78,7 @@ class EditProfileController extends GetxController {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       profileImagePath.value = image.path;
+      userController.avatarLocalPath.value = image.path;
     }
   }
 
@@ -123,6 +135,7 @@ class EditProfileController extends GetxController {
           ? originalName
           : nameController.text;
       originalName = username.value;
+      userController.displayName.value = username.value;
     } else if (activeField.value == 'password') {
       passwordValue.value = passwordController.text.isEmpty
           ? originalPassword
@@ -218,8 +231,8 @@ class EditProfilePage extends StatelessWidget {
                                       File(controller.profileImagePath.value),
                                     )
                                     as ImageProvider
-                              : const NetworkImage(
-                                  'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
+                              : NetworkImage(
+                                  controller.userController.avatarUrl.value,
                                 ),
                         ),
                       ),

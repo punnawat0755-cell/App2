@@ -1,10 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/bottonbar.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:get/get.dart';
-// อย่าลืมเช็ค path ของไฟล์เหล่านี้ให้ตรงกับโปรเจกต์ของคุณด้วยนะครับ
-import 'package:flutter_application_1/module/chat/view/feedback_page.dart';
-import 'package:flutter_application_1/module/chat/view/chatconfirmdialog.dart';
 
 // ==========================================
 // 1. Controller: นำระบบ Timer จากหน้าสีฟ้ามาใส่
@@ -30,25 +28,20 @@ class PauseChatController extends GetxController
   void startTimer() {
     timer?.cancel();
     timer = Timer(const Duration(seconds: 6), () {
-      Get.off(() => ChatPage()); // ครบ 6 วิ ให้ไปหน้า Chat
+      Get.off(
+        () => ChatPage(showPartnerPausedNotice: true),
+      ); // ครบ 6 วิ ให้ไปหน้า Chat พร้อมแจ้งเตือนพักการแชท
     });
   }
 
-  // 💡 ฟังก์ชันแสดง Popup (ทำงานเหมือนหน้าสีฟ้าเป๊ะ)
-  void showExitDialog(BuildContext context) {
-    timer?.cancel(); // หยุดเวลาชั่วคราวตอนที่ Popup เด้งขึ้นมา
-    showChatConfirmDialog(
-      title: "คุณต้องการที่จะออกจากบทสนทนา\nใช่หรือไม่",
-      barrierDismissible: false, // บังคับให้ต้องกดปุ่มยืนยัน/ยกเลิกเท่านั้น
-      onConfirm: () {
-        Get.back(); // ปิด Popup
-        Get.to(() => FeedbackPage()); // ยืนยันจบสนทนา ไปหน้า feedback
-      },
-      onCancel: () {
-        Get.back(); // ปิด Popup
-        startTimer(); // ถ้ายกเลิก ให้กลับมาจับเวลาต่อ
-      },
-    );
+  void goHome() {
+    timer?.cancel();
+    if (Get.isRegistered<BottomNavController>()) {
+      Get.find<BottomNavController>().changePage(0);
+      Get.until((route) => route.isFirst);
+      return;
+    }
+    Get.offAll(() => BottomNavBar());
   }
 
   @override
@@ -79,9 +72,7 @@ class PauseChatPage extends StatelessWidget {
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        controller.showExitDialog(
-          context,
-        ); // เรียก Popup ถ้ายูสเซอร์พยายามกด Back
+        controller.goHome(); // กด back ให้กลับหน้า Home ทันที
       },
       child: Scaffold(
         backgroundColor: Colors.white,
@@ -103,8 +94,7 @@ class PauseChatPage extends StatelessWidget {
                         width: 25,
                         height: 25,
                       ),
-                      onPressed: () =>
-                          controller.showExitDialog(context), // 💡 ผูกกับ Popup
+                      onPressed: controller.goHome,
                     ),
                     // const SizedBox(width: 0),
                     const Expanded(
