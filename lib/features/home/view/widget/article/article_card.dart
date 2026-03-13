@@ -16,8 +16,7 @@ class ArticleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // เช็คว่าเป็นรูปจากเน็ตหรือในเครื่อง
-    bool isNetworkImage = imagePath.startsWith('http');
+    final isNetworkImage = imagePath.startsWith('http');
 
     return GestureDetector(
       onTap: onTap,
@@ -25,10 +24,12 @@ class ArticleCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE9E9E9), width: 1.2),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withValues(alpha: 0.07),
               blurRadius: 10,
+              spreadRadius: 0,
               offset: const Offset(0, 4),
             ),
           ],
@@ -47,12 +48,13 @@ class ArticleCard extends StatelessWidget {
                         height: 110,
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        // เพิ่ม errorBuilder เผื่อโหลดรูปไม่ได้
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 110,
                           color: Colors.grey[200],
-                          child: const Icon(Icons.broken_image,
-                              color: Colors.grey),
+                          child: const Icon(
+                            Icons.broken_image,
+                            color: Colors.grey,
+                          ),
                         ),
                       )
                     : Image.asset(
@@ -63,14 +65,15 @@ class ArticleCard extends StatelessWidget {
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 110,
                           color: Colors.grey[200],
-                          child: const Icon(Icons.image_not_supported,
-                              color: Colors.grey),
+                          child: const Icon(
+                            Icons.image_not_supported,
+                            color: Colors.grey,
+                          ),
                         ),
                       ),
               ),
               const SizedBox(height: 12),
 
-              // ส่วนข้อความ
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Column(
