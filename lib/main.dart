@@ -47,6 +47,14 @@ class MyApp extends StatelessWidget {
 
         // ถ้าต้องการปรับสีหลักด้วย (Optional)
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+
+        // ทำให้หัวข้อวันที่ของปฏิทิน (showDatePicker) ขนาดเท่ากันทั้งแอป
+        datePickerTheme: DatePickerThemeData(
+          headerHeadlineStyle: GoogleFonts.mitr(
+            fontSize: 20,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
       ),
       home: BottomNavBar(),
     );

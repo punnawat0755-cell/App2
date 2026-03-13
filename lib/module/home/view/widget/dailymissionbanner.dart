@@ -3,8 +3,42 @@ import 'package:flutter/material.dart';
 class DailyMissionBanner extends StatelessWidget {
   const DailyMissionBanner({super.key});
 
+  Future<void> _openCalendar(BuildContext context) async {
+    await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1950),
+      lastDate: DateTime.now(),
+    );
+  }
+
+  int _currentWhaleStreak() {
+    final now = DateTime.now();
+    final lastDayToCount = now.day;
+
+    bool hasWhale(int day) {
+      final isWhaleDay = (day >= 1 && day <= 8) || (day >= 15 && day <= 18);
+      return isWhaleDay && day <= now.day;
+    }
+
+    final stack = <int>[];
+    var streak = 0;
+    for (var day = 1; day <= lastDayToCount; day++) {
+      if (hasWhale(day)) {
+        streak++;
+      } else if (streak > 0) {
+        stack.add(streak);
+        streak = 0;
+      }
+    }
+    if (streak > 0) stack.add(streak);
+    return stack.isEmpty ? 0 : stack.last;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final whaleStreak = _currentWhaleStreak();
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
       decoration: BoxDecoration(
@@ -29,11 +63,15 @@ class DailyMissionBanner extends StatelessWidget {
             left: 10,
             top: 20,
             bottom: 20,
-            child: Image.asset(
-              'assets/images/list.png',
-              fit: BoxFit.contain,
-              height: 200,
-              width: 90,
+            child: GestureDetector(
+              onTap: () => _openCalendar(context),
+              behavior: HitTestBehavior.opaque,
+              child: Image.asset(
+                'assets/images/list.png',
+                fit: BoxFit.contain,
+                height: 200,
+                width: 90,
+              ),
             ),
           ),
           Positioned(
@@ -63,10 +101,11 @@ class DailyMissionBanner extends StatelessWidget {
                   children: [
                     Image.asset('assets/images/k1.png'),
                     const SizedBox(width: 5),
-                    const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        Text(
+                        const Text(
                           'DAY',
                           style: TextStyle(
                             color: Color(0xFF4489D7),
@@ -75,8 +114,8 @@ class DailyMissionBanner extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          '138',
-                          style: TextStyle(
+                          '$whaleStreak',
+                          style: const TextStyle(
                             color: Color(0xFF4489D7),
                             fontWeight: FontWeight.bold,
                             fontSize: 26,
