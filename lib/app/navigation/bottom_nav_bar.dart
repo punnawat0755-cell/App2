@@ -12,6 +12,7 @@ import 'package:flutter_application_1/features/profile/view/profile_view.dart';
 import 'package:flutter_application_1/features/chat_user/bindings/chat_binding.dart';
 import 'package:flutter_application_1/features/chat_user/services/chat_user_service.dart';
 import 'package:flutter_application_1/features/chat_user/models/pausechat.dart';
+import 'package:flutter_application_1/rolelogic/view/widget/rolelogic_view.dart';
 
 class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key});
@@ -25,6 +26,9 @@ class _BottomNavBarState extends State<BottomNavBar>
   int _page = 0;
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
   bool _checkingPausedChat = false;
+  bool _runningEntryFlow = false;
+  bool _checkingRoleMode = false;
+  bool _roleSelectionPageOpen = false;
   bool _checkingDailyMood = false;
   bool _dailyMoodPageOpen = false;
 
@@ -41,7 +45,7 @@ class _BottomNavBarState extends State<BottomNavBar>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _openDailyMoodIfNeeded();
+      _openRequiredDailyFlowIfNeeded();
     });
   }
 
@@ -54,7 +58,7 @@ class _BottomNavBarState extends State<BottomNavBar>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _openDailyMoodIfNeeded();
+      _openRequiredDailyFlowIfNeeded();
     }
   }
 
@@ -95,11 +99,6 @@ class _BottomNavBarState extends State<BottomNavBar>
       return;
     }
 
-    final currentRoute = ModalRoute.of(context);
-    if (currentRoute != null && !currentRoute.isCurrent) {
-      return;
-    }
-
     _checkingDailyMood = true;
     try {
       final answeredToday = await DailyMoodStatusService.hasAnsweredToday();
@@ -121,6 +120,53 @@ class _BottomNavBarState extends State<BottomNavBar>
     } finally {
       _checkingDailyMood = false;
       _dailyMoodPageOpen = false;
+    }
+  }
+
+  Future<void> _openRoleSelectionIfNeeded() async {
+    if (!mounted || _checkingRoleMode || _roleSelectionPageOpen) {
+      return;
+    }
+
+    _checkingRoleMode = true;
+    try {
+      _roleSelectionPageOpen = true;
+      final message = await Get.to<String>(() => const RoleSelectionPage());
+      _roleSelectionPageOpen = false;
+
+      if (!mounted || message == null || message.isEmpty) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      _checkingRoleMode = false;
+      _roleSelectionPageOpen = false;
+    }
+  }
+
+  Future<void> _openRequiredDailyFlowIfNeeded() async {
+    if (!mounted || _runningEntryFlow) {
+      return;
+    }
+
+    final currentRoute = ModalRoute.of(context);
+    if (currentRoute != null && !currentRoute.isCurrent) {
+      return;
+    }
+
+    _runningEntryFlow = true;
+    try {
+      await _openRoleSelectionIfNeeded();
+      if (!mounted) {
+        return;
+      }
+
+      await _openDailyMoodIfNeeded();
+    } finally {
+      _runningEntryFlow = false;
     }
   }
 
