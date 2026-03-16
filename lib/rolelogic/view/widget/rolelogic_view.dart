@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
 import 'package:flutter_application_1/rolelogic/view/widget/choice_card.dart';
-import 'package:flutter_application_1/rolelogic/view/widget/test_view.dart';
+import 'package:flutter_application_1/rolelogic/view/widget/role_quiz_view.dart';
 
 class RoleSelectionPage extends StatefulWidget {
   const RoleSelectionPage({super.key});

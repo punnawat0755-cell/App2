@@ -24,7 +24,7 @@ class QuizSelectionResult {
 }
 
 // --------------------------------------------------------
-// 2. หน้าจอ UI หลัก
+// 2. หน้าจอควิซหลัก
 // --------------------------------------------------------
 class QuizScreen extends StatelessWidget {
   QuizScreen({super.key});
