@@ -5,6 +5,7 @@ class FeedPost {
     required this.authorName,
     required this.authorAvatarUrl,
     required this.content,
+    this.imageUrl,
     required this.likeCount,
     required this.commentCount,
     required this.createdAt,
@@ -15,6 +16,7 @@ class FeedPost {
   final String authorName;
   final String authorAvatarUrl;
   final String content;
+  final String? imageUrl;
   final int likeCount;
   final int commentCount;
   final DateTime createdAt;
@@ -28,6 +30,9 @@ class FeedPost {
           : 'ผู้ใช้',
       authorAvatarUrl: map['author_avatar_url']?.toString().trim() ?? '',
       content: map['content_text']?.toString().trim() ?? '',
+      imageUrl: _toOptionalText(
+        map['image_url'] ?? map['media_url'] ?? map['image_path'],
+      ),
       likeCount: _toInt(map['like_count']),
       commentCount: _toInt(map['comment_count']),
       createdAt: _toDateTime(map['created_at']),
@@ -45,5 +50,13 @@ class FeedPost {
 
     final parsed = DateTime.tryParse(value?.toString() ?? '');
     return parsed?.toLocal() ?? DateTime.now();
+  }
+
+  static String? _toOptionalText(dynamic value) {
+    final text = value?.toString().trim();
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+    return text;
   }
 }

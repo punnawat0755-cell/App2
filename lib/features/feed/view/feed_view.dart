@@ -3,10 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
-import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
 import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
+import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
 import 'package:flutter_application_1/supabase_client.dart';
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FeedPage extends StatefulWidget {
@@ -17,7 +16,7 @@ class FeedPage extends StatefulWidget {
 }
 
 class _FeedPageState extends State<FeedPage> {
-  static const _brandBlue = Color(0xFF4A89D8);
+  static const _brandBlue = Color(0xFF4489D7);
 
   final FeedRepository _repository = FeedRepository();
   final User? _currentUser = supabase.auth.currentUser;
@@ -62,15 +61,17 @@ class _FeedPageState extends State<FeedPage> {
   }
 
   Future<void> _openComposer() async {
-    final created = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => _FeedComposerPage(
-          repository: _repository,
-          composerName: _composerName,
-          composerAvatarUrl: _composerAvatarUrl,
-        ),
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FeedComposerSheet(
+        repository: _repository,
+        composerName: _composerName,
+        composerAvatarUrl: _composerAvatarUrl,
       ),
     );
+
     if (!mounted || created != true) return;
     _showSnackBar('โพสต์ของคุณถูกเผยแพร่แล้ว');
   }
@@ -162,7 +163,6 @@ class _FeedPageState extends State<FeedPage> {
         child: Column(
           children: [
             _FeedHeader(
-              composerName: _composerName,
               composerAvatarUrl: _composerAvatarUrl,
               isLoadingComposer: _isLoadingComposer,
               onComposerTap: _openComposer,
@@ -220,7 +220,6 @@ class _FeedPageState extends State<FeedPage> {
                             return FeedPostCard(
                               post: post,
                               isLiked: isLiked,
-                              isOwnPost: post.authorId == currentUser.id,
                               onAuthorTap: () => _openAuthorProfile(post),
                               onToggleLike: _repository.supportsLikeActions
                                   ? () => _toggleLike(post, isLiked)
@@ -320,6 +319,10 @@ class FeedProfilePage extends StatelessWidget {
     }
   }
 
+  Future<void> _refreshProfile() async {
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -327,20 +330,35 @@ class FeedProfilePage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.white,
-        title: Text(authorName),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.grey),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
       ),
       body: StreamBuilder<List<FeedPost>>(
         stream: repository.watchPostsByAuthor(authorId),
         builder: (context, postSnapshot) {
           if (postSnapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'โหลดโปรไฟล์ไม่สำเร็จ\n${postSnapshot.error}',
-                  textAlign: TextAlign.center,
+            return ListView(
+              children: [
+                _ProfileHeader(
+                  authorName: authorName,
+                  authorAvatarUrl: authorAvatarUrl,
+                  postCount: 0,
+                  totalLikes: 0,
                 ),
-              ),
+                Divider(thickness: 1, color: Colors.grey.shade300),
+                const SizedBox(height: 32),
+                SizedBox(
+                  height: 280,
+                  child: _FeedMessageState(
+                    icon: Icons.cloud_off_rounded,
+                    title: 'โหลดโปรไฟล์ไม่สำเร็จ',
+                    subtitle: '${postSnapshot.error}',
+                  ),
+                ),
+              ],
             );
           }
 
@@ -360,25 +378,41 @@ class FeedProfilePage extends StatelessWidget {
               final resolvedAuthorAvatarUrl = posts.isNotEmpty
                   ? posts.first.authorAvatarUrl
                   : authorAvatarUrl;
-              final items = <Widget>[
-                _ProfileHeader(
-                  authorName: authorName,
-                  authorAvatarUrl: resolvedAuthorAvatarUrl,
-                  postCount: posts.length,
-                  totalLikes: totalLikes,
-                ),
-                if (posts.isEmpty)
-                  const _FeedMessageState(
-                    icon: Icons.article_outlined,
-                    title: 'ยังไม่มีโพสต์',
-                    subtitle: 'เมื่อผู้ใช้คนนี้เริ่มโพสต์ ข้อความจะขึ้นที่นี่',
-                  )
-                else
-                  ...posts.map(
-                    (post) => FeedPostCard(
+
+              return RefreshIndicator(
+                onRefresh: _refreshProfile,
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.only(bottom: 32),
+                  itemCount: posts.isEmpty ? 2 : posts.length + 1,
+                  separatorBuilder: (context, index) =>
+                      Divider(thickness: 1, color: Colors.grey.shade200),
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return _ProfileHeader(
+                        authorName: authorName,
+                        authorAvatarUrl: resolvedAuthorAvatarUrl,
+                        postCount: posts.length,
+                        totalLikes: totalLikes,
+                      );
+                    }
+
+                    if (posts.isEmpty) {
+                      return const SizedBox(
+                        height: 280,
+                        child: _FeedMessageState(
+                          icon: Icons.article_outlined,
+                          title: 'ยังไม่มีโพสต์',
+                          subtitle:
+                              'เมื่อผู้ใช้คนนี้เริ่มโพสต์ ข้อความจะขึ้นที่นี่',
+                        ),
+                      );
+                    }
+
+                    final post = posts[index - 1];
+                    return FeedPostCard(
                       post: post,
                       isLiked: likedPostIds.contains(post.id),
-                      isOwnPost: post.authorId == currentUserId,
                       onAuthorTap: null,
                       onToggleLike: repository.supportsLikeActions
                           ? () => _toggleLike(
@@ -390,18 +424,9 @@ class FeedProfilePage extends StatelessWidget {
                       onDelete: post.authorId == currentUserId
                           ? () => _deletePost(context, post)
                           : null,
-                    ),
-                  ),
-              ];
-
-              return ListView.separated(
-                padding: const EdgeInsets.only(bottom: 32),
-                separatorBuilder: (context, index) =>
-                    Divider(thickness: 1, color: Colors.grey.shade200),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  return items[index];
-                },
+                    );
+                  },
+                ),
               );
             },
           );
@@ -411,8 +436,8 @@ class FeedProfilePage extends StatelessWidget {
   }
 }
 
-class _FeedComposerPage extends StatefulWidget {
-  const _FeedComposerPage({
+class _FeedComposerSheet extends StatefulWidget {
+  const _FeedComposerSheet({
     required this.repository,
     required this.composerName,
     required this.composerAvatarUrl,
@@ -423,11 +448,12 @@ class _FeedComposerPage extends StatefulWidget {
   final String composerAvatarUrl;
 
   @override
-  State<_FeedComposerPage> createState() => _FeedComposerPageState();
+  State<_FeedComposerSheet> createState() => _FeedComposerSheetState();
 }
 
-class _FeedComposerPageState extends State<_FeedComposerPage> {
+class _FeedComposerSheetState extends State<_FeedComposerSheet> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   bool _isSubmitting = false;
 
   String _messageForModerationReason(String reason) {
@@ -439,8 +465,19 @@ class _FeedComposerPageState extends State<_FeedComposerPage> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -484,99 +521,210 @@ class _FeedComposerPageState extends State<_FeedComposerPage> {
     }
   }
 
+  void _showAttachmentMessage() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('ตอนนี้ composer นี้ยังรองรับการโพสต์ข้อความเท่านั้น'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.white,
-        title: const Text('เขียนโพสต์'),
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final canSubmit = _controller.text.trim().isNotEmpty && !_isSubmitting;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: FractionallySizedBox(
+        heightFactor: 0.85,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: Material(
+            color: Colors.white,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _AuthorAvatar(
-                    name: widget.composerName,
-                    avatarUrl: widget.composerAvatarUrl,
-                    radius: 24,
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 10),
+                      width: 45,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 5,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: [
-                        Text(
-                          widget.composerName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF25527A),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: GestureDetector(
+                            onTap: () => Navigator.of(context).maybePop(),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: Color(0xFF8D8D8D),
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                         const Text(
-                          'แชร์ความรู้สึกหรือเรื่องที่อยากเล่าได้เลย',
-                          style: TextStyle(color: Color(0xFF6D8BA3)),
+                          'NewPost',
+                          style: TextStyle(
+                            color: Color(0xFF6C6C6C),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Divider(height: 1, thickness: 1, color: Colors.grey[200]),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    child: Row(
+                      children: [
+                        _AuthorAvatar(
+                          name: widget.composerName,
+                          avatarUrl: widget.composerAvatarUrl,
+                          radius: 18,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            widget.composerName,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6C6C6C),
+                            ),
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: _showAttachmentMessage,
+                          child: Image.asset(
+                            'assets/images/Picture.png',
+                            width: 50,
+                            height: 50,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: TextField(
+                              focusNode: _focusNode,
+                              autofocus: true,
+                              controller: _controller,
+                              maxLines: null,
+                              maxLength: 120,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              style: const TextStyle(fontSize: 16),
+                              decoration: const InputDecoration(
+                                hintText: 'คุณกำลังคิดอะไรอยู่.....',
+                                hintStyle: TextStyle(
+                                  color: Color(0xFFCAC9C9),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                border: InputBorder.none,
+                                counterText: '',
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      right: 15,
+                      left: 15,
+                      top: 5,
+                      bottom: 12,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${_controller.text.length}/120',
+                              style: const TextStyle(
+                                color: Color(0xFFC3C3C3),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: canSubmit ? _submit : null,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 150),
+                                opacity: canSubmit ? 1 : 0.55,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 26,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF5CD9FF),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: _isSubmitting
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'POST',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              TextField(
-                controller: _controller,
-                maxLines: 8,
-                minLines: 6,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  hintText:
-                      'วันนี้คุณกำลังรู้สึกยังไง หรืออยากแบ่งปันอะไรกับชุมชน?',
-                  filled: true,
-                  fillColor: const Color(0xFFF5FBFF),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-                onChanged: (_) => setState(() {}),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'โพสต์จะปรากฏบน feed แบบ realtime',
-                      style: TextStyle(color: Color(0xFF7E96AC)),
-                    ),
-                  ),
-                  FilledButton(
-                    onPressed: _controller.text.trim().isEmpty || _isSubmitting
-                        ? null
-                        : _submit,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A89D8),
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('โพสต์'),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -589,7 +737,6 @@ class FeedPostCard extends StatelessWidget {
     super.key,
     required this.post,
     required this.isLiked,
-    required this.isOwnPost,
     required this.onToggleLike,
     required this.onAuthorTap,
     this.onDelete,
@@ -597,7 +744,6 @@ class FeedPostCard extends StatelessWidget {
 
   final FeedPost post;
   final bool isLiked;
-  final bool isOwnPost;
   final VoidCallback? onToggleLike;
   final VoidCallback? onAuthorTap;
   final VoidCallback? onDelete;
@@ -612,9 +758,8 @@ class FeedPostCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              InkWell(
+              GestureDetector(
                 onTap: onAuthorTap,
-                borderRadius: BorderRadius.circular(40),
                 child: _AuthorAvatar(
                   name: post.authorName,
                   avatarUrl: post.authorAvatarUrl,
@@ -623,40 +768,18 @@ class FeedPostCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: InkWell(
+                child: GestureDetector(
                   onTap: onAuthorTap,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        post.authorName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _formatPostTime(post.createdAt),
-                        style: TextStyle(
-                          color: Colors.grey.shade400,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    post.authorName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: Colors.grey,
+                    ),
                   ),
                 ),
               ),
-              if (isOwnPost)
-                Text(
-                  'โพสต์ของคุณ',
-                  style: TextStyle(
-                    color: Colors.grey.shade500,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               if (onDelete != null)
                 PopupMenuButton<String>(
                   color: Colors.white,
@@ -676,35 +799,57 @@ class FeedPostCard extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             post.content,
-            style: const TextStyle(color: Colors.grey, height: 1.5),
+            style: const TextStyle(
+              color: Colors.grey,
+              height: 1.5,
+            ),
           ),
-          const SizedBox(height: 10),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              GestureDetector(
-                onTap: onToggleLike,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? const Color(0xFF4489D7) : Colors.grey,
-                      size: 32,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      post.likeCount.toString(),
-                      style: TextStyle(
+          if ((post.imageUrl ?? '').isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: SizedBox(
+                  width: 250,
+                  height: 300,
+                  child: Image.network(
+                    post.imageUrl!,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      color: Colors.grey[200],
+                      alignment: Alignment.center,
+                      child: const Icon(
+                        Icons.broken_image_outlined,
                         color: Colors.grey,
-                        fontWeight:
-                            isLiked ? FontWeight.bold : FontWeight.normal,
+                        size: 32,
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
-            ],
+            ),
+          ],
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: onToggleLike,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isLiked ? Icons.favorite : Icons.favorite_border,
+                  color: isLiked ? const Color(0xFF4489D7) : Colors.grey,
+                  size: 32,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  post.likeCount.toString(),
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontWeight: isLiked ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -714,13 +859,11 @@ class FeedPostCard extends StatelessWidget {
 
 class _FeedHeader extends StatelessWidget {
   const _FeedHeader({
-    required this.composerName,
     required this.composerAvatarUrl,
     required this.isLoadingComposer,
     required this.onComposerTap,
   });
 
-  final String composerName;
   final String composerAvatarUrl;
   final bool isLoadingComposer;
   final VoidCallback onComposerTap;
@@ -749,7 +892,7 @@ class _FeedHeader extends StatelessWidget {
               child: Row(
                 children: [
                   _AuthorAvatar(
-                    name: composerName,
+                    name: 'คุณ',
                     avatarUrl: composerAvatarUrl,
                     radius: 20,
                   ),
@@ -758,7 +901,7 @@ class _FeedHeader extends StatelessWidget {
                     child: Text(
                       isLoadingComposer
                           ? 'กำลังโหลด...'
-                          : '$composerName กำลังคิดอะไรอยู่.....',
+                          : 'คุณกำลังคิดอะไรอยู่.....',
                       style: TextStyle(
                         color: Colors.grey.shade400,
                         fontSize: 16,
@@ -890,34 +1033,31 @@ class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Center(
-        child: Column(
-          children: [
-            _AuthorAvatar(
-              name: authorName,
-              avatarUrl: authorAvatarUrl,
-              radius: 50,
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+      child: Column(
+        children: [
+          _AuthorAvatar(
+            name: authorName,
+            avatarUrl: authorAvatarUrl,
+            radius: 50,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            authorName,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 10),
-            Text(
-              authorName,
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey.shade600,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '$postCount โพสต์ • $totalLikes ถูกใจ',
+            style: TextStyle(
+              color: Colors.grey.shade500,
+              fontSize: 13,
             ),
-            const SizedBox(height: 10),
-            Text(
-              '$postCount โพสต์ • $totalLikes ถูกใจ',
-              style: TextStyle(
-                color: Colors.grey.shade500,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -940,18 +1080,16 @@ class _AuthorAvatar extends StatelessWidget {
       radius: radius,
       backgroundColor: const Color(0xFFE6F4FF),
       backgroundImage: ProfileAvatarCatalog.providerFor(avatarUrl),
+      child: avatarUrl.trim().isEmpty
+          ? Text(
+              name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+              style: TextStyle(
+                color: const Color(0xFF4489D7),
+                fontWeight: FontWeight.bold,
+                fontSize: radius * 0.8,
+              ),
+            )
+          : null,
     );
   }
-}
-
-String _formatPostTime(DateTime time) {
-  final now = DateTime.now();
-  final diff = now.difference(time);
-
-  if (diff.inSeconds < 60) return 'เมื่อสักครู่';
-  if (diff.inMinutes < 60) return '${diff.inMinutes} นาทีที่แล้ว';
-  if (diff.inHours < 24) return '${diff.inHours} ชั่วโมงที่แล้ว';
-  if (diff.inDays < 7) return '${diff.inDays} วันที่แล้ว';
-
-  return DateFormat('d/M/yyyy HH:mm').format(time);
 }
