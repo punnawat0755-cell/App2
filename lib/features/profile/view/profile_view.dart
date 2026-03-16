@@ -1031,12 +1031,9 @@ class ProfileController extends GetxController {
     }
   }
 
-  String getWhaleImage(int day) {
+  String? getWhaleImage(int day) {
     final dk = getDateKey(selectedYear.value, selectedMonth.value, day);
-    final moodImage = _moodImagePathFromLevel(dailyMoodLevels[dk]);
-    if (moodImage != null) return moodImage;
-    if (dailyPeriodStatus[dk] == true) return 'assets/images/whale_cry.png';
-    return 'assets/images/whale_happy.png';
+    return _moodImagePathFromLevel(dailyMoodLevels[dk]);
   }
 
   bool hasMaleHealthRecord(String dayKey) {
@@ -1048,13 +1045,9 @@ class ProfileController extends GetxController {
         note.isNotEmpty;
   }
 
-  String getMaleHealthImage(int day) {
+  String? getMaleHealthImage(int day) {
     final dayKey = getDateKey(selectedYear.value, selectedMonth.value, day);
-    final moodImage = _moodImagePathFromLevel(dailyMoodLevels[dayKey]);
-    if (moodImage != null) return moodImage;
-    return hasMaleHealthRecord(dayKey)
-        ? 'assets/images/whale_cry.png'
-        : 'assets/images/whale_happy.png';
+    return _moodImagePathFromLevel(dailyMoodLevels[dayKey]);
   }
 
   final List<Map<String, String>> symptomsList = [
@@ -1258,6 +1251,7 @@ class ProfilePage extends StatelessWidget {
                         controller.selectedMonth.value,
                         day,
                       );
+                      final whaleImage = controller.getWhaleImage(day);
 
                       final isSelected = controller.selectedDate.value == day;
                       final isToday = controller.today.value == day &&
@@ -1305,15 +1299,17 @@ class ProfilePage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Image.asset(
-                              controller.getWhaleImage(day),
-                              width: 32,
-                              height: 32,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox(height: 32),
-                            ),
+                            if (whaleImage != null)
+                              const SizedBox(height: 4),
+                            if (whaleImage != null)
+                              Image.asset(
+                                whaleImage,
+                                width: 32,
+                                height: 32,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) =>
+                                    const SizedBox(height: 32),
+                              ),
                           ],
                         ),
                       );
@@ -1555,6 +1551,7 @@ class ProfilePage extends StatelessWidget {
                         controller.selectedMonth.value,
                         day,
                       );
+                      final whaleImage = controller.getMaleHealthImage(day);
                       final isToday = controller.today.value == day &&
                           controller.selectedMonth.value ==
                               DateTime.now().month &&
@@ -1597,15 +1594,17 @@ class ProfilePage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Image.asset(
-                              controller.getMaleHealthImage(day),
-                              width: 32,
-                              height: 32,
-                              fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox(height: 32),
-                            ),
+                            if (whaleImage != null)
+                              const SizedBox(height: 4),
+                            if (whaleImage != null)
+                              Image.asset(
+                                whaleImage,
+                                width: 32,
+                                height: 32,
+                                fit: BoxFit.contain,
+                                errorBuilder: (_, __, ___) =>
+                                    const SizedBox(height: 32),
+                              ),
                           ],
                         ),
                       );
