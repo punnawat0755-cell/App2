@@ -7,6 +7,7 @@ import 'package:flutter_application_1/module/home/view/home_view.dart';
 import 'package:flutter_application_1/module/login/view/singup_view.dart';
 import 'package:flutter_application_1/module/pet/view/pet_view.dart';
 import 'package:flutter_application_1/module/profile/view/profile_view.dart';
+import 'package:flutter_application_1/module/setting/view/edit_view.dart';
 import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:get/get.dart';
 
@@ -15,6 +16,7 @@ class BottomNavController extends GetxController {
   final GlobalKey<CurvedNavigationBarState> bottomNavigationKey = GlobalKey();
 
   final List<Widget> pages = [
+    EditProfilePage(),
     Signup(),
     HomePage(),
     FeedPage(),

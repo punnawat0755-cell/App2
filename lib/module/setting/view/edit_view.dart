@@ -1,10 +1,9 @@
-import 'dart:io'; // 💡 1. Import สำหรับ File
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-// import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:image_picker/image_picker.dart'; // 💡 2. Import สำหรับเลือกรูปจากเครื่อง
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart';
 
 // ==========================================
@@ -15,8 +14,24 @@ class EditProfileController extends GetxController {
   late final AppUserController userController;
 
   // --- ข้อมูลรูปโปรไฟล์ ---
-  final RxString profileImagePath = ''.obs; // 💡 เก็บ path รูปที่เลือก
-  final ImagePicker _picker = ImagePicker(); // 💡 ตัวเรียกเปิดแกลเลอรี่
+  final RxString profileImagePath = ''.obs;
+  final RxString selectedAssetAvatar =
+      ''.obs; // 💡 เก็บ Path รูปโปรไฟล์ที่เป็น Asset (สัตว์น้ำ)
+  final ImagePicker _picker = ImagePicker();
+
+  // 💡 รายการรูปโปรไฟล์ (กรุณาแก้ไขชื่อไฟล์ให้ตรงกับรูปที่คุณมีในโฟลเดอร์ assets)
+  final List<String> avatarList = [
+    'assets/images/whalewhite.png', // โลมา
+    'assets/images/turtle.png', // เต่า
+    'assets/images/penguin.png', // เพนกวิน
+    'assets/images/seahorse.png', // ม้าน้ำ
+    'assets/images/dolphin.png', // วาฬ
+    'assets/images/seal_avatar.png', // แมวน้ำ
+    'assets/images/octopus.png', // ปลาหมึก
+    'assets/images/clownfish.png', // ปลาการ์ตูน
+    'assets/images/pufferfish.png', // ปลาปักเป้า
+    'assets/images/jellyfish.png', // แมงกะพรุน
+  ];
 
   // --- ข้อมูลทั่วไป ---
   final RxString username = 'แมวน้ำ'.obs;
@@ -73,13 +88,21 @@ class EditProfileController extends GetxController {
     super.onClose();
   }
 
-  // 💡 ฟังก์ชันเปิดแกลเลอรี่และเลือกรูป
+  // เลือกรูปจากแกลเลอรี่
   Future<void> pickProfileImage() async {
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
+      selectedAssetAvatar.value = ''; // เคลียร์รูป asset
       profileImagePath.value = image.path;
       userController.avatarLocalPath.value = image.path;
     }
+  }
+
+  // 💡 เลือกรูปจาก Asset ใน Panel
+  void selectAssetAvatar(String assetPath) {
+    profileImagePath.value = ''; // เคลียร์รูปแกลเลอรี่
+    selectedAssetAvatar.value = assetPath;
+    // หากต้องการบันทึกลง AppUserController ด้วยสามารถเพิ่มโค้ดที่นี่ได้
   }
 
   // --- ฟังก์ชันจัดรูปแบบ ---
@@ -168,6 +191,127 @@ class EditProfilePage extends StatelessWidget {
       ? Get.find<EditProfileController>()
       : Get.put(EditProfileController());
 
+  // 💡 ฟังก์ชันสร้าง Bottom Panel เลือกรุป
+  void _showProfilePanel(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent, // ให้พื้นหลังใสเพื่อโชว์ขอบมน
+      isScrollControlled: true,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.only(
+            top: 15,
+            left: 30,
+            right: 30,
+            bottom: 40,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ขีดสีเทาตรงกลางด้านบน
+              Center(
+                child: Container(
+                  width: 50,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 25),
+              // ข้อความหัวข้อ
+              const Text(
+                'เลือกรูปโปรไฟล์',
+                style: TextStyle(
+                  color: Color(0xFF4489D7),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 25),
+              // Grid รูปภาพสัตว์น้ำ
+              Wrap(
+                spacing: 15,
+                runSpacing: 15,
+                children: List.generate(controller.avatarList.length, (index) {
+                  return Obx(() {
+                    // 💡 เช็คว่ารูปนี้คือรูปที่ถูกเลือกอยู่หรือไม่
+                    final isSelected =
+                        controller.selectedAssetAvatar.value ==
+                        controller.avatarList[index];
+
+                    return GestureDetector(
+                      onTap: () {
+                        // 💡 บันทึกรูปที่เลือก แต่ "ไม่ต้องปิด" Panel ให้เลื่อนปิดเอง
+                        controller.selectAssetAvatar(
+                          controller.avatarList[index],
+                        );
+                      },
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          // ตัวรูปโปรไฟล์
+                          Container(
+                            width: 75,
+                            height: 75,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.05),
+                                  blurRadius: 5,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                              image: DecorationImage(
+                                image: AssetImage(controller.avatarList[index]),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                          ),
+
+                          // 💡 เครื่องหมายติ๊กถูก
+                          if (isSelected)
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(3),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8B8B8B),
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 2.5,
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.check,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  });
+                }),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Obx(
@@ -206,7 +350,7 @@ class EditProfilePage extends StatelessWidget {
               children: [
                 const SizedBox(height: 30),
 
-                // --- 💡 ส่วนรูปโปรไฟล์และปุ่มอัปโหลด ---
+                // --- 💡 ส่วนรูปโปรไฟล์และปุ่มวงกลมสีเทา ---
                 Center(
                   child: Stack(
                     children: [
@@ -221,45 +365,52 @@ class EditProfilePage extends StatelessWidget {
                             ),
                           ],
                         ),
-                        // 💡 เปลี่ยนมาใช้ Obx เช็คว่ามีรูปในเครื่องหรือไม่
+                        // 💡 เช็คการแสดงผล (Asset > ไฟล์รูป > รูปเริ่มต้น)
                         child: CircleAvatar(
                           radius: 75,
                           backgroundColor: Colors.grey.shade200,
                           backgroundImage:
-                              controller.profileImagePath.value.isNotEmpty
-                              ? FileImage(
-                                      File(controller.profileImagePath.value),
-                                    )
+                              controller.selectedAssetAvatar.value.isNotEmpty
+                              ? AssetImage(controller.selectedAssetAvatar.value)
                                     as ImageProvider
-                              : NetworkImage(
-                                  controller.userController.avatarUrl.value,
-                                ),
+                              : (controller.profileImagePath.value.isNotEmpty
+                                    ? FileImage(
+                                            File(
+                                              controller.profileImagePath.value,
+                                            ),
+                                          )
+                                          as ImageProvider
+                                    : NetworkImage(
+                                        controller
+                                            .userController
+                                            .avatarUrl
+                                            .value,
+                                      )),
                         ),
                       ),
 
-                      // 💡 ปุ่มเปลี่ยนรูป (ตาม Design ของคุณ)
+                      // 💡 ปุ่มเปลี่ยนรูป (ตาม Design รูปที่ 2)
                       Positioned(
-                        bottom: -3,
-                        right: 8,
+                        bottom: 0,
+                        right: 5,
                         child: GestureDetector(
-                          onTap: controller
-                              .pickProfileImage, // เรียกฟังก์ชันเปิดแกลเลอรี่
+                          onTap: () => _showProfilePanel(
+                            context,
+                          ), // 💡 กดแล้วเรียก Panel
                           child: Container(
-                            // padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFD9D9D9,
-                              ), // สีเทาอ่อนแบบในรูป
+                              color: const Color(0xFFD4D4D4), // สีเทา
                               shape: BoxShape.circle,
                               border: Border.all(
                                 color: Colors.white,
-                                width: 3,
-                              ), // ขอบขาวหนา
+                                width: 3, // ขอบขาวหนา
+                              ),
                             ),
                             child: Image.asset(
-                              'assets/images/upload.png',
-                              width: 40,
-                              height: 40,
+                              'assets/images/seleprofile.png', // ไอคอนสลับรูป (คล้ายในภาพที่สุด)
+                              width: 25,
+                              height: 25,
                             ),
                           ),
                         ),

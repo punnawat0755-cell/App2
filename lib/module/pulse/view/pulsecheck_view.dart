@@ -8,6 +8,8 @@ import 'package:flutter_application_1/module/rolelogic/view/widget/rolelogic_vie
 // 1. Controller สำหรับจัดการข้อมูลและ Logic
 // ==========================================
 class PulsecheckController extends GetxController {
+  static const int maxSelectedTags = 2;
+
   final RxInt selectedMoodIndex = (-1).obs;
   final RxList<String> selectedTags = <String>[].obs;
 
@@ -102,6 +104,18 @@ class PulsecheckController extends GetxController {
     if (selectedTags.contains(tag)) {
       selectedTags.remove(tag);
     } else {
+      if (selectedTags.length >= maxSelectedTags) {
+        Get.snackbar(
+          "เลือกได้สูงสุด $maxSelectedTags แท็ก",
+          "กรุณาเลือกแท็กได้ไม่เกิน $maxSelectedTags อันเท่านั้น",
+          backgroundColor: Colors.redAccent,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.TOP,
+          duration: const Duration(seconds: 3),
+          margin: const EdgeInsets.all(15),
+        );
+        return;
+      }
       selectedTags.add(tag);
     }
   }
@@ -112,6 +126,19 @@ class PulsecheckController extends GetxController {
       Get.snackbar(
         "เดี๋ยวก่อน!",
         "อย่าลืมเลือกน้องวาฬบอกความรู้สึกก่อนกดส่งน้า 🐳",
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 3),
+        margin: const EdgeInsets.all(15),
+      );
+      return;
+    }
+
+    if (storyController.text.trim().isEmpty) {
+      Get.snackbar(
+        "เดี๋ยวก่อน!",
+        "กรุณากรอกบันทึกเรื่องราวของวันนี้ก่อน",
         backgroundColor: Colors.redAccent,
         colorText: Colors.white,
         snackPosition: SnackPosition.TOP,
@@ -377,10 +404,10 @@ class Pulsecheck extends StatelessWidget {
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: isSelected
-                      ? controller.tagFillBlue
-                      : controller.lightFillBlue,
+                      ? const Color(0xFF8BE2FB)
+                      : const Color(0xFFCEEFFE),
                   borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: controller.mainBlue, width: 1.2),
+                  border: Border.all(color: Color(0xff4489D7), width: 1.3),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2.0),
