@@ -12,7 +12,7 @@ class SplashScreenpage extends StatelessWidget {
         children: [
           Center(
             child: Image.asset(
-              'assets/images/logo.png',
+              'assets/images/logo2.png',
               width: 250,
               height: 250,
               fit: BoxFit.contain,
@@ -20,7 +20,7 @@ class SplashScreenpage extends StatelessWidget {
           ),
 
           Positioned(
-            bottom: 40, 
+            bottom: 40,
             child: const Text(
               "HOW ARE YOU",
               style: TextStyle(

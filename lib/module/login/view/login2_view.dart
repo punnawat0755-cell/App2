@@ -17,7 +17,7 @@ class LoginPagetwo extends StatelessWidget {
             children: [
               const SizedBox(height: 60),
               Image.asset(
-                'assets/images/logo.png',
+                'assets/images/logo2.png',
                 width: 150,
                 height: 150,
                 fit: BoxFit.contain,

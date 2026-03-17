@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart';
 
 // ==========================================
 // 💡 1. SignupController (จัดการ Logic ทั้งหมด)
@@ -628,6 +629,12 @@ class Signup extends StatelessWidget {
                   height: 55,
                   child: ElevatedButton(
                     onPressed: () {
+                      final userController =
+                          Get.isRegistered<AppUserController>()
+                          ? Get.find<AppUserController>()
+                          : Get.put(AppUserController(), permanent: true);
+                      userController.gender.value =
+                          controller.selectedGender.value;
                       debugPrint(
                         'ลงทะเบียนเรียบร้อย: ${controller.lastPeriodController.text}',
                       );

@@ -17,6 +17,7 @@ class EditProfileController extends GetxController {
   final RxString profileImagePath = ''.obs;
   final RxString selectedAssetAvatar =
       ''.obs; // 💡 เก็บ Path รูปโปรไฟล์ที่เป็น Asset (สัตว์น้ำ)
+  final RxString pendingAssetAvatar = ''.obs; // รูปที่เลือกใน Panel (ยังไม่กดตกลง)
   final ImagePicker _picker = ImagePicker();
 
   // 💡 รายการรูปโปรไฟล์ (กรุณาแก้ไขชื่อไฟล์ให้ตรงกับรูปที่คุณมีในโฟลเดอร์ assets)
@@ -65,6 +66,7 @@ class EditProfileController extends GetxController {
       profileImagePath.value = userController.avatarLocalPath.value;
     }
     username.value = userController.displayName.value;
+    gender.value = userController.gender.value;
 
     originalName = username.value;
     originalPassword = passwordValue.value;
@@ -100,9 +102,7 @@ class EditProfileController extends GetxController {
 
   // 💡 เลือกรูปจาก Asset ใน Panel
   void selectAssetAvatar(String assetPath) {
-    profileImagePath.value = ''; // เคลียร์รูปแกลเลอรี่
-    selectedAssetAvatar.value = assetPath;
-    // หากต้องการบันทึกลง AppUserController ด้วยสามารถเพิ่มโค้ดที่นี่ได้
+    pendingAssetAvatar.value = assetPath;
   }
 
   // --- ฟังก์ชันจัดรูปแบบ ---
@@ -175,6 +175,8 @@ class EditProfileController extends GetxController {
           ? originalPhone
           : phoneController.text;
       originalPhone = phoneValue.value;
+    } else if (activeField.value == 'gender') {
+      userController.gender.value = gender.value;
     }
     activeField.value = null;
   }
@@ -193,6 +195,7 @@ class EditProfilePage extends StatelessWidget {
 
   // 💡 ฟังก์ชันสร้าง Bottom Panel เลือกรุป
   void _showProfilePanel(BuildContext context) {
+    controller.pendingAssetAvatar.value = controller.selectedAssetAvatar.value;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent, // ให้พื้นหลังใสเพื่อโชว์ขอบมน
@@ -225,14 +228,56 @@ class EditProfilePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 25),
-              // ข้อความหัวข้อ
-              const Text(
-                'เลือกรูปโปรไฟล์',
-                style: TextStyle(
-                  color: Color(0xFF4489D7),
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+              // ข้อความหัวข้อ + ปุ่มตกลง
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'เลือกรูปโปรไฟล์',
+                      style: TextStyle(
+                        color: Color(0xFF4489D7),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      final next = controller.pendingAssetAvatar.value;
+                      if (next.isNotEmpty) {
+                        controller.profileImagePath.value = '';
+                        controller.selectedAssetAvatar.value = next;
+                        controller.userController.avatarLocalPath.value = next;
+                      }
+                      Get.back();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD9F0FF),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 6,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Text(
+                        'ตกลง',
+                        style: TextStyle(
+                          color: Color(0xFF4489D7),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 25),
               // Grid รูปภาพสัตว์น้ำ
@@ -243,7 +288,7 @@ class EditProfilePage extends StatelessWidget {
                   return Obx(() {
                     // 💡 เช็คว่ารูปนี้คือรูปที่ถูกเลือกอยู่หรือไม่
                     final isSelected =
-                        controller.selectedAssetAvatar.value ==
+                        controller.pendingAssetAvatar.value ==
                         controller.avatarList[index];
 
                     return GestureDetector(

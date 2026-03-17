@@ -4,6 +4,9 @@ import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/chat/view/chatselectionpage.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home_view.dart';
+import 'package:flutter_application_1/module/login/view/login2_view.dart';
+import 'package:flutter_application_1/module/login/view/login_view.dart';
+import 'package:flutter_application_1/module/login/view/logo_view.dart';
 import 'package:flutter_application_1/module/login/view/singup_view.dart';
 import 'package:flutter_application_1/module/pet/view/pet_view.dart';
 import 'package:flutter_application_1/module/profile/view/profile_view.dart';
@@ -16,14 +19,16 @@ class BottomNavController extends GetxController {
   final GlobalKey<CurvedNavigationBarState> bottomNavigationKey = GlobalKey();
 
   final List<Widget> pages = [
-    EditProfilePage(),
+    // EditProfilePage(),
+    // ProfilePage(),
+    SplashScreenpage(),
     Signup(),
-    HomePage(),
+    LoginPagetwo(),
+    // HomePage(),
     FeedPage(),
-    ChatSelectionPage(),
+    // ChatSelectionPage(),
     // SettingPage(),
     // PetPage(),
-    ProfilePage(),
   ];
 
   void changePage(int index) {

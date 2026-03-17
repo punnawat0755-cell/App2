@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 // 💡 Import HomeController เพื่อส่งข้อมูลคลิปสั้นกลับไป
 import 'package:flutter_application_1/module/home/view/home_view.dart';
+import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart';
+import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -189,6 +191,9 @@ class PostPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final controller = Get.find<PostPageController>();
+    final userController = Get.isRegistered<AppUserController>()
+        ? Get.find<AppUserController>()
+        : Get.put(AppUserController(), permanent: true);
 
     return FractionallySizedBox(
       heightFactor: 0.85,
@@ -262,19 +267,20 @@ class PostPage extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const CircleAvatar(
+                      const AppProfileAvatar(
                         radius: 18,
-                        backgroundImage: NetworkImage(
-                          'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                        ),
+                        borderWidth: 0,
+                        borderColor: Colors.transparent,
                       ),
                       const SizedBox(width: 12),
-                      const Text(
-                        "seal",
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xff6C6C6C),
+                      Obx(
+                        () => Text(
+                          userController.displayName.value,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xff6C6C6C),
+                          ),
                         ),
                       ),
                       const Spacer(),

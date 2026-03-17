@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:flutter_application_1/module/feed/view/post.dart';
 import 'dart:io';
+import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart';
+import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
 
 // ==========================================
 // 💡 1. Model เก็บข้อมูลโพสต์ (Perfect แล้ว!)
@@ -15,6 +17,7 @@ class PostModel {
   final bool showImage;
   final String? imagePath;
   final bool isLocalImage;
+  final bool isCurrentUser;
 
   PostModel({
     required this.name,
@@ -24,6 +27,7 @@ class PostModel {
     this.showImage = false,
     this.imagePath,
     this.isLocalImage = false,
+    this.isCurrentUser = false,
   }) : likes = likes.obs;
 }
 
@@ -70,6 +74,7 @@ class FeedController extends GetxController {
         showImage: localImagePath != null && localImagePath.isNotEmpty,
         imagePath: localImagePath,
         isLocalImage: true,
+        isCurrentUser: true,
       ),
     );
   }
@@ -92,10 +97,10 @@ class FeedPage extends StatelessWidget {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(vertical: 20),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 child: Center(
                   child: Image.asset(
-                    'assets/images/How 1.png',
+                    'assets/images/logo2.png',
                     width: 65,
                     height: 88,
                   ),
@@ -113,11 +118,10 @@ class FeedPage extends StatelessWidget {
                   ),
                   child: Row(
                     children: [
-                      const CircleAvatar(
+                      const AppProfileAvatar(
                         radius: 20,
-                        backgroundImage: NetworkImage(
-                          'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
-                        ),
+                        borderWidth: 0,
+                        borderColor: Colors.transparent,
                       ),
                       const SizedBox(width: 15),
                       Expanded(
@@ -188,6 +192,10 @@ class PostItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final userController = Get.isRegistered<AppUserController>()
+        ? Get.find<AppUserController>()
+        : Get.put(AppUserController(), permanent: true);
+
     // 💡 ถ้าไม่ได้ส่ง post มา ให้สร้าง Model จำลองจากค่าที่ส่งแยกมาครับ (กัน Error int vs RxInt)
     final PostModel displayPost =
         post ??
@@ -211,17 +219,27 @@ class PostItem extends StatelessWidget {
                   onTap: () => Get.to(
                     () => FeedProfilePage(
                       name: displayPost.name,
-                      avatarUrl: displayPost.avatarUrl,
+                      avatarUrl: displayPost.isCurrentUser
+                          ? userController.avatarUrl.value
+                          : displayPost.avatarUrl,
                     ),
                   ),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundImage: NetworkImage(displayPost.avatarUrl),
-                  ),
+                  child: displayPost.isCurrentUser
+                      ? const AppProfileAvatar(
+                          radius: 20,
+                          borderWidth: 0,
+                          borderColor: Colors.transparent,
+                        )
+                      : CircleAvatar(
+                          radius: 20,
+                          backgroundImage: NetworkImage(displayPost.avatarUrl),
+                        ),
                 ),
                 const SizedBox(width: 10),
                 Text(
-                  displayPost.name,
+                  displayPost.isCurrentUser
+                      ? userController.displayName.value
+                      : displayPost.name,
                   style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,

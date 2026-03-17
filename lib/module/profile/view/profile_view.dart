@@ -3,12 +3,16 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
+import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart'; // 💡 นำเข้า AppUserController
 
 // ==========================================
 // 1. Controller: จัดการข้อมูลแยกตาม ปี-เดือน-วัน
 // ==========================================
 class ProfileController extends GetxController {
   static const int maxSymptomsPerSave = 2;
+
+  // 💡 ดึงข้อมูล User (เพื่อเช็คเพศ)
+  late final AppUserController userController;
 
   var coins = 138.obs;
   var whaleStreakStack = <int>[].obs;
@@ -24,6 +28,9 @@ class ProfileController extends GetxController {
 
   String get dateKey =>
       "${selectedYear.value}-${selectedMonth.value}-${selectedDate.value}";
+
+  // 💡 ฟังก์ชันเช็คเพศ
+  bool get isFemale => userController.gender.value == 'หญิง';
 
   final List<String> monthNames = [
     "มกราคม",
@@ -51,6 +58,9 @@ class ProfileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    userController = Get.isRegistered<AppUserController>()
+        ? Get.find<AppUserController>()
+        : Get.put(AppUserController(), permanent: true);
     recalculateWhaleStreakStack();
   }
 
@@ -118,6 +128,7 @@ class ProfileController extends GetxController {
   List<String> getSymptomsForSelectedDay() => dailySymptoms[dateKey] ?? [];
 
   void setPeriodStatus(bool status) {
+    if (!isFemale) return; // 💡 ป้องกันกรณีไม่ใช่เพศหญิง
     if (selectedDate.value == 0) return;
     if (isSelectedDateInFuture) {
       Get.snackbar(
@@ -125,7 +136,6 @@ class ProfileController extends GetxController {
         "ไม่สามารถบันทึกล่วงหน้าได้",
         backgroundColor: const Color(0xFF2C5282),
         colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
       return;
     }
@@ -140,7 +150,6 @@ class ProfileController extends GetxController {
         "ไม่สามารถบันทึกล่วงหน้าได้",
         backgroundColor: const Color(0xFF2C5282),
         colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
       return;
     }
@@ -154,7 +163,6 @@ class ProfileController extends GetxController {
           "เลือกอาการได้ไม่เกิน $maxSymptomsPerSave รายการต่อการบันทึก",
           backgroundColor: const Color(0xFF2C5282),
           colorText: Colors.white,
-          duration: const Duration(seconds: 3),
         );
         return;
       }
@@ -170,7 +178,6 @@ class ProfileController extends GetxController {
         "กรุณาเลือกวันที่ต้องการ",
         backgroundColor: const Color(0xFF2C5282),
         colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
       return false;
     }
@@ -180,7 +187,6 @@ class ProfileController extends GetxController {
         "ไม่สามารถบันทึกล่วงหน้าได้ (บันทึกได้เฉพาะวันนี้และย้อนหลัง)",
         backgroundColor: const Color(0xFF2C5282),
         colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
       return false;
     }
@@ -192,25 +198,25 @@ class ProfileController extends GetxController {
         "บันทึกได้ไม่เกิน $maxSymptomsPerSave อาการต่อครั้ง",
         backgroundColor: const Color(0xFF2C5282),
         colorText: Colors.white,
-        duration: const Duration(seconds: 3),
       );
       return false;
     }
 
-    dailyPeriodStatus[dateKey] = getPeriodStatusForSelectedDay();
-    draftPeriodStatus.remove(dateKey);
+    if (isFemale) {
+      dailyPeriodStatus[dateKey] = getPeriodStatusForSelectedDay();
+      draftPeriodStatus.remove(dateKey);
+    }
 
     Get.snackbar(
       "สำเร็จ",
       "บันทึกเรียบร้อย",
       backgroundColor: const Color(0xFF2C5282),
       colorText: Colors.white,
-      duration: const Duration(seconds: 3),
     );
     return true;
   }
 
-  // --- ฟังก์ชันแสดง Modal คำแนะนำ ---
+  // --- ฟังก์ชันแสดง Modal คำแนะนำทั่วไป (เฉพาะผู้หญิง) ---
   void showAdviceModal() {
     Get.dialog(
       Dialog(
@@ -291,15 +297,19 @@ class ProfileController extends GetxController {
     );
   }
 
+  // --- ฟังก์ชันแสดง Modal อาการเฉพาะ ---
   void showSymptomAdviceModal(List<String> selectedSymptoms) {
     final uniqueSymptoms = selectedSymptoms.toSet().toList();
+    // 💡 เลือก Data Source ตามเพศ
+    final dataSource = isFemale ? symptomAdviceFemale : symptomAdviceMaleLGBTQ;
+
     final sections = uniqueSymptoms
-        .map((name) => MapEntry(name, symptomAdvice[name] ?? const <String>[]))
+        .map((name) => MapEntry(name, dataSource[name] ?? const <String>[]))
         .where((e) => e.value.isNotEmpty)
         .toList();
 
     if (sections.isEmpty) {
-      showAdviceModal();
+      if (isFemale) showAdviceModal();
       return;
     }
 
@@ -315,10 +325,12 @@ class ProfileController extends GetxController {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "แนะนำวิธีการดูแลตัวเองช่วงเป็นประจำเดือน",
+              Text(
+                isFemale
+                    ? "แนะนำวิธีการดูแลตัวเองช่วงเป็นประจำเดือน"
+                    : "แนะนำวิธีการดูแลตัวเอง",
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Color(0xFF4489D7),
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -416,7 +428,8 @@ class ProfileController extends GetxController {
     );
   }
 
-  final Map<String, List<String>> symptomAdvice = {
+  // 💡 ข้อมูลอาการสำหรับเพศหญิง (คงเดิม)
+  final Map<String, List<String>> symptomAdviceFemale = {
     "ปวดท้อง": [
       "ประคบร้อน: ใช้กระเป๋าน้ำร้อนหรือแผ่นแปะลดปวดท้องบริเวณท้องน้อย",
       "ยาแก้ปวดกลุ่ม NSAIDs (ตามคำแนะนำแพทย์/ฉลากยา) เพื่อบรรเทาปวดเกร็ง",
@@ -461,6 +474,58 @@ class ProfileController extends GetxController {
     ],
   };
 
+  // 💡 ข้อมูลอาการสำหรับชาย / LGBTQ+
+  final Map<String, List<String>> symptomAdviceMaleLGBTQ = {
+    "ปวดท้อง": [
+      "จิบน้ำเกลือแร่: ถ้าปวดบิดจนท้องเสีย ให้จิบ ORS เพื่อเติมอิเล็กโทรไลต์ ป้องกันอาการมือเท้าชา และเพลียแดด",
+      "ยาขับลม/ยาธาตุ: หากจุกเสียดจากมื้อหนัก ให้ใช้ Air-X หรือยาธาตุน้ำขาวเพื่อไล่แก๊สที่ดันกระบังลม",
+      "งดแอลกอฮอล์และของเผ็ด: ช่วงนี้งดปาร์ตี้และพริกแกงเผ็ดจัด เพื่อไม่ให้ลำไส้อักเสบหนักกว่าเดิม",
+      "ยืดเหยียด: ลองนอนหงายแล้วชันเข่าขึ้น เพื่อลดแรงดันในช่องท้อง",
+    ],
+    "แปรปรวน": [
+      "High Protein Snack: ทานโปรตีน เช่น อัลมอนด์ หรืออกไก่ ช่วยให้ระดับพลังงานนิ่งและลดอาการ \"หงุดหงิดไม่มีสาเหตุ\"",
+      "เปลี่ยนสภาพแวดล้อม: ถ้าเริ่มรู้สึกฟุ้งซ่าน ให้ลุกออกจากโต๊ะทำงานทันที เดินไปที่ที่มีแสงแดดหรือลมโกรก",
+      "ออกกำลังกายเบาๆ: การวิดพื้นหรือ Squat สัก 10-20 ครั้ง ช่วยหลั่ง Endorphin และเพิ่มความตื่นตัว",
+      "งดไถฟีด: ปิดโซเชียลชั่วคราว เพื่อเลี่ยงการเปรียบเทียบตัวเองกับคนอื่นในช่วงที่จิตใจอ่อนแอ",
+    ],
+    "หงุดหงิด": [
+      "Box Breathing: หายใจเข้า 4-กลั้น 4-ออก 4-กลั้น 4 ทำ 3 รอบเพื่อ Reset ระบบประสาท",
+      "Cold Shower: ล้างหน้าด้วยน้ำเย็นจัด หรืออาบน้ำเย็นไปเลย ช่วยลดความร้อนในร่างกายและดึงสติกลับมา",
+      "The \"Vent\" Note: พิมพ์ระบายสิ่งที่กวนใจลงใน Note แล้วลบทิ้งซะ เป็นการระบายความโกรธแบบไม่เสียงาน",
+      "เช็กความหิว: ถ้าโมโหง่าย ให้รีบหาของรองท้อง บางครั้งคุณแค่ \"โมโหหิว\" (Hangry)",
+    ],
+    "ท้องอืด": [
+      "เดินเร็ว 10 นาที: การขยับร่างกายช่วยให้ลำไส้เคลื่อนตัวได้ดีกว่าการนั่งจมอยู่บนเก้าอี้",
+      "เลี่ยงมื้อดึก: หากท้องอืดบ่อยให้พยายามจบมื้อสุดท้ายก่อนนอนอย่างน้อย 3 ชั่วโมง",
+      "ลดโซเดียม: งดบะหมี่กึ่งสำเร็จรูปหรือขนมขบเคี้ยว เพราะเกลือจะทำให้ตัวบวมน้ำและแน่นท้อง",
+      "จิบน้ำอุ่นผสมมะนาว: ช่วยกระตุ้นระบบย่อยอาหารและล้างเมือกมันในลำไส้",
+    ],
+    "ปวดหัวไมเกรน": [
+      // 💡 ใช้อันเดียวกันตามที่แจ้ง
+      "อยู่ในที่เงียบ/แสงน้อย ประคบเย็นบริเวณหน้าผากหรือขมับ",
+      "พักสายตา และนอนให้พอ",
+      "ดื่มน้ำให้เพียงพอ ลดภาวะขาดน้ำที่กระตุ้นไมเกรน",
+      "ยาแก้ปวดตามฉลาก/คำแนะนำแพทย์ หากอาการรุนแรงควรปรึกษาแพทย์",
+    ],
+    "เป็นไข้": [
+      // 💡 ใช้อันเดียวกันตามที่แจ้ง
+      "เช็ดตัว: ใช้ผ้าชุบน้ำอุณหภูมิห้องเช็ดตามข้อพับเพื่อระบายความร้อน",
+      "ดื่มน้ำเยอะๆ: ไข้ทำให้ร่างกายเสียน้ำง่าย การดื่มน้ำช่วยลดอุณหภูมิและช่วยให้ระบบภูมิคุ้มกันทำงานดีขึ้น",
+      "พักผ่อนแบบ 100%: หยุดกิจกรรมทุกอย่าง เพราะร่างกายต้องใช้พลังงานทั้งหมดไปกับการซ่อมแซม",
+    ],
+    "หิวจุกจิก": [
+      "เน้นโปรตีนและใยอาหาร: กินไข่ต้ม ถั่ว หรือผัก เพื่อให้อิ่มนานขึ้นและน้ำตาลในเลือดนิ่ง",
+      "จิบน้ำก่อนกิน: บางครั้งสมองแยกไม่ออกระหว่าง \"หิวน้ำ\" กับ \"หิวข้าว\" ลองดื่มน้ำดูก่อน 1 แก้ว",
+      "ดาร์กช็อกโกแลต: ถ้าอยากของหวาน ให้เลือกอันที่มีโกโก้สูงๆ จะช่วยลดความอยากได้ดีกว่าขนมหวานจัดๆ",
+    ],
+    "สิวขึ้น": [
+      "เปลี่ยนปลอกหมอน: แหล่งสะสมแบคทีเรียเบอร์หนึ่ง เปลี่ยนสัปดาห์ละครั้งเป็นอย่างน้อย",
+      "งดใช้มือสัมผัส: เลิกเท้าคาง หรือแกะสิวระหว่างคิดงาน เพราะมือคือตัวนำเชื้อโรค",
+      "ลดของทอด/ของหวาน: อาหารที่มีค่า GI สูงกระตุ้นการผลิตน้ำมันใต้ผิวหนัง",
+      "ล้างหน้าหลังเหงื่อออก: หากไปออกกำลังกายมา ควรรีบล้างหน้าเพื่อไม่ให้คราบเหงื่ออุดตันรูขุมขน",
+    ],
+  };
+
   final Map<int, String> whaleMoods = {
     1: 'whale_happy',
     2: 'whale_cry',
@@ -487,6 +552,7 @@ class ProfileController extends GetxController {
   }
 
   bool isPredictedPeriodDay(int day, int? periodStartDay) {
+    if (!isFemale) return false; // 💡 ถ้าไม่ใช่ผู้หญิง จะไม่มีคาดการณ์
     final start = periodStartDay ?? 1;
     final end = start + 6;
     return day >= start && day <= end;
@@ -515,14 +581,6 @@ class ProfileController extends GetxController {
     if (type == 'whale_love') return 'assets/images/whale_love.png';
     if (type == 'whale_cry') return 'assets/images/whale_cry.png';
     return 'assets/images/whale_happy.png';
-  }
-
-  String getDefaultSymptomImage(String symptomName) {
-    final symptom = symptomsList.firstWhere(
-      (e) => e['name'] == symptomName,
-      orElse: () => {},
-    );
-    return symptom['img'] ?? 'assets/images/thunder 1.png';
   }
 
   final List<Map<String, String>> symptomsList = [
@@ -601,13 +659,17 @@ class ProfilePage extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    "รอบเดือนและอาการ",
-                    style: GoogleFonts.mitr(
-                      textStyle: const TextStyle(
-                        color: Color(0xFF4489D7),
-                        fontSize: 22,
-                        fontWeight: FontWeight.w500,
+                  Obx(
+                    () => Text(
+                      controller.isFemale
+                          ? "รอบเดือนและอาการ"
+                          : "บันทึกอาการ", // 💡 เปลี่ยนข้อความตามเพศ
+                      style: GoogleFonts.mitr(
+                        textStyle: const TextStyle(
+                          color: Color(0xFF4489D7),
+                          fontSize: 22,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
@@ -743,18 +805,14 @@ class ProfilePage extends StatelessWidget {
                             Color textColor = const Color(0xFF4489D7);
 
                             if (isSelected) {
-                              bgColor = const Color(
-                                0xFFFFD348,
-                              ); // สีเหลืองเมื่อจิ้ม
-                            } else if (savedIsPeriod) {
-                              bgColor = const Color(
-                                0xFFF05A42,
-                              ); // สีแดงเมื่อบันทึกแล้ว
+                              bgColor = const Color(0xFFFFD348);
+                            } else if (savedIsPeriod && controller.isFemale) {
+                              // 💡 สีแดงเฉพาะผู้หญิง
+                              bgColor = const Color(0xFFF05A42);
                               textColor = Colors.white;
                             } else if (isPredictedPeriodDay) {
-                              bgColor = const Color(
-                                0xFFF8A5B8,
-                              ); // สีชมพู (คาดการณ์)
+                              // 💡 สีชมพูคาดการณ์ (ฟังก์ชันล็อกไว้แล้วว่าเฉพาะหญิง)
+                              bgColor = const Color(0xFFF8A5B8);
                               textColor = Colors.white;
                             } else if (isToday) {
                               bgColor = const Color(0xFFCCCCCC);
@@ -770,7 +828,6 @@ class ProfilePage extends StatelessWidget {
                                     "ไม่สามารถบันทึกล่วงหน้าได้",
                                     backgroundColor: const Color(0xFF2C5282),
                                     colorText: Colors.white,
-                                    duration: const Duration(seconds: 3),
                                   );
                                   return;
                                 }
@@ -801,9 +858,8 @@ class ProfilePage extends StatelessWidget {
                                     final whalePath = controller.getWhaleImage(
                                       day,
                                     );
-                                    if (whalePath == null) {
+                                    if (whalePath == null)
                                       return const SizedBox(height: 32);
-                                    }
                                     return Image.asset(
                                       whalePath,
                                       width: 32,
@@ -849,10 +905,8 @@ class ProfilePage extends StatelessWidget {
                       color: const Color(0xFFFFDA7B),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: const Color(
-                          0xFF757575,
-                        ), // สีเทาเข้มของเส้นขอบตามรูป
-                        width: 1.5, // ความหนาของเส้นขอบ
+                        color: const Color(0xFF757575),
+                        width: 1.5,
                       ),
                     ),
                     child: const Text(
@@ -894,25 +948,29 @@ class ProfilePage extends StatelessWidget {
                 }
                 return Column(
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildStatusButton(
-                          controller,
-                          "เป็นประจำเดือน",
-                          const Color(0xFFA6E3F9),
-                          true,
-                        ),
-                        const SizedBox(width: 15),
-                        _buildStatusButton(
-                          controller,
-                          "ไม่เป็นประจำเดือน",
-                          const Color(0xFFA6E3F9),
-                          false,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 30),
+                    // 💡 แสดงปุ่มเลือกประจำเดือน เฉพาะเมื่อเป็นเพศหญิง
+                    if (controller.isFemale) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          _buildStatusButton(
+                            controller,
+                            "เป็นประจำเดือน",
+                            const Color(0xFFA6E3F9),
+                            true,
+                          ),
+                          const SizedBox(width: 15),
+                          _buildStatusButton(
+                            controller,
+                            "ไม่เป็นประจำเดือน",
+                            const Color(0xFFA6E3F9),
+                            false,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 30),
+                    ],
+
                     Wrap(
                       spacing: 15,
                       runSpacing: 20,
@@ -969,15 +1027,31 @@ class ProfilePage extends StatelessWidget {
                         onPressed: () {
                           final saved = controller.saveDailyData();
                           if (!saved) return;
-                          if (!controller.getPeriodStatusForSelectedDay()) {
-                            return;
-                          }
+
                           final selectedSymptoms = controller
                               .getSymptomsForSelectedDay();
-                          if (selectedSymptoms.isEmpty) {
-                            controller.showAdviceModal();
+
+                          // 💡 ตรวจสอบและแสดง Popup ตามเพศและอาการ
+                          if (controller.isFemale) {
+                            if (!controller.getPeriodStatusForSelectedDay() &&
+                                selectedSymptoms.isEmpty)
+                              return;
+
+                            if (selectedSymptoms.isEmpty) {
+                              controller
+                                  .showAdviceModal(); // เป็นประจำเดือนแต่ไม่มีอาการ
+                            } else {
+                              controller.showSymptomAdviceModal(
+                                selectedSymptoms,
+                              );
+                            }
                           } else {
-                            controller.showSymptomAdviceModal(selectedSymptoms);
+                            // 💡 ชาย / LGBTQ+ แสดง Popup เมื่อมีอาการเท่านั้น
+                            if (selectedSymptoms.isNotEmpty) {
+                              controller.showSymptomAdviceModal(
+                                selectedSymptoms,
+                              );
+                            }
                           }
                         },
                         style: ElevatedButton.styleFrom(
