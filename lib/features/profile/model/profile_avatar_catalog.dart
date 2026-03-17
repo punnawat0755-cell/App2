@@ -4,10 +4,11 @@ class ProfileAvatarCatalog {
   ProfileAvatarCatalog._();
 
   static const String _basePath = 'assets/images/profile_avatars';
+  static const int _avatarCount = 12;
 
   static final List<String> assetPaths = List<String>.unmodifiable(
     List<String>.generate(
-      10,
+      _avatarCount,
       (index) => '$_basePath/avatar_${index + 1}.png',
     ),
   );
