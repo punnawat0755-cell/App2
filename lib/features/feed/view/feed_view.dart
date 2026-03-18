@@ -89,6 +89,7 @@ class _FeedPageState extends State<FeedPage> {
     } catch (error) {
       if (!mounted) return;
       _showSnackBar('อัปเดตการกดถูกใจไม่สำเร็จ: $error', isError: true);
+      rethrow;
     }
   }
 
@@ -224,6 +225,7 @@ class _FeedPageState extends State<FeedPage> {
                             final isLiked = likedPostIds.contains(post.id);
 
                             return FeedPostCard(
+                              key: ValueKey(post.id),
                               post: post,
                               isLiked: isLiked,
                               onAuthorTap: () => _openAuthorProfile(post),
@@ -284,6 +286,7 @@ class FeedProfilePage extends StatelessWidget {
           backgroundColor: Colors.red,
         ),
       );
+      rethrow;
     }
   }
 
@@ -417,6 +420,7 @@ class FeedProfilePage extends StatelessWidget {
 
                     final post = posts[index - 1];
                     return FeedPostCard(
+                      key: ValueKey(post.id),
                       post: post,
                       isLiked: likedPostIds.contains(post.id),
                       onAuthorTap: null,
@@ -913,7 +917,7 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
   }
 }
 
-class FeedPostCard extends StatelessWidget {
+class FeedPostCard extends StatefulWidget {
   const FeedPostCard({
     super.key,
     required this.post,
@@ -925,9 +929,70 @@ class FeedPostCard extends StatelessWidget {
 
   final FeedPost post;
   final bool isLiked;
-  final VoidCallback? onToggleLike;
+  final Future<void> Function()? onToggleLike;
   final VoidCallback? onAuthorTap;
   final VoidCallback? onDelete;
+
+  @override
+  State<FeedPostCard> createState() => _FeedPostCardState();
+}
+
+class _FeedPostCardState extends State<FeedPostCard> {
+  late bool _displayIsLiked;
+  late int _displayLikeCount;
+  bool _isUpdatingLike = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayIsLiked = widget.isLiked;
+    _displayLikeCount = widget.post.likeCount;
+  }
+
+  @override
+  void didUpdateWidget(covariant FeedPostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLiked != oldWidget.isLiked) {
+      _displayIsLiked = widget.isLiked;
+    }
+    if (widget.post.likeCount != oldWidget.post.likeCount) {
+      _displayLikeCount = widget.post.likeCount;
+    }
+  }
+
+  Future<void> _handleToggleLike() async {
+    final onToggleLike = widget.onToggleLike;
+    if (onToggleLike == null || _isUpdatingLike) {
+      return;
+    }
+
+    final previousIsLiked = _displayIsLiked;
+    final previousLikeCount = _displayLikeCount;
+    final nextIsLiked = !previousIsLiked;
+    final nextLikeCount = nextIsLiked
+        ? previousLikeCount + 1
+        : (previousLikeCount > 0 ? previousLikeCount - 1 : 0);
+
+    setState(() {
+      _displayIsLiked = nextIsLiked;
+      _displayLikeCount = nextLikeCount;
+      _isUpdatingLike = true;
+    });
+
+    try {
+      await onToggleLike();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _displayIsLiked = previousIsLiked;
+        _displayLikeCount = previousLikeCount;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingLike = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -940,19 +1005,19 @@ class FeedPostCard extends StatelessWidget {
           Row(
             children: [
               GestureDetector(
-                onTap: onAuthorTap,
+                onTap: widget.onAuthorTap,
                 child: _AuthorAvatar(
-                  name: post.authorName,
-                  avatarUrl: post.authorAvatarUrl,
+                  name: widget.post.authorName,
+                  avatarUrl: widget.post.authorAvatarUrl,
                   radius: 20,
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: GestureDetector(
-                  onTap: onAuthorTap,
+                  onTap: widget.onAuthorTap,
                   child: Text(
-                    post.authorName,
+                    widget.post.authorName,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -961,12 +1026,12 @@ class FeedPostCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (onDelete != null)
+              if (widget.onDelete != null)
                 PopupMenuButton<String>(
                   color: Colors.white,
                   icon: const Icon(Icons.more_horiz, color: Colors.grey),
                   onSelected: (value) {
-                    if (value == 'delete') onDelete?.call();
+                    if (value == 'delete') widget.onDelete?.call();
                   },
                   itemBuilder: (context) => const [
                     PopupMenuItem<String>(
@@ -977,17 +1042,17 @@ class FeedPostCard extends StatelessWidget {
                 ),
             ],
           ),
-          if (post.content.trim().isNotEmpty) ...[
+          if (widget.post.content.trim().isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
-              post.content,
+              widget.post.content,
               style: const TextStyle(
                 color: Colors.grey,
                 height: 1.5,
               ),
             ),
           ],
-          if ((post.imageUrl ?? '').isNotEmpty) ...[
+          if ((widget.post.imageUrl ?? '').isNotEmpty) ...[
             const SizedBox(height: 12),
             Center(
               child: ClipRRect(
@@ -996,7 +1061,7 @@ class FeedPostCard extends StatelessWidget {
                   width: 250,
                   height: 300,
                   child: Image.network(
-                    post.imageUrl!,
+                    widget.post.imageUrl!,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) => Container(
                       color: Colors.grey[200],
@@ -1014,21 +1079,24 @@ class FeedPostCard extends StatelessWidget {
           ],
           const SizedBox(height: 10),
           GestureDetector(
-            onTap: onToggleLike,
+            onTap: _handleToggleLike,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: isLiked ? const Color(0xFF4489D7) : Colors.grey,
+                  _displayIsLiked ? Icons.favorite : Icons.favorite_border,
+                  color:
+                      _displayIsLiked ? const Color(0xFF4489D7) : Colors.grey,
                   size: 32,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  post.likeCount.toString(),
+                  _displayLikeCount.toString(),
                   style: TextStyle(
                     color: Colors.grey,
-                    fontWeight: isLiked ? FontWeight.bold : FontWeight.normal,
+                    fontWeight: _displayIsLiked
+                        ? FontWeight.bold
+                        : FontWeight.normal,
                   ),
                 ),
               ],

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/features/login/view/login.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/login/view/policy.dart';
 import 'package:flutter_application_1/features/setting/view/edit_profile_page.dart';
@@ -78,6 +79,26 @@ class _SettingPageState extends State<SettingPage> {
             'Seal';
         _isLoadingDisplayName = false;
       });
+    }
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      await _supabase.auth.signOut();
+
+      if (!mounted) {
+        return;
+      }
+
+      Get.offAll(() => const LoginPage());
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('ออกจากระบบไม่สำเร็จ: $error')),
+      );
     }
   }
 
@@ -204,6 +225,8 @@ class _SettingPageState extends State<SettingPage> {
                   'รายการโปรด',
                   () => Get.to(() => const FavoritesPage()),
                 ),
+                const SizedBox(height: 56),
+                _buildLogoutButton(),
               ],
             ),
           ),
@@ -372,6 +395,39 @@ class _SettingPageState extends State<SettingPage> {
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         onTap: onTap,
+      ),
+    );
+  }
+
+  Widget _buildLogoutButton() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: _handleLogout,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'ออกจากระบบ',
+              style: GoogleFonts.mitr(
+                textStyle: const TextStyle(
+                  color: Color(0xFF9E9E9E),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Image.asset(
+              'assets/images/exit.png',
+              width: 34,
+              height: 34,
+              fit: BoxFit.contain,
+            ),
+          ],
+        ),
       ),
     );
   }

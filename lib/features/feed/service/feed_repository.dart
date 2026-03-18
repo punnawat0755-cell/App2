@@ -24,12 +24,14 @@ class FeedRepository {
 
   static const _postsTable = 'posts';
   static const _postMediaTable = 'post_media';
+  static const _postLikesTable = 'post_reactions';
   static const _profilesTable = 'profiles';
   static const _feedImageBucketConfig = String.fromEnvironment(
     'SUPABASE_FEED_IMAGE_BUCKET',
     defaultValue: 'app_media',
   );
   static const _imageMediaType = 'image';
+  static const _likeReaction = 'like';
 
   final SupabaseClient _client;
   final ContentModerationService _moderationService =
@@ -37,27 +39,30 @@ class FeedRepository {
 
   String get _feedImageBucket => _normalizeBucketName(_feedImageBucketConfig);
 
-  bool get supportsLikeActions => false;
+  bool get supportsLikeActions => true;
 
   Stream<List<FeedPost>> watchPosts() {
-    return _client
-        .from(_postsTable)
-        .stream(primaryKey: const ['id'])
-        .order('created_at', ascending: false)
-        .asyncMap(_mapPosts);
+    return _watchMappedPosts();
   }
 
   Stream<List<FeedPost>> watchPostsByAuthor(String authorId) {
-    return _client
-        .from(_postsTable)
-        .stream(primaryKey: const ['id'])
-        .eq('user_id', authorId)
-        .order('created_at', ascending: false)
-        .asyncMap(_mapPosts);
+    return _watchMappedPosts(authorId: authorId);
   }
 
   Stream<Set<String>> watchLikedPostIds(String userId) {
-    return Stream<Set<String>>.value(const <String>{});
+    return _client
+        .from(_postLikesTable)
+        .stream(primaryKey: const ['post_id', 'user_id'])
+        .eq('user_id', userId)
+        .map(
+          (rows) => rows
+              .where(
+                (row) => row['reaction']?.toString() == _likeReaction,
+              )
+              .map((row) => row['post_id']?.toString() ?? '')
+              .where((id) => id.isNotEmpty)
+              .toSet(),
+        );
   }
 
   Future<FeedComposerIdentity> getComposerIdentity() async {
@@ -136,7 +141,7 @@ class FeedRepository {
       );
       createdPostId = postId;
 
-      if (!hasImage || selectedImageBytes == null) {
+      if (!hasImage) {
         return;
       }
 
@@ -168,15 +173,22 @@ class FeedRepository {
   }
 
   Future<void> likePost(String postId) async {
-    throw const PostgrestException(
-      message: 'ยังไม่มีตารางไลก์รายผู้ใช้สำหรับ feed นี้',
-    );
+    final user = _requireUser();
+    await _client.from(_postLikesTable).upsert({
+      'post_id': postId,
+      'user_id': user.id,
+      'reaction': _likeReaction,
+    }, onConflict: 'post_id,user_id');
   }
 
   Future<void> unlikePost(String postId) async {
-    throw const PostgrestException(
-      message: 'ยังไม่มีตารางไลก์รายผู้ใช้สำหรับ feed นี้',
-    );
+    final user = _requireUser();
+    await _client
+        .from(_postLikesTable)
+        .delete()
+        .eq('post_id', postId)
+        .eq('reaction', _likeReaction)
+        .eq('user_id', user.id);
   }
 
   Future<void> deletePost(String postId) async {
@@ -246,6 +258,7 @@ class FeedRepository {
     final namesByUserId = <String, String>{};
     final avatarsByUserId = <String, String>{};
     final imageUrlsByPostId = <String, String>{};
+    final likeCountsByPostId = <String, int>{};
 
     if (authorIds.isNotEmpty) {
       try {
@@ -309,6 +322,25 @@ class FeedRepository {
       } catch (_) {
         // Keep posts visible even if post_media fetch fails.
       }
+
+      try {
+        final likeRows = await _client
+            .from(_postLikesTable)
+            .select('post_id')
+            .eq('reaction', _likeReaction)
+            .inFilter('post_id', postIds);
+
+        for (final row in likeRows) {
+          final map = Map<String, dynamic>.from(row);
+          final postId = map['post_id']?.toString() ?? '';
+          if (postId.isEmpty) {
+            continue;
+          }
+          likeCountsByPostId[postId] = (likeCountsByPostId[postId] ?? 0) + 1;
+        }
+      } catch (_) {
+        // Keep feed visible even if like counts fail to load.
+      }
     }
 
     final posts = rows.map((row) {
@@ -318,10 +350,91 @@ class FeedRepository {
       map['author_name'] = namesByUserId[userId];
       map['author_avatar_url'] = avatarsByUserId[userId];
       map['image_url'] = imageUrlsByPostId[postId];
+      map['like_count'] = likeCountsByPostId[postId] ?? map['like_count'];
       return FeedPost.fromMap(map);
     }).toList();
     posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return posts;
+  }
+
+  Stream<List<FeedPost>> _watchMappedPosts({String? authorId}) {
+    late final StreamController<List<FeedPost>> controller;
+    StreamSubscription<List<Map<String, dynamic>>>? postsSubscription;
+    StreamSubscription<List<Map<String, dynamic>>>? mediaSubscription;
+    StreamSubscription<List<Map<String, dynamic>>>? likesSubscription;
+
+    List<Map<String, dynamic>> latestPostRows = const [];
+    var hasLoadedPosts = false;
+
+    Future<void> emitMappedPosts() async {
+      if (!hasLoadedPosts) {
+        return;
+      }
+
+      try {
+        controller.add(await _mapPosts(latestPostRows));
+      } catch (error, stackTrace) {
+        controller.addError(error, stackTrace);
+      }
+    }
+
+    controller = StreamController<List<FeedPost>>(
+      onListen: () {
+        void onPosts(List<Map<String, dynamic>> rows) {
+          latestPostRows = rows
+              .map<Map<String, dynamic>>(
+                (row) => Map<String, dynamic>.from(row),
+              )
+              .toList();
+          hasLoadedPosts = true;
+          unawaited(emitMappedPosts());
+        }
+
+        if (authorId != null && authorId.isNotEmpty) {
+          postsSubscription = _client
+              .from(_postsTable)
+              .stream(primaryKey: const ['id'])
+              .eq('user_id', authorId)
+              .order('created_at', ascending: false)
+              .listen(
+                onPosts,
+                onError: controller.addError,
+              );
+        } else {
+          postsSubscription = _client
+              .from(_postsTable)
+              .stream(primaryKey: const ['id'])
+              .order('created_at', ascending: false)
+              .listen(
+                onPosts,
+                onError: controller.addError,
+              );
+        }
+
+        mediaSubscription = _client
+            .from(_postMediaTable)
+            .stream(primaryKey: const ['post_id', 'storage_path'])
+            .listen(
+              (_) => unawaited(emitMappedPosts()),
+              onError: (_, __) {},
+            );
+
+        likesSubscription = _client
+            .from(_postLikesTable)
+            .stream(primaryKey: const ['post_id', 'user_id'])
+            .listen(
+              (_) => unawaited(emitMappedPosts()),
+              onError: (_, __) {},
+            );
+      },
+      onCancel: () async {
+        await postsSubscription?.cancel();
+        await mediaSubscription?.cancel();
+        await likesSubscription?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   User _requireUser() {

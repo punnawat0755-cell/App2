@@ -183,16 +183,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _handleLogout() async {
-    await supabase.auth.signOut();
-    if (!mounted) return;
-
-    setState(() {
-      _displayName = 'ผู้ใช้';
-      _isNameLoading = false;
-    });
-  }
-
   void _handleClipTap(_HomeClip clip) {
     debugPrint('ยังไม่มีหน้าปลายทางสำหรับ ${clip.title}');
   }
@@ -211,47 +201,40 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  IconButton(
-                    onPressed: _handleLogout,
-                    icon: const Icon(Icons.logout, color: Color(0xFF4489D7)),
-                    tooltip: 'Log out',
-                  ),
-                  GestureDetector(
-                    onTap: () async {
-                      await Get.to(() => const SettingPage());
-                      if (!mounted) {
-                        return;
-                      }
-                      await _loadUsername();
-                    },
-                    child: SizedBox(
-                      width: 50,
-                      height: 50,
-                      child: Obx(
-                        () => Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 3),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.06),
-                                blurRadius: 10,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                            image: DecorationImage(
-                              image: avatarController.avatarImageProvider,
-                              fit: BoxFit.cover,
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () async {
+                    await Get.to(() => const SettingPage());
+                    if (!mounted) {
+                      return;
+                    }
+                    await _loadUsername();
+                  },
+                  child: SizedBox(
+                    width: 50,
+                    height: 50,
+                    child: Obx(
+                      () => Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.06),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
                             ),
+                          ],
+                          image: DecorationImage(
+                            image: avatarController.avatarImageProvider,
+                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
               const SizedBox(height: 5),
               Text(
