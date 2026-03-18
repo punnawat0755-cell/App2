@@ -5,7 +5,7 @@ import 'package:flutter_application_1/core/services/content_moderation_service.d
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
 import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
 import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
-import 'package:flutter_application_1/supabase_client.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FeedPage extends StatefulWidget {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'package:flutter_application_1/supabase_client.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'login.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -95,7 +95,8 @@ class _RegisterPageState extends State<RegisterPage> {
       final password = _passwordController.text.trim();
 
       if (username.isEmpty || email.isEmpty || password.isEmpty) {
-        throw const AuthException('กรุณากรอกข้อมูลให้ครบ (Name, Email, Password)');
+        throw const AuthException(
+            'กรุณากรอกข้อมูลให้ครบ (Name, Email, Password)');
       }
       if (_birthday == null) {
         throw const AuthException('กรุณาเลือกวันเกิด');
@@ -214,9 +215,13 @@ class _RegisterPageState extends State<RegisterPage> {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.black54),
-          suffixIcon: suffix ?? (suffixIcon != null ? Icon(suffixIcon, color: Colors.grey) : null),
+          suffixIcon: suffix ??
+              (suffixIcon != null
+                  ? Icon(suffixIcon, color: Colors.grey)
+                  : null),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
         ),
       ),
     );
@@ -309,7 +314,8 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   const SizedBox(height: 30),
                   _buildInputLabel('ชื่อผู้ใช้งาน', isRequired: true),
-                  _buildTextField(controller: _usernameController, hint: 'แมวน้ำ'),
+                  _buildTextField(
+                      controller: _usernameController, hint: 'แมวน้ำ'),
                   _buildInputLabel('วันเกิด', isRequired: true),
                   _buildTextField(
                     controller: _birthdayController,
@@ -319,7 +325,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     suffixIcon: Icons.calendar_today_outlined,
                     suffix: IconButton(
                       onPressed: _pickBirthday,
-                      icon: const Icon(Icons.calendar_today_outlined, color: Colors.grey),
+                      icon: const Icon(Icons.calendar_today_outlined,
+                          color: Colors.grey),
                     ),
                   ),
                   _buildInputLabel('เพศ', isRequired: true),

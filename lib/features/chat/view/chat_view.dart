@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:get/get.dart';
 
-import 'package:flutter_application_1/bottom_bar.dart';
+import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/features/chat/view/chat_confirm_dialog.dart';
 import 'package:flutter_application_1/features/chat_user/bindings/chat_binding.dart';
 import 'package:flutter_application_1/features/chat/view/conversation_summary_screen.dart';

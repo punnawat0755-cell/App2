@@ -146,6 +146,9 @@ class ProfileController extends GetxController {
   String get dateKey =>
       getDateKey(selectedYear.value, selectedMonth.value, selectedDate.value);
 
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
   String _normalizeCalendarDateKey(dynamic rawValue) {
     final parsedDate = _tryParseDate(rawValue);
     if (parsedDate != null) {
@@ -300,6 +303,11 @@ class ProfileController extends GetxController {
     notesController.clear();
   }
 
+  Future<void> refreshProfile() async {
+    _resetProfileState();
+    await _bootstrapProfile();
+  }
+
   String _normalizeGender(String? raw) {
     final value = raw?.trim().toLowerCase();
     switch (value) {
@@ -341,7 +349,10 @@ class ProfileController extends GetxController {
           final key = _normalizeCalendarDateKey(row['calendar_date']);
           if (key.isEmpty) continue;
 
-          dailyPeriodStatus[key] = row['is_menstruating'] ?? false;
+          final isMenstruating = row['is_menstruating'];
+          if (isMenstruating is bool) {
+            dailyPeriodStatus[key] = isMenstruating;
+          }
 
           if (row['symptoms'] != null) {
             dailySymptoms[key] = List<String>.from(row['symptoms']);
@@ -405,13 +416,19 @@ class ProfileController extends GetxController {
     if (_n8nPeriodWebhook.trim().isNotEmpty) {
       final ok = await _fetchPeriodPredictionFromN8n(userId);
       if (ok) {
-        _trimPredictedDaysByRecordedPeriodStatus();
+        _reconcilePredictedDaysWithRecordedStatus();
         return;
       }
     }
 
+    final usedLocalFallback = _applyLocalOngoingPeriodFallback();
+    if (usedLocalFallback) {
+      _reconcilePredictedDaysWithRecordedStatus();
+      return;
+    }
+
     await _fetchPeriodPredictionFromSupabaseRpc();
-    _trimPredictedDaysByRecordedPeriodStatus();
+    _reconcilePredictedDaysWithRecordedStatus();
   }
 
   Future<bool> _fetchPeriodPredictionFromN8n(String userId) async {
@@ -459,6 +476,9 @@ class ProfileController extends GetxController {
 
       final decoded = jsonDecode(response.body);
       final payload = _unwrapWebhookPayload(decoded);
+      if (!_payloadHasExplicitPredictionWindow(payload)) {
+        return false;
+      }
       return _applyPredictionPayload(payload);
     } catch (e) {
       debugPrint('n8n period prediction error: $e');
@@ -604,6 +624,238 @@ class ProfileController extends GetxController {
       dailyPeriodStatus.containsKey(dayKey) &&
       dailyPeriodStatus[dayKey] == false;
 
+  bool _isCurrentSelectedMonth() {
+    final now = DateTime.now();
+    return selectedYear.value == now.year && selectedMonth.value == now.month;
+  }
+
+  List<DateTime> _latestRecordedPeriodStreak() {
+    final dates = dailyPeriodStatus.entries
+        .where((entry) => entry.value == true)
+        .map((entry) => _tryParseDate(entry.key))
+        .whereType<DateTime>()
+        .map(_dateOnly)
+        .where((date) =>
+            date.year == selectedYear.value &&
+            date.month == selectedMonth.value)
+        .toSet()
+        .toList()
+      ..sort((a, b) => a.compareTo(b));
+
+    if (dates.isEmpty) return <DateTime>[];
+
+    var currentStreak = <DateTime>[];
+    var latestStreak = <DateTime>[];
+
+    for (final date in dates) {
+      if (currentStreak.isEmpty) {
+        currentStreak = <DateTime>[date];
+        continue;
+      }
+
+      if (date.difference(currentStreak.last).inDays == 1) {
+        currentStreak.add(date);
+        continue;
+      }
+
+      latestStreak = List<DateTime>.from(currentStreak);
+      currentStreak = <DateTime>[date];
+    }
+
+    if (currentStreak.isNotEmpty) {
+      latestStreak = List<DateTime>.from(currentStreak);
+    }
+
+    return latestStreak;
+  }
+
+  bool _hasExplicitNonPeriodAfterDate(DateTime date) {
+    final target = _dateOnly(date);
+    for (final entry in dailyPeriodStatus.entries) {
+      if (entry.value != false) continue;
+
+      final parsed = _tryParseDate(entry.key);
+      if (parsed == null) continue;
+
+      final day = _dateOnly(parsed);
+      if (day.year != selectedYear.value || day.month != selectedMonth.value) {
+        continue;
+      }
+
+      if (day.isAfter(target)) return true;
+    }
+
+    return false;
+  }
+
+  int _estimatedLocalPeriodDurationDays(int recordedDays) {
+    final statsBased =
+        statAvgPeriodDuration.value > 0 ? statAvgPeriodDuration.value : 5;
+    final estimated = statsBased < recordedDays ? recordedDays : statsBased;
+    return estimated.clamp(1, 10).toInt();
+  }
+
+  bool _applyLocalOngoingPeriodFallback() {
+    if (!_isCurrentSelectedMonth()) return false;
+
+    final streak = _latestRecordedPeriodStreak();
+    if (streak.isEmpty) return false;
+
+    final start = streak.first;
+    final actualEnd = streak.last;
+    if (_hasExplicitNonPeriodAfterDate(actualEnd)) return false;
+
+    final durationDays = _estimatedLocalPeriodDurationDays(streak.length);
+    final predictedEnd = start.add(Duration(days: durationDays - 1));
+    if (!predictedEnd.isAfter(actualEnd)) return false;
+
+    _replacePredictedDays(
+      List.generate(durationDays, (index) => start.add(Duration(days: index))),
+    );
+
+    if (predictionConfidence.value.trim().isEmpty) {
+      predictionConfidence.value = 'low';
+    }
+    _setPredictionTextFromEndDate(predictedEnd);
+    debugPrint(
+      'period prediction local fallback start=$start actualEnd=$actualEnd predictedEnd=$predictedEnd',
+    );
+    return true;
+  }
+
+  bool _payloadHasExplicitPredictionWindow(Map<String, dynamic> payload) {
+    if (payload.isEmpty) return false;
+
+    final directPredictedStart = _tryParseDate(_readValueIgnoreCase(payload, [
+      'predicted_start_date',
+      'predictedStartDate',
+      'predicted_next_period',
+      'predictedNextPeriod',
+    ]));
+    final directPredictedEnd = _tryParseDate(_readValueIgnoreCase(payload, [
+      'predicted_end_date',
+      'predictedEndDate',
+      'period_end_date',
+      'periodEndDate',
+    ]));
+    if (directPredictedStart != null || directPredictedEnd != null) {
+      return true;
+    }
+
+    final predictionRaw = payload['prediction'];
+    if (predictionRaw is Map || predictionRaw is Map<String, dynamic>) {
+      final prediction = predictionRaw is Map<String, dynamic>
+          ? predictionRaw
+          : Map<String, dynamic>.from(predictionRaw as Map);
+      final nestedPredictedEnd =
+          _tryParseDate(_readValueIgnoreCase(prediction, [
+        'predicted_end_date',
+        'predictedEndDate',
+      ]));
+      if (nestedPredictedEnd != null) return true;
+    }
+
+    final predictedDaysValue = _readValueIgnoreCase(payload, [
+      'predicted_period_days',
+      'predicted_dates',
+      'predictedDays',
+      'period_days',
+      'periodDays',
+    ]);
+    if (predictedDaysValue is List && predictedDaysValue.isNotEmpty) {
+      return true;
+    }
+    if (predictedDaysValue is String && predictedDaysValue.trim().isNotEmpty) {
+      return true;
+    }
+
+    bool hasSupportedEvents(dynamic eventsRaw) {
+      if (eventsRaw is! List) return false;
+
+      for (final eventRaw in eventsRaw) {
+        Map<String, dynamic>? event;
+        if (eventRaw is Map<String, dynamic>) {
+          event = eventRaw;
+        } else if (eventRaw is Map) {
+          event = Map<String, dynamic>.from(eventRaw);
+        }
+        if (event == null) continue;
+
+        final type = (event['type'] ?? '').toString().trim().toLowerCase();
+        if (type == 'next_period_estimate' ||
+            type == 'next_period' ||
+            type == 'predicted_period' ||
+            type == 'predicted_period_end') {
+          return true;
+        }
+      }
+
+      return false;
+    }
+
+    return hasSupportedEvents(payload['events']) ||
+        hasSupportedEvents(payload['calendar_events']);
+  }
+
+  List<DateTime> _sortedPredictedDates() {
+    final dates = predictedPeriodDays
+        .map(_tryParseDate)
+        .whereType<DateTime>()
+        .map(_dateOnly)
+        .toSet()
+        .toList()
+      ..sort((a, b) => a.compareTo(b));
+    return dates;
+  }
+
+  void _replacePredictedDays(Iterable<DateTime> dates) {
+    final nextKeys = dates
+        .map((date) => getDateKey(date.year, date.month, date.day))
+        .toSet();
+
+    predictedPeriodDays
+      ..clear()
+      ..addAll(nextKeys);
+    predictedPeriodDays.refresh();
+  }
+
+  bool _shiftPredictedDaysForwardIfNeeded() {
+    final predictedDates = _sortedPredictedDates();
+    if (predictedDates.isEmpty) return false;
+
+    final hasRecordedPeriod = predictedDates.any((date) {
+      final key = getDateKey(date.year, date.month, date.day);
+      return dailyPeriodStatus[key] == true;
+    });
+    if (hasRecordedPeriod) return false;
+
+    final todayDate = _dateOnly(DateTime.now());
+    final originalStart = predictedDates.first;
+
+    int shiftDays = 0;
+    if (originalStart.isBefore(todayDate)) {
+      shiftDays = todayDate.difference(originalStart).inDays;
+    }
+
+    while (true) {
+      final shiftedStart = originalStart.add(Duration(days: shiftDays));
+      final shiftedStartKey = getDateKey(
+        shiftedStart.year,
+        shiftedStart.month,
+        shiftedStart.day,
+      );
+      if (!_hasExplicitNonPeriodRecord(shiftedStartKey)) break;
+      shiftDays++;
+    }
+
+    if (shiftDays <= 0) return false;
+
+    _replacePredictedDays(
+      predictedDates.map((date) => date.add(Duration(days: shiftDays))),
+    );
+    return true;
+  }
+
   void _trimPredictedDaysByRecordedPeriodStatus() {
     if (predictedPeriodDays.isEmpty) return;
 
@@ -634,6 +886,20 @@ class ProfileController extends GetxController {
       (key) => key.compareTo(firstRecordedNonPeriodDay!) >= 0,
     );
     predictedPeriodDays.refresh();
+  }
+
+  void _reconcilePredictedDaysWithRecordedStatus() {
+    if (predictedPeriodDays.isEmpty) return;
+
+    final shifted = _shiftPredictedDaysForwardIfNeeded();
+    _trimPredictedDaysByRecordedPeriodStatus();
+
+    if (shifted && predictedPeriodDays.isNotEmpty) {
+      final shiftedDates = _sortedPredictedDates();
+      if (shiftedDates.isNotEmpty) {
+        _setPredictionTextFromDate(shiftedDates.first);
+      }
+    }
   }
 
   bool _applyPredictionPayload(Map<String, dynamic> payload) {
@@ -933,7 +1199,16 @@ class ProfileController extends GetxController {
     }
   }
 
-  bool getPeriodStatusForSelectedDay() => dailyPeriodStatus[dateKey] ?? false;
+  bool? getExplicitPeriodStatusForSelectedDay() {
+    if (selectedDate.value == 0 || !dailyPeriodStatus.containsKey(dateKey)) {
+      return null;
+    }
+    return dailyPeriodStatus[dateKey];
+  }
+
+  bool getPeriodStatusForSelectedDay() =>
+      getExplicitPeriodStatusForSelectedDay() == true;
+
   List<String> getSymptomsForSelectedDay() => dailySymptoms[dateKey] ?? [];
 
   void setPeriodStatus(bool status) {
@@ -960,16 +1235,18 @@ class ProfileController extends GetxController {
     dailySymptoms.refresh();
   }
 
-  Future<void> saveDailyData() async {
+  Future<bool> saveDailyData({bool showSuccessSnackbar = true}) async {
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) {
       Get.snackbar("ข้อผิดพลาด", "กรุณาเข้าสู่ระบบก่อน",
           backgroundColor: Colors.redAccent, colorText: Colors.white);
-      return;
+      return false;
     }
 
     try {
-      bool isPeriod = getPeriodStatusForSelectedDay();
+      final hasExplicitPeriodStatus = dailyPeriodStatus.containsKey(dateKey);
+      final bool? isPeriod =
+          hasExplicitPeriodStatus ? dailyPeriodStatus[dateKey] : null;
       await supabase.rpc(
         'save_calendar_health_log',
         params: {
@@ -977,10 +1254,12 @@ class ProfileController extends GetxController {
           'p_is_menstruating': isPeriod,
           'p_symptoms': getSymptomsForSelectedDay(),
           // [ใหม่] ส่งค่าใหม่ทั้งหมด (null ถ้าไม่เป็นประจำเดือน)
-          'p_flow_level':
-              isFemaleAccount && isPeriod ? currentFlowLevel.value : null,
-          'p_pain_level':
-              isFemaleAccount && isPeriod ? currentPainLevel.value : null,
+          'p_flow_level': isFemaleAccount && isPeriod == true
+              ? currentFlowLevel.value
+              : null,
+          'p_pain_level': isFemaleAccount && isPeriod == true
+              ? currentPainLevel.value
+              : null,
           'p_notes': notesController.text.trim().isEmpty
               ? null
               : notesController.text.trim(),
@@ -988,18 +1267,22 @@ class ProfileController extends GetxController {
       );
 
       // อัปเดต local state
-      dailyFlowLevel[dateKey] = isPeriod ? currentFlowLevel.value : null;
-      dailyPainLevel[dateKey] = isPeriod ? currentPainLevel.value : null;
+      dailyFlowLevel[dateKey] =
+          isPeriod == true ? currentFlowLevel.value : null;
+      dailyPainLevel[dateKey] =
+          isPeriod == true ? currentPainLevel.value : null;
       dailyNotes[dateKey] = notesController.text.trim().isEmpty
           ? null
           : notesController.text.trim();
 
-      Get.snackbar(
-        "สำเร็จ ✨",
-        "บันทึกข้อมูลวันที่ ${selectedDate.value} เรียบร้อยแล้ว",
-        backgroundColor: const Color(0xFF2C5282),
-        colorText: Colors.white,
-      );
+      if (showSuccessSnackbar) {
+        Get.snackbar(
+          "สำเร็จ ✨",
+          "บันทึกข้อมูลวันที่ ${selectedDate.value} เรียบร้อยแล้ว",
+          backgroundColor: const Color(0xFF2C5282),
+          colorText: Colors.white,
+        );
+      }
 
       if (isFemaleAccount) {
         fetchPeriodPrediction();
@@ -1008,9 +1291,11 @@ class ProfileController extends GetxController {
       } else {
         await loadMonthData();
       }
+      return true;
     } catch (e) {
       Get.snackbar("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลได้: $e",
           backgroundColor: Colors.redAccent, colorText: Colors.white);
+      return false;
     }
   }
 
@@ -1079,6 +1364,82 @@ class ProfileController extends GetxController {
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
 
+  static const List<_PeriodCareSectionData> _periodCareSections = [
+    _PeriodCareSectionData(
+      symptomKey: 'ปวดท้อง',
+      title: 'ปวดท้อง',
+      tips: [
+        'ประคบร้อน: ใช้กระเป๋าน้ำร้อนหรือแผ่นแปะแก้ปวดท้อง วางบริเวณท้องน้อยความร้อนจะช่วยให้กล้ามเนื้อมดลูกที่หดตัวอยู่คลายตัวลง และเพิ่มการไหลเวียนเลือด',
+        'ยาแก้ปวด: กลุ่ม NSAIDs: เช่น Ibuprofen หรือ Mefenamic acid (พอนสแตน) จะช่วยยับยั้งสาร Prostaglandins ที่ทำให้มดลูกบีบตัว ได้ดีกว่าพาราเซตามอลปกติ (ควรทานหลังอาหารทันทีเพราะกัดกระเพาะ)',
+        'ยาคลายกล้ามเนื้อมดลูก: เช่น Buscopan ช่วยลดการเกร็งปวดได้ตรงจุด',
+        'จิบน้ำอุ่น: หลีกเลี่ยงน้ำเย็นจัดเพราะน้ำอุ่นช่วยให้เลือดไหลเวียนดีขึ้นและลดการเกร็งของกล้ามเนื้อ',
+        'เลี่ยงคาเฟอีน: ชา กาแฟ หรือน้ำอัดลมที่มีคาเฟอีน จะทำให้หลอดเลือดหดตัวและอาจกระตุ้นให้ปวดท้องมากขึ้น รวมถึงทำให้หงุดหงิดง่ายขึ้นด้วย',
+      ],
+    ),
+    _PeriodCareSectionData(
+      symptomKey: 'แปรปรวน',
+      title: 'อารมณ์แปรปรวน',
+      tips: [
+        'กินแป้งเชิงซ้อน (Complex Carbs): เช่น ข้าวกล้อง ขนมปังโฮลวีต ช่วยให้ระดับน้ำตาลในเลือดนิ่ง และช่วยเพิ่มการผลิต Serotonin ทำให้ใจนิ่งขึ้น',
+        'ลดน้ำตาลและคาเฟอีน: น้ำตาลทำให้สะใจแค่แป๊บเดียวแต่จะทำให้ "ดิ่ง" หนักกว่าเดิมตอนน้ำตาลตก ส่วนคาเฟอีนจะกระตุ้นความกระวนกระวาย และทำให้นอนไม่หลับ ซึ่งยิ่งทำให้อารมณ์พัง',
+      ],
+    ),
+    _PeriodCareSectionData(
+      symptomKey: 'ท้องอืด',
+      title: 'ท้องอืด',
+      tips: [
+        'ขยับร่างกายเบาๆ: การเดินเล่นสัก 10-15 นาที ช่วยกระตุ้นให้ลำไส้เคลื่อนตัวและขับลมออกมาได้ดีขึ้นมากครับ',
+        'เลี่ยงผักตระกูลกะหล่ำ: เช่น บรอกโคลี กะหล่ำปลี เพราะมีน้ำตาลที่ย่อยยากและทำให้เกิดแก๊สเยอะ',
+        'ลดอาหารรสจัดและของเค็ม: โซเดียมจะทำให้ร่างกายกักเก็บน้ำไว้มากขึ้น ยิ่งทำให้รู้สึกตัวบวมและท้องอืดหนักกว่าเดิม',
+      ],
+    ),
+    _PeriodCareSectionData(
+      symptomKey: 'ปวดหัวไมเกรน',
+      title: 'ปวดหัวไมเกรน',
+      tips: [
+        'หา "ที่มืดและเงียบ": สมองช่วงไมเกรนจะไวต่อสิ่งเร้ามาก การปิดไฟ นอนพักในห้องเงียบๆ สัก 20 นาทีช่วยได้มหาศาล',
+        'ประคบเย็น: ใช้เจลเย็นหรือผ้าชุบน้ำเย็นจัดประคบที่ท้ายทอยหรือขมับ ความเย็นจะช่วยให้หลอดเลือดที่ขยายตัวเกินไป (สาเหตุของไมเกรน) หดตัวลง',
+        'ยาแก้ปวด (ต้องไว): ไมเกรนต้องดักด้วยยาตั้งแต่ "เริ่มรู้สึกจี๊ด" ถ้าปล่อยให้ปวดจนคลื่นไส้ ยาจะดูดซึมได้ยากขึ้น (ยาเฉพาะกลุ่ม Triptans หรือยาพื้นฐานอย่าง Naproxen/Ibuprofen)',
+        'จิบน้ำเปล่าเยอะๆ: ร่างกายที่ขาดน้ำ (Dehydration) คือตัวกระตุ้นไมเกรนชั้นดี',
+      ],
+    ),
+    _PeriodCareSectionData(
+      symptomKey: 'หงุดหงิด',
+      title: 'หงุดหงิด',
+      tips: [
+        'Box Breathing: หายใจเข้า 4 วินาที, กลั้น 4 วินาที, ออก 4 วินาที, กลั้น 4 วินาที ทำวนไป 3-4 รอบ เพื่อลดการทำงานของระบบประสาท Sympathetic ที่ทำให้เรารู้สึก "อยากปะทะ"',
+        'ลดสิ่งเร้า: ปิดเสียงแจ้งเตือน หรือใส่หูฟังตัดเสียงรบกวน (Noise Cancelling) เพื่อลดภาระของสมองในการรับข้อมูล',
+      ],
+    ),
+    _PeriodCareSectionData(
+      symptomKey: 'เป็นไข้',
+      title: 'เป็นไข้',
+      tips: [
+        'เช็ดตัว: ใช้ผ้าชุบน้ำอุณหภูมิห้องเช็ดตามข้อพับเพื่อระบายความร้อน',
+        'ดื่มน้ำเยอะๆ: ไข้ทำให้ร่างกายเสียน้ำง่าย การดื่มน้ำช่วยลดอุณหภูมิและช่วยให้ระบบภูมิคุ้มกันทำงานดีขึ้น',
+        'พักผ่อนแบบ 100%: หยุดกิจกรรมทุกอย่าง เพราะร่างกายต้องใช้พลังงานทั้งหมดไปกับการซ่อมแซม',
+      ],
+    ),
+    _PeriodCareSectionData(
+      symptomKey: 'หิวบ่อย',
+      title: 'หิวบ่อย',
+      tips: [
+        'เน้นโปรตีนและใยอาหาร: กินไข่ต้ม ถั่ว หรือผัก เพื่อให้อิ่มนานขึ้นและน้ำตาลในเลือดนิ่ง',
+        'จิบน้ำก่อนกิน: บางครั้งสมองแยกไม่ออกระหว่าง "หิวน้ำ" กับ "หิวข้าว" ลองดื่มน้ำดูก่อน 1 แก้ว',
+        'ดาร์กช็อกโกแลต: ถ้าอยากของหวาน ให้เลือกอันที่มีโกโก้สูงๆ จะช่วยลดความอยากได้ดีกว่าขนมหวานจัดๆ',
+      ],
+    ),
+    _PeriodCareSectionData(
+      symptomKey: 'สิวขึ้น',
+      title: 'สิวขึ้น',
+      tips: [
+        'งดสัมผัสใบหน้า: มือเราสกปรกกว่าที่คิด ยิ่งจับยิ่งอักเสบ',
+        'ล้างปลอกหมอน: ถ้าสิวขึ้นซ้ำซาก ลองเช็กความสะอาดของที่นอน',
+        'ลดนมและน้ำตาล: งานวิจัยหลายฉบับชี้ว่านมวัวและของหวานกระตุ้นการอักเสบของผิว',
+      ],
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final ProfileController controller = Get.put(ProfileController());
@@ -1115,6 +1476,172 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  Future<void> _handleMenstrualSave(ProfileController controller) async {
+    final selectedSections = _selectedPeriodCareSections(controller);
+    final shouldShowPeriodCareDialog =
+        controller.getPeriodStatusForSelectedDay() &&
+            selectedSections.isNotEmpty;
+    final saved = await controller.saveDailyData(
+      showSuccessSnackbar: !shouldShowPeriodCareDialog,
+    );
+
+    if (saved && shouldShowPeriodCareDialog) {
+      await _showPeriodCareDialog(selectedSections);
+    }
+  }
+
+  List<_PeriodCareSectionData> _selectedPeriodCareSections(
+    ProfileController controller,
+  ) {
+    final selectedSymptoms = controller.getSymptomsForSelectedDay().toSet();
+    return _periodCareSections
+        .where((section) => selectedSymptoms.contains(section.symptomKey))
+        .toList();
+  }
+
+  Future<void> _showPeriodCareDialog(
+    List<_PeriodCareSectionData> sections,
+  ) {
+    return Get.dialog<void>(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 560,
+            maxHeight: Get.height * 0.9,
+          ),
+          child: Container(
+            clipBehavior: Clip.antiAlias,
+            decoration: BoxDecoration(
+              color: const Color(0xFFABE7F8),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'แนะนำวิธีการดูแลตัวเองช่วงเป็นประจำเดือน',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.mitr(
+                      textStyle: const TextStyle(
+                        color: Color(0xFF4489D7),
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children:
+                              sections.map(_buildPeriodCareSection).toList(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: 110,
+                    height: 42,
+                    child: FilledButton(
+                      onPressed: () => Get.back<void>(),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF5ECAF4),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      child: Text(
+                        'ปิด',
+                        style: GoogleFonts.mitr(
+                          textStyle: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      barrierDismissible: true,
+    );
+  }
+
+  Widget _buildPeriodCareSection(_PeriodCareSectionData section) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            section.title,
+            style: GoogleFonts.mitr(
+              textStyle: const TextStyle(
+                color: Color(0xFF4489D7),
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                height: 1.2,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...section.tips.map(_buildPeriodCareTip),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPeriodCareTip(String tip) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 7, right: 8),
+            child: Icon(
+              Icons.circle,
+              size: 5,
+              color: Color(0xFF4B94E9),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              tip,
+              style: GoogleFonts.mitr(
+                textStyle: const TextStyle(
+                  color: Color(0xFF4B94E9),
+                  fontSize: 13,
+                  height: 1.28,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeader(
     ProfileController controller,
     ProfileAvatarController avatarController,
@@ -1144,7 +1671,10 @@ class ProfilePage extends StatelessWidget {
           ),
         ),
         GestureDetector(
-          onTap: () => Get.to(() => const SettingPage()),
+          onTap: () async {
+            await Get.to(() => const SettingPage());
+            await controller.refreshProfile();
+          },
           child: Obx(
             () => CircleAvatar(
               radius: 25,
@@ -1299,8 +1829,7 @@ class ProfilePage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (whaleImage != null)
-                              const SizedBox(height: 4),
+                            if (whaleImage != null) const SizedBox(height: 4),
                             if (whaleImage != null)
                               Image.asset(
                                 whaleImage,
@@ -1433,7 +1962,7 @@ class ProfilePage extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
-                  onPressed: () => controller.saveDailyData(),
+                  onPressed: () => _handleMenstrualSave(controller),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2C5282),
                     shape: RoundedRectangleBorder(
@@ -1594,8 +2123,7 @@ class ProfilePage extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            if (whaleImage != null)
-                              const SizedBox(height: 4),
+                            if (whaleImage != null) const SizedBox(height: 4),
                             if (whaleImage != null)
                               Image.asset(
                                 whaleImage,
@@ -1657,25 +2185,6 @@ class ProfilePage extends StatelessWidget {
 
           return Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _buildStatusButton(
-                    controller,
-                    "มีความเครียด/ไม่สบาย",
-                    const Color(0xFFA6E3F9),
-                    true,
-                  ),
-                  const SizedBox(width: 15),
-                  _buildStatusButton(
-                    controller,
-                    "ปกติ",
-                    const Color(0xFFA6E3F9),
-                    false,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 30),
               Wrap(
                 spacing: 15,
                 runSpacing: 20,
@@ -1759,8 +2268,8 @@ class ProfilePage extends StatelessWidget {
     bool isPeriodTab,
   ) {
     return Obx(() {
-      bool isSelected =
-          controller.getPeriodStatusForSelectedDay() == isPeriodTab;
+      final selectedStatus = controller.getExplicitPeriodStatusForSelectedDay();
+      final isSelected = selectedStatus == isPeriodTab;
       return GestureDetector(
         onTap: () => controller.setPeriodStatus(isPeriodTab),
         child: Container(
@@ -1784,6 +2293,18 @@ class ProfilePage extends StatelessWidget {
       );
     });
   }
+}
+
+class _PeriodCareSectionData {
+  final String symptomKey;
+  final String title;
+  final List<String> tips;
+
+  const _PeriodCareSectionData({
+    required this.symptomKey,
+    required this.title,
+    required this.tips,
+  });
 }
 
 // // ==========================================

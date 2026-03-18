@@ -1,11 +1,85 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
+import 'package:flutter_application_1/features/login/view/policy.dart';
+import 'package:flutter_application_1/features/setting/view/edit_profile_page.dart';
+import 'package:flutter_application_1/features/setting/view/favorites_page.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-class SettingPage extends StatelessWidget {
+class SettingPage extends StatefulWidget {
   const SettingPage({super.key});
+
+  @override
+  State<SettingPage> createState() => _SettingPageState();
+}
+
+class _SettingPageState extends State<SettingPage> {
+  final SupabaseClient _supabase = Supabase.instance.client;
+  String _displayName = 'Seal';
+  bool _isLoadingDisplayName = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDisplayName();
+  }
+
+  Future<void> _loadDisplayName() async {
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _displayName = 'Seal';
+        _isLoadingDisplayName = false;
+      });
+      return;
+    }
+
+    try {
+      final row = await _supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      final metadata = user.userMetadata ?? const <String, dynamic>{};
+      final nextName = _firstNonEmpty([
+            row?['username'],
+            metadata['username'],
+            metadata['name'],
+            metadata['display_name'],
+            user.email?.split('@').first,
+          ]) ??
+          'Seal';
+
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _displayName = nextName;
+        _isLoadingDisplayName = false;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _displayName = _firstNonEmpty([
+              user.userMetadata?['username'],
+              user.userMetadata?['name'],
+              user.userMetadata?['display_name'],
+              user.email?.split('@').first,
+            ]) ??
+            'Seal';
+        _isLoadingDisplayName = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,7 +87,6 @@ class SettingPage extends StatelessWidget {
         Get.isRegistered<ProfileAvatarController>()
             ? Get.find<ProfileAvatarController>()
             : Get.put(ProfileAvatarController());
-    final displayName = _resolveDisplayName();
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFFF),
@@ -86,7 +159,7 @@ class SettingPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  displayName,
+                  _isLoadingDisplayName ? '...' : _displayName,
                   style: GoogleFonts.mitr(
                     textStyle: const TextStyle(
                       color: Color(0xFF4489D7),
@@ -111,16 +184,25 @@ class SettingPage extends StatelessWidget {
                 _buildSettingItem(
                   Image.asset('assets/images/person.png'),
                   'แก้ไขข้อมูล',
+                  () async {
+                    final shouldRefresh =
+                        await Get.to<bool>(() => const EditProfilePage());
+                    if (shouldRefresh == true) {
+                      await _loadDisplayName();
+                    }
+                  },
                 ),
                 const SizedBox(height: 20),
                 _buildSettingItem(
                   Image.asset('assets/images/lock.png'),
                   'ความเป็นส่วนตัว',
+                  () => Get.to(() => const PrivacyDetailPage()),
                 ),
                 const SizedBox(height: 20),
                 _buildSettingItem(
                   Image.asset('assets/images/heart.png'),
                   'รายการโปรด',
+                  () => Get.to(() => const FavoritesPage()),
                 ),
               ],
             ),
@@ -240,27 +322,21 @@ class SettingPage extends StatelessWidget {
     );
   }
 
-  String _resolveDisplayName() {
-    final user = Supabase.instance.client.auth.currentUser;
-    final metadata = user?.userMetadata ?? const <String, dynamic>{};
-    final candidates = [
-      metadata['username'],
-      metadata['name'],
-      metadata['display_name'],
-      user?.email?.split('@').first,
-    ];
-
-    for (final value in candidates) {
+  String? _firstNonEmpty(List<dynamic> values) {
+    for (final value in values) {
       final text = value?.toString().trim();
       if (text != null && text.isNotEmpty) {
         return text;
       }
     }
-
-    return 'Seal';
+    return null;
   }
 
-  Widget _buildSettingItem(Widget leading, String title) {
+  Widget _buildSettingItem(
+    Widget leading,
+    String title,
+    VoidCallback onTap,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFCEEFFE).withValues(alpha: 0.8),
@@ -295,7 +371,7 @@ class SettingPage extends StatelessWidget {
           size: 20,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-        onTap: () {},
+        onTap: onTap,
       ),
     );
   }

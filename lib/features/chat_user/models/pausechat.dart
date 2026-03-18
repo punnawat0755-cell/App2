@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import 'package:flutter_application_1/bottom_bar.dart';
+import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/features/chat/view/chat_view.dart';
 import 'package:flutter_application_1/features/chat_user/bindings/chat_binding.dart';
 import 'package:flutter_application_1/features/chat_user/services/chat_user_service.dart';
-import 'package:flutter_application_1/supabase_client.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 
 class PauseChatPage extends StatefulWidget {

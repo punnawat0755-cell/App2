@@ -6,7 +6,8 @@ import 'package:flutter_application_1/features/home/view/widget/article/article_
 import 'package:flutter_application_1/features/home/view/widget/article/article_detail.dart';
 import 'package:flutter_application_1/features/home/view/widget/home_widgets.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
-import 'package:flutter_application_1/supabase_client.dart';
+import 'package:flutter_application_1/features/setting/view/setting.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
 
@@ -218,24 +219,33 @@ class _HomePageState extends State<HomePage> {
                     icon: const Icon(Icons.logout, color: Color(0xFF4489D7)),
                     tooltip: 'Log out',
                   ),
-                  SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: Obx(
-                      () => Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+                  GestureDetector(
+                    onTap: () async {
+                      await Get.to(() => const SettingPage());
+                      if (!mounted) {
+                        return;
+                      }
+                      await _loadUsername();
+                    },
+                    child: SizedBox(
+                      width: 50,
+                      height: 50,
+                      child: Obx(
+                        () => Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.06),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                            image: DecorationImage(
+                              image: avatarController.avatarImageProvider,
+                              fit: BoxFit.cover,
                             ),
-                          ],
-                          image: DecorationImage(
-                            image: avatarController.avatarImageProvider,
-                            fit: BoxFit.cover,
                           ),
                         ),
                       ),

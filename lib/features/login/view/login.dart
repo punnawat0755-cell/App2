@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/bottom_bar.dart';
+import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'register.dart';
@@ -67,8 +67,7 @@ class _LoginPageState extends State<LoginPage> {
       } else {
         final bool? isAccepted = await Navigator.push<bool>(
           context,
-          MaterialPageRoute(
-              builder: (_) => const PrivacyPolicyPage()),
+          MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
         );
 
         if (!mounted) return;
@@ -152,8 +151,7 @@ class _LoginPageState extends State<LoginPage> {
       await supabase.auth.resetPasswordForEmail(email);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว')),
+        const SnackBar(content: Text('ส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว')),
       );
     } on AuthException catch (e) {
       _showError(_prettyAuthMessage(e.message));
@@ -193,8 +191,7 @@ class _LoginPageState extends State<LoginPage> {
           prefixIcon: Icon(icon, color: Colors.grey),
           suffixIcon: suffix,
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
         ),
       ),
     );
@@ -244,8 +241,7 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 40),
           child: Column(
             children: [
               const SizedBox(height: 60),
@@ -255,8 +251,7 @@ class _LoginPageState extends State<LoginPage> {
                 height: 150,
                 fit: BoxFit.contain,
                 errorBuilder: (ctx, obj, st) =>
-                    const Icon(Icons.image,
-                        size: 100, color: Colors.grey),
+                    const Icon(Icons.image, size: 100, color: Colors.grey),
               ),
               const SizedBox(height: 20),
               const Text(
@@ -272,8 +267,7 @@ class _LoginPageState extends State<LoginPage> {
                 controller: _emailController,
                 icon: Icons.person,
                 hint: 'อีเมล',
-                keyboardType:
-                    TextInputType.emailAddress,
+                keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 20),
               _roundedField(
@@ -282,12 +276,9 @@ class _LoginPageState extends State<LoginPage> {
                 hint: 'รหัสผ่าน',
                 obscure: _hidePw,
                 suffix: IconButton(
-                  onPressed: () =>
-                      setState(() => _hidePw = !_hidePw),
+                  onPressed: () => setState(() => _hidePw = !_hidePw),
                   icon: Icon(
-                    _hidePw
-                        ? Icons.visibility
-                        : Icons.visibility_off,
+                    _hidePw ? Icons.visibility : Icons.visibility_off,
                     color: Colors.grey,
                   ),
                 ),
@@ -295,46 +286,39 @@ class _LoginPageState extends State<LoginPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed:
-                      _isLoading ? null : _forgotPassword,
+                  onPressed: _isLoading ? null : _forgotPassword,
                   child: const Text(
                     'ลืมรหัสผ่าน?',
-                    style:
-                        TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Colors.grey),
                   ),
                 ),
               ),
               const SizedBox(height: 30),
               _primaryButton(
                 text: 'เข้าสู่ระบบ',
-                onPressed:
-                    _isLoading ? null : _login,
+                onPressed: _isLoading ? null : _login,
                 loading: _isLoading,
               ),
               const SizedBox(height: 100),
               Row(
-                mainAxisAlignment:
-                    MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
                     'ยังไม่มีบัญชีใช่ไหม? ',
-                    style:
-                        TextStyle(color: Colors.grey),
+                    style: TextStyle(color: Colors.grey),
                   ),
                   TextButton(
                     onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (_) =>
-                            const RegisterPage(),
+                        builder: (_) => const RegisterPage(),
                       ),
                     ),
                     child: const Text(
                       'ลงทะเบียน',
                       style: TextStyle(
                         color: _lightBlue,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),

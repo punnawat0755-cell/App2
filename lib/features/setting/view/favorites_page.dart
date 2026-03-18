@@ -6,39 +6,38 @@ class FavoritesPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ข้อมูลจำลอง (Mock Data)
     final List<Map<String, dynamic>> favoriteItems = [
       {
-        "date": "January 25, 2026",
-        "title": "seal",
-        "content":
+        'date': 'January 25, 2026',
+        'title': 'seal',
+        'content':
             "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา 24 ชม. หรอกนะ การยอมรับความเปราะบางของตัวเอง คือก้าวแรกของการเยียวยาที่แท้จริง 🤍",
-        "image_url":
-            "https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg",
+        'image_url':
+            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
       },
       {
-        "date": "January 25, 2026",
-        "title": "seal2",
-        "content":
-            "คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น ดอกไม้ยังคงเป็นดอกไม้แม้ในวันที่ไม่มีใครชม คุณเองก็เช่นกัน 🌷",
-        "image_url":
-            "https://i.pinimg.com/736x/c5/47/82/c54782d0ca477283d800f5637a9efe67.jpg",
+        'date': 'January 25, 2026',
+        'title': 'seal2',
+        'content':
+            'คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น ดอกไม้ยังคงเป็นดอกไม้แม้ในวันที่ไม่มีใครชม คุณเองก็เช่นกัน 🌷',
+        'image_url':
+            'https://i.pinimg.com/736x/c5/47/82/c54782d0ca477283d800f5637a9efe67.jpg',
       },
       {
-        "date": "January 23, 2026",
-        "title": "seal",
-        "content":
+        'date': 'January 23, 2026',
+        'title': 'seal',
+        'content':
             "อนุญาตให้ตัวเอง 'ไม่โอเค' บ้างก็ได้ ไม่จำเป็นต้องแบกความเข้มแข็งไว้ตลอดเวลา 24 ชม. หรอกนะ การยอมรับความเปราะบางของตัวเอง คือก้าวแรกของการเยียวยาที่แท้จริง 🤍",
-        "image_url":
-            "https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg",
+        'image_url':
+            'https://i.pinimg.com/736x/ed/15/c6/ed15c639cc2c49b51d8e5b1c1743a37d.jpg',
       },
       {
-        "date": "January 23, 2026",
-        "title": "seal2",
-        "content":
-            "คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น ดอกไม้ยังคงเป็นดอกไม้แม้ในวันที่ไม่มีใครชม คุณเองก็เช่นกัน 🌷",
-        "image_url":
-            "https://i.pinimg.com/736x/c5/47/82/c54782d0ca477283d800f5637a9efe67.jpg",
+        'date': 'January 23, 2026',
+        'title': 'seal2',
+        'content':
+            'คุณค่าของคุณไม่ได้ลดลงในวันที่คุณทำพลาด หรือในวันที่ใครมองไม่เห็น ดอกไม้ยังคงเป็นดอกไม้แม้ในวันที่ไม่มีใครชม คุณเองก็เช่นกัน 🌷',
+        'image_url':
+            'https://i.pinimg.com/736x/c5/47/82/c54782d0ca477283d800f5637a9efe67.jpg',
       },
     ];
 
@@ -65,7 +64,7 @@ class FavoritesPage extends StatelessWidget {
         ),
         titleSpacing: 2,
         title: const Text(
-          "รายการโปรด",
+          'รายการโปรด',
           style: TextStyle(
             color: Color(0xFF4489D7),
             fontSize: 22,
@@ -79,23 +78,16 @@ class FavoritesPage extends StatelessWidget {
         itemCount: favoriteItems.length,
         itemBuilder: (context, index) {
           final item = favoriteItems[index];
-
-          // เช็คการแสดง Header วันที่
-          bool showDateHeader = false;
-          if (index == 0 ||
-              favoriteItems[index]['date'] !=
-                  favoriteItems[index - 1]['date']) {
-            showDateHeader = true;
-          }
+          final bool showDateHeader = index == 0 ||
+              favoriteItems[index]['date'] != favoriteItems[index - 1]['date'];
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. ส่วนแสดงวันที่ (Header)
               if (showDateHeader) ...[
                 const SizedBox(height: 10),
                 Text(
-                  item['date'],
+                  item['date'] as String,
                   style: const TextStyle(
                     color: Color(0xFF4489D7),
                     fontSize: 18,
@@ -104,8 +96,6 @@ class FavoritesPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
               ],
-
-              // 2. ส่วนเนื้อหาแต่ละรายการ
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Column(
@@ -113,24 +103,21 @@ class FavoritesPage extends StatelessWidget {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // รูปภาพวงกลม
                         CircleAvatar(
-                          radius: 25, // ขนาดตามที่เคยปรับไว้
+                          radius: 25,
                           backgroundColor: Colors.grey[200],
                           backgroundImage: NetworkImage(
-                            item['image_url'] ??
-                                'https://via.placeholder.com/150', // ดึงรูปตามข้อมูลในลิสต์
+                            item['image_url'] as String? ??
+                                'https://via.placeholder.com/150',
                           ),
                         ),
                         const SizedBox(width: 10),
-
-                        // ข้อความ (Title & Content)
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                item['title'],
+                                item['title'] as String,
                                 style: const TextStyle(
                                   color: Color(0xFF757575),
                                   fontSize: 18,
@@ -139,7 +126,7 @@ class FavoritesPage extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                item['content'],
+                                item['content'] as String,
                                 style: const TextStyle(
                                   color: Color(0xFF9E9E9E),
                                   fontSize: 14,
@@ -152,8 +139,6 @@ class FavoritesPage extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 15),
-
-                    // 3. เส้นคั่นที่ยาวเต็มขอบ
                     const Divider(
                       color: Color(0xFFD9D9D9),
                       thickness: 1.2,

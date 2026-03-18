@@ -8,8 +8,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'firebase_options.dart';
 import 'core/services/notification_service.dart';
-import 'package:flutter_application_1/supabase_client.dart'; 
-import 'bottom_bar.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
+import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'features/login/view/login.dart';
 import 'features/login/view/logo.dart';
 
@@ -33,11 +33,12 @@ Future<void> main() async {
 
   await Supabase.initialize(
     url: 'https://dvbagdhjlklmysjjuvht.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmFnZGhqbGtsbXlzamp1dmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzQ0MjcsImV4cCI6MjA4Mzk1MDQyN30.pqinIw8uza_02BRRheQrBLNnRK0InCBBXG00HmB0Bys',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmFnZGhqbGtsbXlzamp1dmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzQ0MjcsImV4cCI6MjA4Mzk1MDQyN30.pqinIw8uza_02BRRheQrBLNnRK0InCBBXG00HmB0Bys',
   );
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  
+
   try {
     await NotificationService.initialize();
   } catch (e) {
@@ -46,7 +47,6 @@ Future<void> main() async {
 
   runApp(const MyApp());
 }
-
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -74,7 +74,7 @@ class AuthStateHandler extends StatefulWidget {
 }
 
 class _AuthStateHandlerState extends State<AuthStateHandler> {
-  // ✅ แก้ไข: ใช้ตัวแปร 'supabase' จาก supabase_client.dart แทน Supabase.instance.client
+  // ใช้ shared client จาก core/supabase/supabase_client.dart
   final _authStream = supabase.auth.onAuthStateChange;
 
   @override
