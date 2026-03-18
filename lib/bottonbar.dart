@@ -20,15 +20,15 @@ class BottomNavController extends GetxController {
 
   final List<Widget> pages = [
     // EditProfilePage(),
-    // ProfilePage(),
-    SplashScreenpage(),
-    Signup(),
-    LoginPagetwo(),
-    // HomePage(),
+    // SplashScreenpage(),
+    // Signup(),
+    // LoginPagetwo(),
+    HomePage(),
     FeedPage(),
-    // ChatSelectionPage(),
+    ChatSelectionPage(),
+    PetPage(),
+    ProfilePage(),
     // SettingPage(),
-    // PetPage(),
   ];
 
   void changePage(int index) {
