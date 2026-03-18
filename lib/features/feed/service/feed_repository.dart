@@ -1,9 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
 import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
-import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FeedComposerIdentity {
@@ -22,11 +23,19 @@ class FeedRepository {
   FeedRepository({SupabaseClient? client}) : _client = client ?? supabase;
 
   static const _postsTable = 'posts';
+  static const _postMediaTable = 'post_media';
   static const _profilesTable = 'profiles';
+  static const _feedImageBucketConfig = String.fromEnvironment(
+    'SUPABASE_FEED_IMAGE_BUCKET',
+    defaultValue: 'app_media',
+  );
+  static const _imageMediaType = 'image';
 
   final SupabaseClient _client;
   final ContentModerationService _moderationService =
       ContentModerationService.instance;
+
+  String get _feedImageBucket => _normalizeBucketName(_feedImageBucketConfig);
 
   bool get supportsLikeActions => false;
 
@@ -82,30 +91,80 @@ class FeedRepository {
     );
   }
 
-  Future<void> createPost(String content) async {
+  Future<void> createPost({
+    required String content,
+    Uint8List? imageBytes,
+    String? imageFileName,
+  }) async {
     final identity = await getComposerIdentity();
     final normalizedContent = content.trim();
-    final moderation = await _moderationService.moderateText(
-      source: 'feed_post',
-      text: normalizedContent,
-      metadata: {
-        'userId': identity.userId,
-        'authorName': identity.authorName,
-      },
-    );
+    final selectedImageBytes = imageBytes;
+    final hasImage = selectedImageBytes != null && selectedImageBytes.isNotEmpty;
 
-    if (!moderation.allow) {
-      throw ContentModerationBlockedException(moderation.reason);
+    if (normalizedContent.isEmpty && !hasImage) {
+      throw const PostgrestException(
+        message: 'กรุณาเพิ่มข้อความหรือเลือกรูปภาพก่อนโพสต์',
+      );
     }
 
-    final safeText = moderation.safeText.trim().isNotEmpty
-        ? moderation.safeText.trim()
-        : normalizedContent;
+    var safeText = normalizedContent;
+    if (normalizedContent.isNotEmpty) {
+      final moderation = await _moderationService.moderateText(
+        source: 'feed_post',
+        text: normalizedContent,
+        metadata: {
+          'userId': identity.userId,
+          'authorName': identity.authorName,
+        },
+      );
 
-    await _client.from(_postsTable).insert({
-      'user_id': identity.userId,
-      'content_text': safeText,
-    });
+      if (!moderation.allow) {
+        throw ContentModerationBlockedException(moderation.reason);
+      }
+
+      safeText = moderation.safeText.trim().isNotEmpty
+          ? moderation.safeText.trim()
+          : normalizedContent;
+    }
+
+    String? createdPostId;
+    String? uploadedImagePath;
+    try {
+      final postId = await _insertPost(
+        userId: identity.userId,
+        content: safeText,
+      );
+      createdPostId = postId;
+
+      if (!hasImage || selectedImageBytes == null) {
+        return;
+      }
+
+      final storagePath = await _uploadPostImage(
+        postId: postId,
+        userId: identity.userId,
+        imageBytes: selectedImageBytes,
+        imageFileName: imageFileName,
+      );
+      uploadedImagePath = storagePath;
+
+      await _insertPostMedia(
+        postId: postId,
+        storagePath: storagePath,
+        publicUrl: _client.storage.from(_feedImageBucket).getPublicUrl(
+              storagePath,
+            ),
+        fileSizeBytes: selectedImageBytes.lengthInBytes,
+      );
+    } catch (error) {
+      if (uploadedImagePath != null) {
+        await _deleteStorageObject(uploadedImagePath);
+      }
+      if (createdPostId != null && hasImage) {
+        await _deletePostRow(postId: createdPostId, userId: identity.userId);
+      }
+      rethrow;
+    }
   }
 
   Future<void> likePost(String postId) async {
@@ -122,14 +181,62 @@ class FeedRepository {
 
   Future<void> deletePost(String postId) async {
     final user = _requireUser();
+    Map<String, dynamic>? ownedPost;
+    List<Map<String, dynamic>> postMediaRows = const [];
+
+    try {
+      ownedPost = await _client
+          .from(_postsTable)
+          .select('id')
+          .eq('id', postId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+    } catch (_) {
+      ownedPost = null;
+    }
+
+    if (ownedPost == null) {
+      return;
+    }
+
+    try {
+      final mediaRows = await _client
+          .from(_postMediaTable)
+          .select('storage_bucket, storage_path')
+          .eq('post_id', postId);
+      postMediaRows = mediaRows
+          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+          .toList();
+    } catch (_) {
+      postMediaRows = const [];
+    }
+
     await _client
         .from(_postsTable)
         .delete()
         .eq('id', postId)
         .eq('user_id', user.id);
+
+    final removablePaths = postMediaRows
+        .where(
+          (row) =>
+              _normalizeBucketName(row['storage_bucket']?.toString() ?? '') ==
+              _feedImageBucket,
+        )
+        .map((row) => row['storage_path']?.toString().trim() ?? '')
+        .where((path) => path.isNotEmpty)
+        .toList();
+    if (removablePaths.isNotEmpty) {
+      await _deleteStorageObjects(removablePaths);
+    }
   }
 
   Future<List<FeedPost>> _mapPosts(List<Map<String, dynamic>> rows) async {
+    final postIds = rows
+        .map((row) => row['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
     final authorIds = rows
         .map((row) => row['user_id']?.toString() ?? '')
         .where((id) => id.isNotEmpty)
@@ -138,6 +245,8 @@ class FeedRepository {
 
     final namesByUserId = <String, String>{};
     final avatarsByUserId = <String, String>{};
+    final imageUrlsByPostId = <String, String>{};
+
     if (authorIds.isNotEmpty) {
       try {
         final profiles = await _client
@@ -163,11 +272,52 @@ class FeedRepository {
       }
     }
 
+    if (postIds.isNotEmpty) {
+      try {
+        final mediaRows = await _client
+            .from(_postMediaTable)
+            .select(
+              'post_id, media_type, public_url, storage_bucket, storage_path, order_no',
+            )
+            .inFilter('post_id', postIds)
+            .eq('media_type', _imageMediaType)
+            .order('order_no', ascending: true);
+
+        for (final row in mediaRows) {
+          final map = Map<String, dynamic>.from(row);
+          final postId = map['post_id']?.toString() ?? '';
+          if (postId.isEmpty || imageUrlsByPostId.containsKey(postId)) {
+            continue;
+          }
+
+          final publicUrl = map['public_url']?.toString().trim();
+          if (publicUrl != null && publicUrl.isNotEmpty) {
+            imageUrlsByPostId[postId] = publicUrl;
+            continue;
+          }
+
+          final storagePath = map['storage_path']?.toString().trim() ?? '';
+          final storageBucket = _normalizeBucketName(
+            map['storage_bucket']?.toString() ?? _feedImageBucket,
+          );
+          if (storagePath.isNotEmpty) {
+            imageUrlsByPostId[postId] = _client.storage
+                .from(storageBucket)
+                .getPublicUrl(storagePath);
+          }
+        }
+      } catch (_) {
+        // Keep posts visible even if post_media fetch fails.
+      }
+    }
+
     final posts = rows.map((row) {
       final map = Map<String, dynamic>.from(row);
+      final postId = map['id']?.toString() ?? '';
       final userId = map['user_id']?.toString() ?? '';
       map['author_name'] = namesByUserId[userId];
       map['author_avatar_url'] = avatarsByUserId[userId];
+      map['image_url'] = imageUrlsByPostId[postId];
       return FeedPost.fromMap(map);
     }).toList();
     posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
@@ -200,4 +350,188 @@ class FeedRepository {
 
     return 'ผู้ใช้';
   }
+
+  Future<String> _uploadPostImage({
+    required String postId,
+    required String userId,
+    required Uint8List imageBytes,
+    String? imageFileName,
+  }) async {
+    final extension = _resolveImageExtension(imageFileName);
+    final fileName = _resolveStorageFileName(imageFileName, extension);
+    final storagePath = 'posts/$userId/$postId/$fileName';
+
+    try {
+      await _client.storage.from(_feedImageBucket).uploadBinary(
+            storagePath,
+            imageBytes,
+            fileOptions: FileOptions(
+              cacheControl: '3600',
+              contentType: _contentTypeForExtension(extension),
+            ),
+          );
+    } on StorageException catch (error) {
+      if (_looksLikeMissingBucket(error)) {
+        throw FeedImageBucketNotFoundException(_feedImageBucket);
+      }
+      rethrow;
+    }
+
+    return storagePath;
+  }
+
+  Future<String> _insertPost({
+    required String userId,
+    required String content,
+  }) async {
+    final insertedRow = await _client
+        .from(_postsTable)
+        .insert({
+          'user_id': userId,
+          'content_text': content,
+        })
+        .select('id')
+        .single();
+
+    final postId = insertedRow['id']?.toString().trim();
+    if (postId == null || postId.isEmpty) {
+      throw const PostgrestException(
+        message: 'ไม่สามารถอ่านรหัสโพสต์ที่เพิ่งสร้างได้',
+      );
+    }
+
+    return postId;
+  }
+
+  Future<void> _insertPostMedia({
+    required String postId,
+    required String storagePath,
+    required String publicUrl,
+    required int fileSizeBytes,
+  }) async {
+    await _client.from(_postMediaTable).insert({
+      'post_id': postId,
+      'media_type': _imageMediaType,
+      'storage_bucket': _feedImageBucket,
+      'storage_path': storagePath,
+      'public_url': publicUrl,
+      'thumbnail_url': null,
+      'width': null,
+      'height': null,
+      'duration_sec': null,
+      'file_size_bytes': fileSizeBytes,
+      'order_no': 0,
+    });
+  }
+
+  Future<void> _deleteStorageObject(String storagePath) async {
+    try {
+      await _client.storage.from(_feedImageBucket).remove([storagePath]);
+    } catch (_) {
+      // Ignore cleanup failures to avoid masking the main action result.
+    }
+  }
+
+  Future<void> _deleteStorageObjects(List<String> storagePaths) async {
+    try {
+      await _client.storage.from(_feedImageBucket).remove(storagePaths);
+    } catch (_) {
+      // Ignore cleanup failures to avoid masking the main action result.
+    }
+  }
+
+  Future<void> _deletePostRow({
+    required String postId,
+    required String userId,
+  }) async {
+    try {
+      await _client
+          .from(_postsTable)
+          .delete()
+          .eq('id', postId)
+          .eq('user_id', userId);
+    } catch (_) {
+      // Ignore cleanup failures to avoid masking the main action result.
+    }
+  }
+
+  String _resolveImageExtension(String? imageFileName) {
+    final fileName = imageFileName?.trim() ?? '';
+    final dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex == -1 || dotIndex == fileName.length - 1) {
+      return 'jpg';
+    }
+
+    final extension = fileName.substring(dotIndex + 1).toLowerCase();
+    switch (extension) {
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+      case 'webp':
+      case 'gif':
+        return extension == 'jpeg' ? 'jpg' : extension;
+      default:
+        return 'jpg';
+    }
+  }
+
+  String _resolveStorageFileName(String? imageFileName, String extension) {
+    final original = imageFileName?.trim() ?? '';
+    final dotIndex = original.lastIndexOf('.');
+    final baseName = dotIndex > 0 ? original.substring(0, dotIndex) : original;
+    final sanitizedBaseName = baseName
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+
+    final normalizedBaseName =
+        sanitizedBaseName.isEmpty ? 'image' : sanitizedBaseName;
+    return '$normalizedBaseName.$extension';
+  }
+
+  String _contentTypeForExtension(String extension) {
+    switch (extension) {
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      case 'jpg':
+      default:
+        return 'image/jpeg';
+    }
+  }
+
+  bool _looksLikeMissingBucket(StorageException error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('bucket not found') ||
+        message.contains('statuscode: 404') ||
+        message.contains('status code: 404');
+  }
+
+  String _normalizeBucketName(String rawBucketName) {
+    final trimmed = rawBucketName.trim();
+    if (trimmed.isEmpty) {
+      return 'app_media';
+    }
+
+    const schemaPrefix = 'public.';
+    if (trimmed.startsWith(schemaPrefix)) {
+      return trimmed.substring(schemaPrefix.length);
+    }
+
+    return trimmed;
+  }
+}
+
+class FeedImageBucketNotFoundException implements Exception {
+  const FeedImageBucketNotFoundException(this.bucketName);
+
+  final String bucketName;
+
+  @override
+  String toString() =>
+      'FeedImageBucketNotFoundException(bucketName: $bucketName)';
 }

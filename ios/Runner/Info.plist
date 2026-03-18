@@ -45,5 +45,7 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>แอปต้องใช้สิทธิ์เข้าถึงคลังรูปเพื่อให้คุณแนบรูปใน feed ได้</string>
 </dict>
 </plist>

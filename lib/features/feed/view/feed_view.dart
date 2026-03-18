@@ -1,11 +1,13 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
 import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
 import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
-import 'package:flutter_application_1/core/supabase/supabase_client.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FeedPage extends StatefulWidget {
@@ -60,7 +62,7 @@ class _FeedPageState extends State<FeedPage> {
     }
   }
 
-  Future<void> _openComposer() async {
+  Future<void> _openComposer({bool openImagePickerOnOpen = false}) async {
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -69,6 +71,7 @@ class _FeedPageState extends State<FeedPage> {
         repository: _repository,
         composerName: _composerName,
         composerAvatarUrl: _composerAvatarUrl,
+        openImagePickerOnOpen: openImagePickerOnOpen,
       ),
     );
 
@@ -165,7 +168,8 @@ class _FeedPageState extends State<FeedPage> {
             _FeedHeader(
               composerAvatarUrl: _composerAvatarUrl,
               isLoadingComposer: _isLoadingComposer,
-              onComposerTap: _openComposer,
+              onComposerTap: () => _openComposer(),
+              onImageTap: () => _openComposer(openImagePickerOnOpen: true),
             ),
             Expanded(
               child: StreamBuilder<List<FeedPost>>(
@@ -199,7 +203,9 @@ class _FeedPageState extends State<FeedPage> {
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.fromLTRB(24, 48, 24, 120),
                             children: [
-                              _FeedEmptyState(onCreatePost: _openComposer),
+                              _FeedEmptyState(
+                                onCreatePost: () => _openComposer(),
+                              ),
                             ],
                           ),
                         );
@@ -441,20 +447,29 @@ class _FeedComposerSheet extends StatefulWidget {
     required this.repository,
     required this.composerName,
     required this.composerAvatarUrl,
+    required this.openImagePickerOnOpen,
   });
 
   final FeedRepository repository;
   final String composerName;
   final String composerAvatarUrl;
+  final bool openImagePickerOnOpen;
 
   @override
   State<_FeedComposerSheet> createState() => _FeedComposerSheetState();
 }
 
 class _FeedComposerSheetState extends State<_FeedComposerSheet> {
+  static const _maxImageBytes = 8 * 1024 * 1024;
+
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
+  final ImagePicker _imagePicker = ImagePicker();
+
   bool _isSubmitting = false;
+  bool _isPickingImage = false;
+  Uint8List? _selectedImageBytes;
+  String? _selectedImageName;
 
   String _messageForModerationReason(String reason) {
     final normalizedReason = reason.toLowerCase();
@@ -468,7 +483,13 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+      if (!mounted) {
+        return;
+      }
+
+      if (widget.openImagePickerOnOpen) {
+        _pickImage();
+      } else {
         _focusNode.requestFocus();
       }
     });
@@ -481,13 +502,87 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    if (_isPickingImage || _isSubmitting) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() => _isPickingImage = true);
+
+    try {
+      final image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 88,
+        maxWidth: 2200,
+      );
+
+      if (image == null) {
+        if (!mounted) return;
+        setState(() => _isPickingImage = false);
+        _focusNode.requestFocus();
+        return;
+      }
+
+      final imageBytes = await image.readAsBytes();
+      if (!mounted) return;
+
+      if (imageBytes.lengthInBytes > _maxImageBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('รูปใหญ่เกินไป กรุณาเลือกรูปที่ไม่เกิน 8 MB'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isPickingImage = false);
+        return;
+      }
+
+      setState(() {
+        _selectedImageBytes = imageBytes;
+        _selectedImageName = image.name;
+        _isPickingImage = false;
+      });
+      _focusNode.requestFocus();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('เลือกรูปไม่สำเร็จ: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _isPickingImage = false);
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _removeSelectedImage() {
+    if (_isSubmitting) {
+      return;
+    }
+
+    setState(() {
+      _selectedImageBytes = null;
+      _selectedImageName = null;
+    });
+  }
+
   Future<void> _submit() async {
     final content = _controller.text.trim();
-    if (content.isEmpty || _isSubmitting) return;
+    final hasSelectedImage =
+        _selectedImageBytes != null && _selectedImageBytes!.isNotEmpty;
+    if ((content.isEmpty && !hasSelectedImage) || _isSubmitting) {
+      return;
+    }
 
     setState(() => _isSubmitting = true);
     try {
-      await widget.repository.createPost(content);
+      await widget.repository.createPost(
+        content: content,
+        imageBytes: _selectedImageBytes,
+        imageFileName: _selectedImageName,
+      );
       if (!mounted) return;
       FocusScope.of(context).unfocus();
       Navigator.of(context).pop(true);
@@ -496,6 +591,17 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(_messageForModerationReason(error.reason)),
+          backgroundColor: Colors.red,
+        ),
+      );
+      setState(() => _isSubmitting = false);
+    } on FeedImageBucketNotFoundException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'ยังไม่พบ Supabase Storage bucket ชื่อ ${error.bucketName} กรุณาตรวจชื่อ bucket หรือสร้าง bucket นี้เป็น Public',
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -521,18 +627,15 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
     }
   }
 
-  void _showAttachmentMessage() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('ตอนนี้ composer นี้ยังรองรับการโพสต์ข้อความเท่านั้น'),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final canSubmit = _controller.text.trim().isNotEmpty && !_isSubmitting;
+    final hasSelectedImage =
+        _selectedImageBytes != null && _selectedImageBytes!.isNotEmpty;
+    final canSubmit =
+        (_controller.text.trim().isNotEmpty || hasSelectedImage) &&
+            !_isSubmitting &&
+            !_isPickingImage;
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
@@ -618,7 +721,7 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                           ),
                         ),
                         GestureDetector(
-                          onTap: _showAttachmentMessage,
+                          onTap: _pickImage,
                           child: Image.asset(
                             'assets/images/Picture.png',
                             width: 50,
@@ -634,6 +737,72 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          if (hasSelectedImage) ...[
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(10, 4, 10, 14),
+                              child: Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: AspectRatio(
+                                      aspectRatio: 1,
+                                      child: Image.memory(
+                                        _selectedImageBytes!,
+                                        fit: BoxFit.cover,
+                                      ),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 10,
+                                    right: 10,
+                                    child: Material(
+                                      color: Colors.black54,
+                                      shape: const CircleBorder(),
+                                      child: InkWell(
+                                        customBorder: const CircleBorder(),
+                                        onTap: _removeSelectedImage,
+                                        child: const Padding(
+                                          padding: EdgeInsets.all(6),
+                                          child: Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 18,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 12),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.image_outlined,
+                                    size: 18,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      _selectedImageName ?? 'รูปที่เลือก',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: Colors.grey.shade600,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             child: TextField(
@@ -683,6 +852,18 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                               ),
                             ),
                             const SizedBox(height: 8),
+                            if (_isPickingImage)
+                              const Padding(
+                                padding: EdgeInsets.only(bottom: 8),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Color(0xFF5CD9FF),
+                                  ),
+                                ),
+                              ),
                             GestureDetector(
                               onTap: canSubmit ? _submit : null,
                               child: AnimatedOpacity(
@@ -796,14 +977,16 @@ class FeedPostCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            post.content,
-            style: const TextStyle(
-              color: Colors.grey,
-              height: 1.5,
+          if (post.content.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              post.content,
+              style: const TextStyle(
+                color: Colors.grey,
+                height: 1.5,
+              ),
             ),
-          ),
+          ],
           if ((post.imageUrl ?? '').isNotEmpty) ...[
             const SizedBox(height: 12),
             Center(
@@ -862,11 +1045,13 @@ class _FeedHeader extends StatelessWidget {
     required this.composerAvatarUrl,
     required this.isLoadingComposer,
     required this.onComposerTap,
+    required this.onImageTap,
   });
 
   final String composerAvatarUrl;
   final bool isLoadingComposer;
   final VoidCallback onComposerTap;
+  final VoidCallback onImageTap;
 
   @override
   Widget build(BuildContext context) {
@@ -876,7 +1061,7 @@ class _FeedHeader extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 20),
           child: Center(
             child: Image.asset(
-              'assets/images/How 1.png',
+              'assets/images/logo.png',
               width: 65,
               height: 88,
             ),
@@ -885,38 +1070,59 @@ class _FeedHeader extends StatelessWidget {
         Divider(thickness: 1, color: Colors.grey.shade200),
         Material(
           color: Colors.white,
-          child: InkWell(
-            onTap: onComposerTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              child: Row(
-                children: [
-                  _AuthorAvatar(
-                    name: 'คุณ',
-                    avatarUrl: composerAvatarUrl,
-                    radius: 20,
-                  ),
-                  const SizedBox(width: 15),
-                  Expanded(
-                    child: Text(
-                      isLoadingComposer
-                          ? 'กำลังโหลด...'
-                          : 'คุณกำลังคิดอะไรอยู่.....',
-                      style: TextStyle(
-                        color: Colors.grey.shade400,
-                        fontSize: 16,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: onComposerTap,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 4,
+                        horizontal: 2,
+                      ),
+                      child: Row(
+                        children: [
+                          _AuthorAvatar(
+                            name: 'คุณ',
+                            avatarUrl: composerAvatarUrl,
+                            radius: 20,
+                          ),
+                          const SizedBox(width: 15),
+                          Expanded(
+                            child: Text(
+                              isLoadingComposer
+                                  ? 'กำลังโหลด...'
+                                  : 'คุณกำลังคิดอะไรอยู่.....',
+                              style: TextStyle(
+                                color: Colors.grey.shade400,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                  Image.asset(
-                    'assets/images/Picture.png',
-                    width: 40,
-                    height: 35,
-                    fit: BoxFit.contain,
-                    color: Colors.grey,
+                ),
+                const SizedBox(width: 6),
+                InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: onImageTap,
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Image.asset(
+                      'assets/images/Picture.png',
+                      width: 40,
+                      height: 35,
+                      fit: BoxFit.contain,
+                      color: Colors.grey,
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
