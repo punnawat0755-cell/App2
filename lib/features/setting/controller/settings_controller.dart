@@ -83,7 +83,7 @@ class SettingsController extends GetxController {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      'Pick one of the in-app profile avatars.',
+                      'Pick one of your old or in-app profile avatars.',
                       style: TextStyle(
                         color: Color(0xFF6D7B8B),
                       ),
@@ -125,7 +125,8 @@ class SettingsController extends GetxController {
                               fit: StackFit.expand,
                               children: [
                                 CircleAvatar(
-                                  backgroundImage: AssetImage(avatarPath),
+                                  backgroundImage: avatarController
+                                      .avatarImageProviderFor(avatarPath),
                                 ),
                                 if (isSelected)
                                   const Align(

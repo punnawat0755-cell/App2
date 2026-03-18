@@ -53,12 +53,17 @@ class EditProfileController extends GetxController {
       return false;
     }
 
+    final trimmedName = nameController.text.trim();
+    final trimmedBio = bioController.text.trim();
+
     try {
       isSaving.value = true;
       await _profileService.updateProfile(
-        displayName: nameController.text,
-        bio: bioController.text,
+        displayName: trimmedName,
+        bio: trimmedBio,
       );
+      nameController.text = trimmedName;
+      bioController.text = trimmedBio;
       Get.snackbar(
         'Profile updated',
         'Your profile information has been saved.',

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/features/feed/model/feed_comment.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
 import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
@@ -20,6 +21,8 @@ class _FeedPageState extends State<FeedPage> {
 
   final FeedRepository _repository = FeedRepository();
   final User? _currentUser = supabase.auth.currentUser;
+  final Map<String, bool> _optimisticLikedStates = <String, bool>{};
+  final Set<String> _likeRequestsInFlight = <String>{};
 
   String _composerName = 'คุณ';
   bool _isLoadingComposer = true;
@@ -69,6 +72,7 @@ class _FeedPageState extends State<FeedPage> {
     _showSnackBar('โพสต์ของคุณถูกเผยแพร่แล้ว');
   }
 
+  // ignore: unused_element
   Future<void> _toggleLike(FeedPost post, bool isLiked) async {
     try {
       if (isLiked) {
@@ -80,6 +84,95 @@ class _FeedPageState extends State<FeedPage> {
       if (!mounted) return;
       _showSnackBar('อัปเดตการกดถูกใจไม่สำเร็จ: $error', isError: true);
     }
+  }
+
+  Future<void> _toggleLikeOptimistic(FeedPost post, bool isLiked) async {
+    if (_likeRequestsInFlight.contains(post.id)) {
+      return;
+    }
+
+    final nextLiked = !isLiked;
+    setState(() {
+      _optimisticLikedStates[post.id] = nextLiked;
+      _likeRequestsInFlight.add(post.id);
+    });
+
+    try {
+      if (nextLiked) {
+        await _repository.likePost(post.id);
+      } else {
+        await _repository.unlikePost(post.id);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _optimisticLikedStates.remove(post.id);
+        _likeRequestsInFlight.remove(post.id);
+      });
+      _showSnackBar(
+          'เธญเธฑเธเน€เธ”เธ•เธเธฒเธฃเธเธ”เธ–เธนเธเนเธเนเธกเนเธชเธณเน€เธฃเนเธ: $error',
+          isError: true);
+      return;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _likeRequestsInFlight.remove(post.id);
+        });
+      }
+    }
+  }
+
+  bool _resolveLikedState(FeedPost post, Set<String> serverLikedPostIds) {
+    return _optimisticLikedStates[post.id] ??
+        serverLikedPostIds.contains(post.id);
+  }
+
+  int _resolveLikeCount(FeedPost post, Set<String> serverLikedPostIds) {
+    final optimisticLiked = _optimisticLikedStates[post.id];
+    final serverLiked = serverLikedPostIds.contains(post.id);
+
+    if (optimisticLiked == null || optimisticLiked == serverLiked) {
+      return post.likeCount;
+    }
+
+    final delta = optimisticLiked ? 1 : -1;
+    final nextCount = post.likeCount + delta;
+    return nextCount < 0 ? 0 : nextCount;
+  }
+
+  void _scheduleOptimisticLikeCleanup(
+    List<FeedPost> posts,
+    Set<String> serverLikedPostIds,
+  ) {
+    final syncedPostIds = <String>[];
+
+    for (final post in posts) {
+      final optimisticLiked = _optimisticLikedStates[post.id];
+      if (optimisticLiked == null) continue;
+
+      final serverLiked = serverLikedPostIds.contains(post.id);
+      if (optimisticLiked == serverLiked &&
+          !_likeRequestsInFlight.contains(post.id)) {
+        syncedPostIds.add(post.id);
+      }
+    }
+
+    if (syncedPostIds.isEmpty) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      var changed = false;
+      for (final postId in syncedPostIds) {
+        changed = _optimisticLikedStates.remove(postId) != null || changed;
+      }
+
+      if (changed) {
+        setState(() {});
+      }
+    });
   }
 
   Future<void> _deletePost(FeedPost post) async {
@@ -113,16 +206,11 @@ class _FeedPageState extends State<FeedPage> {
     }
   }
 
-  void _openAuthorProfile(FeedPost post) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FeedProfilePage(
-          repository: _repository,
-          authorId: post.authorId,
-          authorName: post.authorName,
-          currentUserId: _currentUser?.id,
-        ),
-      ),
+  Future<void> _openComments(FeedPost post) async {
+    await _showFeedCommentsSheet(
+      context: context,
+      repository: _repository,
+      post: post,
     );
   }
 
@@ -183,6 +271,7 @@ class _FeedPageState extends State<FeedPage> {
                       final likedPostIds =
                           likeSnapshot.data ?? const <String>{};
                       final posts = postSnapshot.data ?? const <FeedPost>[];
+                      _scheduleOptimisticLikeCleanup(posts, likedPostIds);
 
                       if (posts.isEmpty) {
                         return RefreshIndicator(
@@ -207,15 +296,20 @@ class _FeedPageState extends State<FeedPage> {
                               thickness: 1, color: Colors.grey.shade200),
                           itemBuilder: (context, index) {
                             final post = posts[index];
-                            final isLiked = likedPostIds.contains(post.id);
+                            final isLiked =
+                                _resolveLikedState(post, likedPostIds);
+                            final likeCount =
+                                _resolveLikeCount(post, likedPostIds);
 
                             return FeedPostCard(
                               post: post,
                               isLiked: isLiked,
+                              likeCount: likeCount,
                               isOwnPost: post.authorId == currentUser.id,
-                              onAuthorTap: () => _openAuthorProfile(post),
+                              onAuthorTap: null,
+                              onCommentTap: () => _openComments(post),
                               onToggleLike: _repository.supportsLikeActions
-                                  ? () => _toggleLike(post, isLiked)
+                                  ? () => _toggleLikeOptimistic(post, isLiked)
                                   : null,
                               onDelete: post.authorId == currentUser.id
                                   ? () => _deletePost(post)
@@ -310,6 +404,14 @@ class FeedProfilePage extends StatelessWidget {
     }
   }
 
+  Future<void> _openComments(BuildContext context, FeedPost post) async {
+    await _showFeedCommentsSheet(
+      context: context,
+      repository: repository,
+      post: post,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -364,8 +466,10 @@ class FeedProfilePage extends StatelessWidget {
                     (post) => FeedPostCard(
                       post: post,
                       isLiked: likedPostIds.contains(post.id),
+                      likeCount: post.likeCount,
                       isOwnPost: post.authorId == currentUserId,
                       onAuthorTap: null,
+                      onCommentTap: () => _openComments(context, post),
                       onToggleLike: repository.supportsLikeActions
                           ? () => _toggleLike(
                                 context,
@@ -569,16 +673,20 @@ class FeedPostCard extends StatelessWidget {
     super.key,
     required this.post,
     required this.isLiked,
+    required this.likeCount,
     required this.isOwnPost,
     required this.onToggleLike,
+    required this.onCommentTap,
     required this.onAuthorTap,
     this.onDelete,
   });
 
   final FeedPost post;
   final bool isLiked;
+  final int likeCount;
   final bool isOwnPost;
   final VoidCallback? onToggleLike;
+  final VoidCallback? onCommentTap;
   final VoidCallback? onAuthorTap;
   final VoidCallback? onDelete;
 
@@ -670,7 +778,7 @@ class FeedPostCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      post.likeCount.toString(),
+                      likeCount.toString(),
                       style: TextStyle(
                         color: Colors.grey,
                         fontWeight:
@@ -681,20 +789,23 @@ class FeedPostCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 18),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.mode_comment_outlined,
-                    color: Colors.grey,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    post.commentCount.toString(),
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                ],
+              GestureDetector(
+                onTap: onCommentTap,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.mode_comment_outlined,
+                      color: Colors.grey,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      post.commentCount.toString(),
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -899,6 +1010,349 @@ class _ProfileHeader extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+Future<void> _showFeedCommentsSheet({
+  required BuildContext context,
+  required FeedRepository repository,
+  required FeedPost post,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: Colors.white,
+    showDragHandle: true,
+    builder: (context) => _FeedCommentsSheet(
+      repository: repository,
+      post: post,
+    ),
+  );
+}
+
+class _FeedCommentsSheet extends StatefulWidget {
+  const _FeedCommentsSheet({
+    required this.repository,
+    required this.post,
+  });
+
+  final FeedRepository repository;
+  final FeedPost post;
+
+  @override
+  State<_FeedCommentsSheet> createState() => _FeedCommentsSheetState();
+}
+
+class _FeedCommentsSheetState extends State<_FeedCommentsSheet> {
+  final TextEditingController _controller = TextEditingController();
+  bool _isSubmitting = false;
+
+  String _messageForModerationReason(String reason) {
+    final normalizedReason = reason.toLowerCase();
+    if (normalizedReason.contains('moderation-blocked-by-n8n')) {
+      return 'คอมเมนต์นี้ไม่ผ่านการตรวจสอบ จึงยังไม่สามารถส่งได้';
+    }
+    return 'ยังไม่สามารถส่งคอมเมนต์นี้ได้ในตอนนี้';
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitComment() async {
+    final content = _controller.text.trim();
+    if (content.isEmpty || _isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      await widget.repository.addComment(
+        postId: widget.post.id,
+        content: content,
+      );
+      if (!mounted) return;
+      _controller.clear();
+      FocusScope.of(context).unfocus();
+    } on ContentModerationBlockedException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_messageForModerationReason(error.reason)),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ส่งคอมเมนต์ไม่สำเร็จ: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.78,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'ความคิดเห็น',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF25527A),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5FBFF),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            _AuthorAvatar(
+                              name: widget.post.authorName,
+                              radius: 16,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                widget.post.authorName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: Color(0xFF25527A),
+                                ),
+                              ),
+                            ),
+                            Text(
+                              _formatPostTime(widget.post.createdAt),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF7E96AC),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          widget.post.content,
+                          style: const TextStyle(
+                            color: Color(0xFF4F6073),
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: StreamBuilder<List<FeedComment>>(
+                stream: widget.repository.watchComments(widget.post.id),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          'โหลดคอมเมนต์ไม่สำเร็จ\n${snapshot.error}',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(height: 1.5),
+                        ),
+                      ),
+                    );
+                  }
+
+                  if (!snapshot.hasData) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final comments = snapshot.data ?? const <FeedComment>[];
+                  if (comments.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 24),
+                        child: Text(
+                          'ยังไม่มีคอมเมนต์ เริ่มพูดคุยกับโพสต์นี้ได้เลย',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF7E96AC),
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                    itemCount: comments.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      return _FeedCommentTile(comment: comments[index]);
+                    },
+                  );
+                },
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  top: BorderSide(color: Colors.grey.shade200),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 4,
+                      decoration: InputDecoration(
+                        hintText: 'เขียนคอมเมนต์...',
+                        filled: true,
+                        fillColor: const Color(0xFFF5FBFF),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      onChanged: (_) => setState(() {}),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton(
+                    onPressed: _controller.text.trim().isEmpty || _isSubmitting
+                        ? null
+                        : _submitComment,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF4A89D8),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: 16,
+                      ),
+                    ),
+                    child: _isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('ส่ง'),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedCommentTile extends StatelessWidget {
+  const _FeedCommentTile({required this.comment});
+
+  final FeedComment comment;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _AuthorAvatar(name: comment.authorName, radius: 18),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FBFF),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        comment.authorName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF25527A),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      _formatPostTime(comment.createdAt),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF7E96AC),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  comment.content,
+                  style: const TextStyle(
+                    color: Color(0xFF4F6073),
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

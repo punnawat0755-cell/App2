@@ -2,31 +2,58 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/features/setting/controller/edit_profile_controller.dart';
 import 'package:get/get.dart';
 
-class EditProfilePage extends GetView<EditProfileController> {
+class EditProfilePage extends StatefulWidget {
   const EditProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final editController = Get.put(EditProfileController());
+  State<EditProfilePage> createState() => _EditProfilePageState();
+}
 
+class _EditProfilePageState extends State<EditProfilePage> {
+  late final String _controllerTag;
+  late final EditProfileController _editController;
+
+  @override
+  void initState() {
+    super.initState();
+    _controllerTag = UniqueKey().toString();
+    _editController = Get.put(
+      EditProfileController(),
+      tag: _controllerTag,
+    );
+  }
+
+  @override
+  void dispose() {
+    if (Get.isRegistered<EditProfileController>(tag: _controllerTag)) {
+      Get.delete<EditProfileController>(
+        tag: _controllerTag,
+        force: true,
+      );
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF7FAFD),
       appBar: AppBar(
         title: const Text('Edit profile'),
       ),
       body: Obx(() {
-        if (editController.isLoading.value) {
+        if (_editController.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
 
         return Form(
-          key: editController.formKey,
+          key: _editController.formKey,
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
               _FieldCard(
                 child: TextFormField(
-                  controller: editController.nameController,
+                  controller: _editController.nameController,
                   decoration: const InputDecoration(
                     labelText: 'Display name',
                     border: InputBorder.none,
@@ -42,7 +69,7 @@ class EditProfilePage extends GetView<EditProfileController> {
               const SizedBox(height: 14),
               _FieldCard(
                 child: TextFormField(
-                  initialValue: editController.email.value,
+                  initialValue: _editController.email.value,
                   readOnly: true,
                   decoration: const InputDecoration(
                     labelText: 'Email',
@@ -53,7 +80,7 @@ class EditProfilePage extends GetView<EditProfileController> {
               const SizedBox(height: 14),
               _FieldCard(
                 child: TextFormField(
-                  controller: editController.bioController,
+                  controller: _editController.bioController,
                   minLines: 3,
                   maxLines: 5,
                   decoration: const InputDecoration(
@@ -65,10 +92,10 @@ class EditProfilePage extends GetView<EditProfileController> {
               ),
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: editController.isSaving.value
+                onPressed: _editController.isSaving.value
                     ? null
                     : () async {
-                        final success = await editController.save();
+                        final success = await _editController.save();
                         if (success) {
                           Get.back();
                         }
@@ -77,7 +104,9 @@ class EditProfilePage extends GetView<EditProfileController> {
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: Text(
-                  editController.isSaving.value ? 'Saving...' : 'Save changes',
+                  _editController.isSaving.value
+                      ? 'Saving...'
+                      : 'Save changes',
                 ),
               ),
             ],

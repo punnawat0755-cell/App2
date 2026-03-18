@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/features/setting/controller/settings_controller.dart';
+import 'package:flutter_application_1/features/setting/view/about_app_page.dart';
+import 'package:flutter_application_1/features/setting/view/app_lock_page.dart';
 import 'package:flutter_application_1/features/setting/view/edit_profile_page.dart';
+import 'package:flutter_application_1/features/setting/view/favorites_page.dart';
+import 'package:flutter_application_1/features/setting/view/help_center_page.dart';
 import 'package:flutter_application_1/features/setting/view/notification_settings_page.dart';
 import 'package:flutter_application_1/features/setting/view/privacy_settings_page.dart';
 import 'package:flutter_application_1/features/setting/view/theme_settings_page.dart';
@@ -85,6 +89,42 @@ class SettingsPage extends GetView<SettingsController> {
                 subtitle: 'Switch between light, dark, or system mode.',
                 icon: Icons.palette_outlined,
                 onTap: () => Get.to(() => const ThemeSettingsPage()),
+              ),
+              const SizedBox(height: 22),
+              const Text(
+                'More',
+                style: TextStyle(
+                  color: Color(0xFF6D7B8B),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 12),
+              SettingsMenuTile(
+                title: 'Favorites',
+                subtitle: 'Quick links to the parts of the app users visit most.',
+                icon: Icons.favorite_border_rounded,
+                onTap: () => Get.to(() => const FavoritesPage()),
+              ),
+              const SizedBox(height: 14),
+              SettingsMenuTile(
+                title: 'App lock',
+                subtitle: 'Control whether the app should ask to unlock again.',
+                icon: Icons.shield_outlined,
+                onTap: () => Get.to(() => const AppLockPage()),
+              ),
+              const SizedBox(height: 14),
+              SettingsMenuTile(
+                title: 'Help center',
+                subtitle: 'Read common answers or contact support.',
+                icon: Icons.help_outline_rounded,
+                onTap: () => Get.to(() => const HelpCenterPage()),
+              ),
+              const SizedBox(height: 14),
+              SettingsMenuTile(
+                title: 'About app',
+                subtitle: 'See app information and a short product overview.',
+                icon: Icons.info_outline_rounded,
+                onTap: () => Get.to(() => const AboutAppPage()),
               ),
               const SizedBox(height: 22),
               OutlinedButton.icon(
