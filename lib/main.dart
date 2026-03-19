@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'core/config/app_env.dart';
 import 'firebase_options.dart';
 import 'core/services/notification_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
@@ -23,20 +23,34 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppEnv.load();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
+  final supabaseUrl = AppEnv.string(
+    'SUPABASE_URL',
+    compileTimeValue: const bool.hasEnvironment('SUPABASE_URL')
+        ? const String.fromEnvironment('SUPABASE_URL')
+        : null,
+  );
+  final supabaseAnonKey = AppEnv.string(
+    'SUPABASE_ANON_KEY',
+    compileTimeValue: const bool.hasEnvironment('SUPABASE_ANON_KEY')
+        ? const String.fromEnvironment('SUPABASE_ANON_KEY')
+        : null,
+  );
+
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    throw StateError(
+      'Missing Supabase config. Add SUPABASE_URL and SUPABASE_ANON_KEY to .env.',
+    );
+  }
+
   await Supabase.initialize(
-    url: const String.fromEnvironment(
-      'SUPABASE_URL',
-      defaultValue: '',
-    ),
-    anonKey: const String.fromEnvironment(
-      'SUPABASE_ANON_KEY',
-      defaultValue: '',
-    ),
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
   );
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);

@@ -31,6 +31,7 @@ class FeedRepository {
     defaultValue: 'app_media',
   );
   static const _imageMediaType = 'image';
+  static const _videoMediaType = 'video';
   static const _likeReaction = 'like';
 
   final SupabaseClient _client;
@@ -104,7 +105,8 @@ class FeedRepository {
     final identity = await getComposerIdentity();
     final normalizedContent = content.trim();
     final selectedImageBytes = imageBytes;
-    final hasImage = selectedImageBytes != null && selectedImageBytes.isNotEmpty;
+    final hasImage =
+        selectedImageBytes != null && selectedImageBytes.isNotEmpty;
 
     if (normalizedContent.isEmpty && !hasImage) {
       throw const PostgrestException(
@@ -258,6 +260,7 @@ class FeedRepository {
     final namesByUserId = <String, String>{};
     final avatarsByUserId = <String, String>{};
     final imageUrlsByPostId = <String, String>{};
+    final postsWithVideoMedia = <String>{};
     final likeCountsByPostId = <String, int>{};
 
     if (authorIds.isNotEmpty) {
@@ -293,13 +296,26 @@ class FeedRepository {
               'post_id, media_type, public_url, storage_bucket, storage_path, order_no',
             )
             .inFilter('post_id', postIds)
-            .eq('media_type', _imageMediaType)
             .order('order_no', ascending: true);
 
         for (final row in mediaRows) {
           final map = Map<String, dynamic>.from(row);
           final postId = map['post_id']?.toString() ?? '';
           if (postId.isEmpty || imageUrlsByPostId.containsKey(postId)) {
+            if (postId.isNotEmpty &&
+                map['media_type']?.toString() == _videoMediaType) {
+              postsWithVideoMedia.add(postId);
+            }
+            continue;
+          }
+
+          final mediaType = map['media_type']?.toString() ?? '';
+          if (mediaType == _videoMediaType) {
+            postsWithVideoMedia.add(postId);
+            continue;
+          }
+
+          if (mediaType != _imageMediaType) {
             continue;
           }
 
@@ -314,9 +330,8 @@ class FeedRepository {
             map['storage_bucket']?.toString() ?? _feedImageBucket,
           );
           if (storagePath.isNotEmpty) {
-            imageUrlsByPostId[postId] = _client.storage
-                .from(storageBucket)
-                .getPublicUrl(storagePath);
+            imageUrlsByPostId[postId] =
+                _client.storage.from(storageBucket).getPublicUrl(storagePath);
           }
         }
       } catch (_) {
@@ -343,7 +358,10 @@ class FeedRepository {
       }
     }
 
-    final posts = rows.map((row) {
+    final posts = rows.where((row) {
+      final postId = row['id']?.toString() ?? '';
+      return postId.isNotEmpty && !postsWithVideoMedia.contains(postId);
+    }).map((row) {
       final map = Map<String, dynamic>.from(row);
       final postId = map['id']?.toString() ?? '';
       final userId = map['user_id']?.toString() ?? '';
@@ -413,19 +431,17 @@ class FeedRepository {
 
         mediaSubscription = _client
             .from(_postMediaTable)
-            .stream(primaryKey: const ['post_id', 'storage_path'])
-            .listen(
-              (_) => unawaited(emitMappedPosts()),
-              onError: (_, __) {},
-            );
+            .stream(primaryKey: const ['post_id', 'storage_path']).listen(
+          (_) => unawaited(emitMappedPosts()),
+          onError: (_, __) {},
+        );
 
         likesSubscription = _client
             .from(_postLikesTable)
-            .stream(primaryKey: const ['post_id', 'user_id'])
-            .listen(
-              (_) => unawaited(emitMappedPosts()),
-              onError: (_, __) {},
-            );
+            .stream(primaryKey: const ['post_id', 'user_id']).listen(
+          (_) => unawaited(emitMappedPosts()),
+          onError: (_, __) {},
+        );
       },
       onCancel: () async {
         await postsSubscription?.cancel();

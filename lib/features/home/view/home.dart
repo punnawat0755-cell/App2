@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
+import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/home/view/play_video_page.dart';
@@ -14,7 +14,6 @@ import 'package:flutter_application_1/features/profile/controller/profile_avatar
 import 'package:flutter_application_1/features/setting/view/setting.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:get/get.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 
 class HomePage extends StatefulWidget {
@@ -32,11 +31,14 @@ class _HomePageState extends State<HomePage> {
   late final Stream<List<HomeVideoClip>> _videoClipsStream;
   Timer? _timer;
   final HomeVideoRepository _homeVideoRepository = HomeVideoRepository();
+  final HomeVideoPrefetchService _homeVideoPrefetchService =
+      HomeVideoPrefetchService.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isNameLoading = true;
   bool _isUploadingClip = false;
   String _displayName = 'ผู้ใช้';
+  String _lastWarmupSignature = '';
 
   final List<_HomeArticle> _articleList = const [
     _HomeArticle(
@@ -148,14 +150,56 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _openVideoClip(HomeVideoClip clip) {
+  void _openVideoClip(List<HomeVideoClip> clips, int initialIndex) {
+    if (clips.isEmpty) {
+      return;
+    }
+
     Get.to(
       () => PlayVideoPage(
-        videoPath: clip.videoUrl,
-        uploaderName: clip.authorName,
-        caption: clip.caption,
+        clips: clips,
+        initialIndex: initialIndex,
       ),
     );
+  }
+
+  void _warmUpVisibleClips(
+    BuildContext context,
+    List<HomeVideoClip> clips,
+  ) {
+    final visibleClips = clips.take(2).toList(growable: false);
+    final signature = visibleClips.map((clip) => clip.id).join('|');
+    if (signature.isEmpty || signature == _lastWarmupSignature) {
+      return;
+    }
+
+    _lastWarmupSignature = signature;
+    unawaited(_homeVideoPrefetchService.warmUpClips(visibleClips));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+
+      for (final clip in visibleClips) {
+        final thumbnailPath = clip.thumbnailUrl?.trim() ?? '';
+        if (thumbnailPath.startsWith('http')) {
+          precacheImage(NetworkImage(thumbnailPath), context);
+        }
+      }
+    });
+  }
+
+  String _clipCardTitle(HomeVideoClip clip) {
+    final caption = clip.caption.trim();
+    if (caption.isNotEmpty) {
+      return caption;
+    }
+    return clip.authorName;
+  }
+
+  String _clipCardSubtitle(HomeVideoClip clip) {
+    return '${clip.authorName} • ${clip.relativeTimeLabel}';
   }
 
   Future<void> _pickAndUploadClip() async {
@@ -440,6 +484,7 @@ class _HomePageState extends State<HomePage> {
                     }
 
                     final clips = snapshot.data ?? const <HomeVideoClip>[];
+                    _warmUpVisibleClips(context, clips);
                     return ListView.separated(
                       scrollDirection: Axis.horizontal,
                       clipBehavior: Clip.none,
@@ -453,12 +498,28 @@ class _HomePageState extends State<HomePage> {
 
                         final clip = clips[index - 1];
                         return InkWell(
-                          onTap: () => _openVideoClip(clip),
-                          child: ClipCard(
-                            title: clip.authorName,
-                            subtitle: clip.relativeTimeLabel,
-                            imagePath: clip.videoUrl,
-                            forceVideoPreview: true,
+                          onTap: () => _openVideoClip(clips, index - 1),
+                          child: FutureBuilder<String?>(
+                            future: index <= 2
+                                ? _homeVideoPrefetchService.prefetchVideo(
+                                    clip.videoUrl,
+                                  )
+                                : _homeVideoPrefetchService.getCachedPath(
+                                    clip.videoUrl,
+                                  ),
+                            builder: (context, previewSnapshot) {
+                              final cachedPreviewPath =
+                                  previewSnapshot.data?.trim() ?? '';
+                              return ClipCard(
+                                title: _clipCardTitle(clip),
+                                subtitle: _clipCardSubtitle(clip),
+                                imagePath: cachedPreviewPath.isNotEmpty
+                                    ? cachedPreviewPath
+                                    : clip.videoUrl,
+                                thumbnailPath: clip.thumbnailUrl,
+                                forceVideoPreview: true,
+                              );
+                            },
                           ),
                         );
                       },

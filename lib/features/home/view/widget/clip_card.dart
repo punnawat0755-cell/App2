@@ -9,12 +9,14 @@ class ClipCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.imagePath,
+    this.thumbnailPath,
     this.forceVideoPreview = false,
   });
 
   final String title;
   final String subtitle;
   final String imagePath;
+  final String? thumbnailPath;
   final bool forceVideoPreview;
 
   @override
@@ -29,14 +31,17 @@ class ClipCard extends StatelessWidget {
         lower.endsWith('.m4v');
 
     return SizedBox(
-      width: 110,
+      width: 128,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(
           fit: StackFit.expand,
           children: [
             if (isVideo)
-              _VideoThumbnail(videoPath: imagePath)
+              _VideoPreview(
+                videoPath: imagePath,
+                thumbnailPath: thumbnailPath,
+              )
             else if (isNetworkImage)
               Image.network(
                 imagePath,
@@ -68,7 +73,7 @@ class ClipCard extends StatelessWidget {
               bottom: 0,
               left: 0,
               right: 0,
-              height: 60,
+              height: 82,
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.vertical(
@@ -108,6 +113,8 @@ class ClipCard extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     subtitle,
@@ -115,12 +122,89 @@ class ClipCard extends StatelessWidget {
                       color: Colors.white70,
                       fontSize: 10,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VideoPreview extends StatelessWidget {
+  const _VideoPreview({
+    required this.videoPath,
+    this.thumbnailPath,
+  });
+
+  final String videoPath;
+  final String? thumbnailPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedThumbnailPath = thumbnailPath?.trim() ?? '';
+    if (resolvedThumbnailPath.isNotEmpty) {
+      return _PreviewImage(path: resolvedThumbnailPath);
+    }
+
+    if (!videoPath.startsWith('http')) {
+      return _VideoThumbnail(videoPath: videoPath);
+    }
+
+    return Container(
+      color: const Color(0xFFDDE7F0),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.play_circle_fill_rounded,
+        size: 42,
+        color: Color(0xFF8AA0B6),
+      ),
+    );
+  }
+}
+
+class _PreviewImage extends StatelessWidget {
+  const _PreviewImage({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    if (path.startsWith('http')) {
+      return Image.network(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _previewFallback(),
+      );
+    }
+
+    if (path.startsWith('assets/')) {
+      return Image.asset(
+        path,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _previewFallback(),
+      );
+    }
+
+    return Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _previewFallback(),
+    );
+  }
+
+  Widget _previewFallback() {
+    return Container(
+      color: const Color(0xFFDDE7F0),
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.play_circle_fill_rounded,
+        size: 42,
+        color: Color(0xFF8AA0B6),
       ),
     );
   }
