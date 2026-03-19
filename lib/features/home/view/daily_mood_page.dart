@@ -110,7 +110,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   final List<String> _selectedTags = [];
 
   int? _todayScore;
-  // String? _todayLabel; // hidden with the answered summary card for now
 
   final TextEditingController _noteCtrl = TextEditingController();
   final TextEditingController _healingCtrl = TextEditingController();
@@ -172,9 +171,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       _answeredToday = (savedDate == today);
       _todayScore =
           _answeredToday ? prefs.getInt(DailyMoodStatusService.scoreKey) : null;
-      // _todayLabel = _answeredToday
-      //     ? prefs.getString(DailyMoodStatusService.labelKey)
-      //     : null;
       _editUsedToday =
           (prefs.getString(DailyMoodStatusService.editUsedDateKey) == today);
       _isEditMode = false;
@@ -226,90 +222,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     }
   }
 
-  /* void _prepareSingleEditReset() {
-    if (!_answeredToday || _editUsedToday) return;
-
-    setState(() {
-      _isEditMode = true;
-      _selectedMoodIndex = 2;
-      _selectedTags.clear();
-      _noteCtrl.clear();
-      _healingCtrl.clear();
-      _serverNote = null;
-      _serverHealingQuote = null;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content:
-            Text('ล้างฟอร์มแล้ว คุณแก้ไขคำตอบวันนี้ได้อีก 1 ครั้งเท่านั้น'),
-      ),
-    );
-  } */
-
   Future<void> _refreshProfileCalendarIfNeeded() async {
     if (!Get.isRegistered<ProfileController>()) return;
     await Get.find<ProfileController>().loadMonthData();
   }
-
-  /* Future<void> _confirmClearCache() async {
-    if (_answeredToday) {
-      if (_editUsedToday) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('คุณใช้สิทธิ์แก้ไขคำตอบวันนี้แล้ว')),
-        );
-        return;
-      }
-
-      final shouldResetForEdit = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('ล้างฟอร์มเพื่อแก้ไข'),
-          content: const Text(
-            'ต้องการล้างคำตอบบนหน้าจอเพื่อแก้ไขใหม่ใช่ไหม? คุณจะแก้ไขได้เพียง 1 ครั้งต่อวัน',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('ยกเลิก'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('ล้างฟอร์ม'),
-            ),
-          ],
-        ),
-      );
-
-      if (shouldResetForEdit == true && mounted) {
-        _prepareSingleEditReset();
-      }
-      return;
-    }
-
-    final shouldClear = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('รีเซ็ตคำตอบวันนี้'),
-        content: const Text('ต้องการล้างคำตอบและสิทธิ์แก้ไขของวันนี้ใช่ไหม?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('ยกเลิก'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('รีเซ็ต'),
-          ),
-        ],
-      ),
-    );
-
-    if (shouldClear == true) {
-      // สามารถใส่คำสั่งลบข้อมูลจาก Supabase ตรงนี้เพิ่มได้ ถ้าต้องการให้ลบ DB ด้วย
-      await _clearDailyMoodCache();
-    }
-  } */
 
   // ---------- Supabase ----------
   Future<void> _syncFromSupabaseToday() async {
@@ -389,14 +305,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   }
 
   // ---------- Actions ----------
-  /* void _startEditOnce() {
-    if (!_answeredToday || _editUsedToday) return;
-    setState(() => _isEditMode = true);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('เลือกคำตอบใหม่ได้ 1 ครั้ง')),
-    );
-  } */
-
   Future<void> _submitMood(_MoodOption option) async {
     final isFirstAnswer = !_answeredToday;
     final canEditNow = _answeredToday && _isEditMode && !_editUsedToday;
@@ -498,44 +406,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Hidden for now per latest UI request:
-                      // back button + reset button
-                      /*
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          if (_canLeavePage)
-                            IconButton(
-                              onPressed: () => Navigator.of(context).maybePop(),
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints.tightFor(
-                                  width: 32, height: 32),
-                              visualDensity: VisualDensity.compact,
-                              icon: const Icon(
-                                Icons.arrow_back_ios_new,
-                                color: mainBlue,
-                              ),
-                              tooltip: 'ย้อนกลับ',
-                            )
-                          else
-                            const SizedBox(width: 32),
-                          TextButton.icon(
-                            onPressed: _confirmClearCache,
-                            style: TextButton.styleFrom(
-                              foregroundColor: mainBlue,
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                            ),
-                            icon: const Icon(Icons.restart_alt, size: 18),
-                            label: const Text(
-                              'รีเซ็ต',
-                              style: TextStyle(fontWeight: FontWeight.w700),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      */
                       const Text(
                         'วันนี้คุณรู้สึกยังไง ?',
                         textAlign: TextAlign.center,
@@ -546,57 +416,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      // Hidden for now per latest UI request:
-                      // status chips
-                      /*
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _buildInfoChip(
-                            icon: _answeredToday
-                                ? Icons.check_circle
-                                : Icons.access_time_filled,
-                            label: _answeredToday
-                                ? 'ตอบแล้ววันนี้'
-                                : 'ยังไม่ตอบวันนี้',
-                            backgroundColor: _answeredToday
-                                ? const Color(0xFFDFF6E8)
-                                : const Color(0xFFEAF2FF),
-                          ),
-                          _buildInfoChip(
-                            icon: !_answeredToday
-                                ? Icons.today
-                                : _editUsedToday
-                                    ? Icons.lock
-                                    : (_isEditMode
-                                        ? Icons.edit
-                                        : Icons.edit_outlined),
-                            label: !_answeredToday
-                                ? 'ตอบได้วันละ 1 ครั้ง'
-                                : _editUsedToday
-                                    ? 'ใช้สิทธิ์แก้ไขแล้ว'
-                                    : (_isEditMode
-                                        ? 'กำลังแก้ไขคำตอบ'
-                                        : 'แก้ได้อีก 1 ครั้ง'),
-                            backgroundColor: _editUsedToday
-                                ? const Color(0xFFFFE7D6)
-                                : const Color(0xFFEAF7FF),
-                          ),
-                          _buildInfoChip(
-                            icon: _isLoggedIn
-                                ? Icons.cloud_done
-                                : Icons.smartphone,
-                            label: _isLoggedIn
-                                ? 'ซิงก์กับบัญชีแล้ว'
-                                : 'บันทึกลงเครื่องเท่านั้น',
-                            backgroundColor: const Color(0xFFF1F5FF),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      */
                       Row(
                         children: List.generate(_moodOptions.length, (index) {
                           final option = _moodOptions[index];
@@ -667,14 +486,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                         ],
                       ),
                       const SizedBox(height: 24),
-                      // Hidden for now per latest UI request:
-                      // answered-today summary card
-                      /*
-                      if (_answeredToday) ...[
-                        _buildStatusCard(canSelectMood: canSelectMood),
-                        const SizedBox(height: 24),
-                      ],
-                      */
                       const Text(
                         'บันทึกเรื่องราวของวันนี้',
                         style: TextStyle(
@@ -795,101 +606,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       ),
     );
   }
-
-  /* Widget _buildInfoChip({
-    required IconData icon,
-    required String label,
-    required Color backgroundColor,
-  }) {
-    const mainBlue = Color(0xFF4A89D8);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFBFDEF7)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: mainBlue),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              color: mainBlue,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  } */
-
-  /* Widget _buildStatusCard({required bool canSelectMood}) {
-    const mainBlue = Color(0xFF4A89D8);
-    final selectedTagsSummary = _selectedTags.isEmpty
-        ? 'ยังไม่ได้เลือกคำอธิบายความรู้สึกเพิ่มเติม'
-        : _selectedTags.join(' • ');
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFEAF7FF),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFBFDEF7)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'วันนี้ตอบแล้ว: ${_todayLabel ?? '-'} | คะแนน ${_todayScore ?? '-'} / 100',
-            style: const TextStyle(
-              color: Color(0xFF0D47A1),
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            selectedTagsSummary,
-            style: TextStyle(
-              color: mainBlue.withValues(alpha: 0.78),
-              fontSize: 13,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (_isEditMode)
-            const Text(
-              'กำลังแก้ไขคำตอบวันนี้ กดส่งพลังใจเพื่อบันทึกอีกครั้ง',
-              style: TextStyle(
-                color: mainBlue,
-                fontWeight: FontWeight.w600,
-              ),
-            )
-          else if (!_editUsedToday)
-            OutlinedButton.icon(
-              onPressed: canSelectMood ? null : _startEditOnce,
-              icon: const Icon(Icons.edit, size: 18),
-              label: const Text('แก้ไขคำตอบ (ได้ 1 ครั้ง)'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: mainBlue,
-                side: const BorderSide(color: Color(0xFF93C5FD)),
-              ),
-            )
-          else
-            const Text(
-              'คุณใช้สิทธิ์แก้ไขคำตอบวันนี้แล้ว',
-              style: TextStyle(
-                color: mainBlue,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-        ],
-      ),
-    );
-  } */
 
   Widget _buildPulseTextField({
     required TextEditingController controller,

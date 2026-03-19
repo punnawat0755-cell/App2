@@ -396,11 +396,16 @@ class ChatUserService extends GetxService {
         });
 
         return chatId;
-      } catch (_) {
+      } on Exception catch (e, stack) {
+        debugPrint(
+          'tryMatchWithWaitingUser attempt $attempt failed: $e\n$stack',
+        );
         continue; // ถ้า Transaction ล้มเหลว ให้ลองใหม่
       }
     }
 
+    debugPrint(
+        'tryMatchWithWaitingUser: exhausted all retry attempts for user $userId');
     return null;
   }
 

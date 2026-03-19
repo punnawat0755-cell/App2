@@ -1,11 +1,11 @@
 name: flutter_application_1
-description: "A new Flutter project."
+description: "How Are You - Mental health support app with chat matching, mood tracking, and pet gamification."
 publish_to: 'none'
 
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.2.3 <4.0.0'
+  sdk: '>=3.2.3 <4.0.0'  # Consider pinning to exact minor version in future
 
 dependencies:
   flutter:

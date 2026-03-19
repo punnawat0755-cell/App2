@@ -1,4 +1,6 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+
+import 'package:cloud_firestore/firebase_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -12,6 +14,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
   static const String _broadcastTopic = 'all_users';
+  static final List<StreamSubscription> _subscriptions = [];
 
   static const AndroidNotificationChannel _androidChannel =
       AndroidNotificationChannel(
@@ -53,23 +56,27 @@ class NotificationService {
     debugPrint('FCM token: $token');
     await _saveTokenForCurrentUser(token);
 
-    FirebaseAuth.instance.authStateChanges().listen((user) async {
-      if (user == null) {
-        return;
-      }
-      await _subscribeAllUsersTopic(messaging);
-      final freshToken = await messaging.getToken();
-      await _saveTokenForCurrentUser(freshToken);
-    });
+    _subscriptions.add(
+      FirebaseAuth.instance.authStateChanges().listen((user) async {
+        if (user == null) {
+          return;
+        }
+        await _subscribeAllUsersTopic(messaging);
+        final freshToken = await messaging.getToken();
+        await _saveTokenForCurrentUser(freshToken);
+      }),
+    );
 
-    supabase.Supabase.instance.client.auth.onAuthStateChange
-        .listen((event) async {
-      if (event.session?.user == null) {
-        return;
-      }
-      final freshToken = await messaging.getToken();
-      await _saveTokenForCurrentUser(freshToken);
-    });
+    _subscriptions.add(
+      supabase.Supabase.instance.client.auth.onAuthStateChange
+          .listen((event) async {
+        if (event.session?.user == null) {
+          return;
+        }
+        final freshToken = await messaging.getToken();
+        await _saveTokenForCurrentUser(freshToken);
+      }),
+    );
 
     messaging.onTokenRefresh.listen((newToken) async {
       await _subscribeAllUsersTopic(messaging);
@@ -78,6 +85,14 @@ class NotificationService {
 
     FirebaseMessaging.onMessage.listen(_showForegroundNotification);
     _initialized = true;
+  }
+
+  static Future<void> dispose() async {
+    for (final sub in _subscriptions) {
+      await sub.cancel();
+    }
+    _subscriptions.clear();
+    _initialized = false;
   }
 
   static Future<void> _saveTokenForCurrentUser(String? token) async {

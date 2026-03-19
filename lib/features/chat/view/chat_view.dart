@@ -953,6 +953,27 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     return const Center(child: CircularProgressIndicator());
                   }
 
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline,
+                              color: Colors.red, size: 40),
+                          const SizedBox(height: 8),
+                          Text(
+                            'โหลดข้อความไม่ได้',
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                          TextButton(
+                            onPressed: () => setState(() {}),
+                            child: const Text('ลองใหม่'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
                   final docs = [...(snapshot.data?.docs ?? const [])]
                     ..sort((a, b) {
                       final ad = a.data() as Map<String, dynamic>;

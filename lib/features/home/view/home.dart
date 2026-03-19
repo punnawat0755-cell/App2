@@ -25,7 +25,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const _missionDayCount = '138';
+  static const int _defaultMissionDays = 138;
 
   int _currentBannerIndex = 0;
   late final PageController _pageController;
@@ -115,43 +115,28 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
-    const apiKey =
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmFnZGhqbGtsbXlzamp1dmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzQ0MjcsImV4cCI6MjA4Mzk1MDQyN30.pqinIw8uza_02BRRheQrBLNnRK0InCBBXG00HmB0Bys';
-    final apiUrl =
-        'https://dvbagdhjlklmysjjuvht.supabase.co/rest/v1/profiles?select=username&id=eq.${user.id}';
-
     try {
-      final response = await http.get(
-        Uri.parse(apiUrl),
-        headers: {
-          'apikey': apiKey,
-          'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-        },
-      );
+      final response = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+      if (response != null) {
+        final username = response['username']?.toString().trim();
 
-        if (data.isNotEmpty) {
-          final username = data[0]['username']?.toString().trim();
-
-          if (!mounted) return;
-          setState(() {
-            _displayName =
-                (username != null && username.isNotEmpty) ? username : 'ผู้ใช้';
-            _isNameLoading = false;
-          });
-        } else {
-          if (!mounted) return;
-          setState(() {
-            _displayName = 'ผู้ใช้';
-            _isNameLoading = false;
-          });
-        }
+        if (!mounted) return;
+        setState(() {
+          _displayName =
+              (username != null && username.isNotEmpty) ? username : 'ผู้ใช้';
+          _isNameLoading = false;
+        });
       } else {
-        debugPrint('API Error: ${response.statusCode} - ${response.body}');
-        throw Exception('Failed to load profile');
+        if (!mounted) return;
+        setState(() {
+          _displayName = 'ผู้ใช้';
+          _isNameLoading = false;
+        });
       }
     } catch (e) {
       debugPrint('Error fetching user from API: $e');
@@ -408,7 +393,7 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     DailyMissionBanner(
                       onTap: _openDailyMission,
-                      dayCount: _missionDayCount,
+                      dayCount: _defaultMissionDays.toString(),
                     ),
                     ClownFishBanner(),
                     LoveJobBanner(),

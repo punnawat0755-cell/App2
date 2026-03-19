@@ -93,7 +93,9 @@ class _BottomNavBarState extends State<BottomNavBar>
         binding: UserChatBinding(),
       );
     } finally {
-      _checkingPausedChat = false;
+      if (mounted) {
+        _checkingPausedChat = false;
+      }
     }
   }
 

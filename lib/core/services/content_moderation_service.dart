@@ -21,7 +21,7 @@ class ContentModerationService {
   );
   static const bool _allowBadCertificate = bool.fromEnvironment(
     'N8N_ALLOW_BAD_CERT',
-    defaultValue: true,
+    defaultValue: false, // SECURE
   );
   static const String _allowBadCertificateHosts = String.fromEnvironment(
     'N8N_ALLOW_BAD_CERT_HOSTS',
