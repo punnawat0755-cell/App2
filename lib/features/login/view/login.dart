@@ -241,19 +241,19 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
           child: Column(
             children: [
-              const SizedBox(height: 60),
+              const SizedBox(height: 40),
               Image.asset(
                 'assets/images/logo.png',
-                width: 150,
-                height: 150,
+                width: 250,
+                height: 250,
                 fit: BoxFit.contain,
                 errorBuilder: (ctx, obj, st) =>
-                    const Icon(Icons.image, size: 100, color: Colors.grey),
+                    const Icon(Icons.image, size: 10, color: Colors.grey),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 10),
               const Text(
                 'เข้าสู่ระบบ',
                 style: TextStyle(
