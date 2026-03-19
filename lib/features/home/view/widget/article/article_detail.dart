@@ -17,18 +17,25 @@ class ArticleDetailPage extends StatelessWidget {
     bool isNetworkImage = imagePath.startsWith('http');
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F9FF),
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back_ios, color: Colors.grey),
-                onPressed: () => Navigator.pop(context),
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 10),
+                  child: Image.asset(
+                    'assets/images/back.png',
+                    width: 25,
+                    height: 25,
+                  ),
+                ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 30),
               ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: isNetworkImage
@@ -40,6 +47,7 @@ class ArticleDetailPage extends StatelessWidget {
                     : Image.asset(
                         imagePath,
                         width: double.infinity,
+                        height: 250,
                         fit: BoxFit.cover,
                       ),
               ),
@@ -50,7 +58,7 @@ class ArticleDetailPage extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                     color: Color(0xFF4489D7),
-                    fontSize: 24,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

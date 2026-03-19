@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:get/get.dart';
+import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
 import 'package:flutter_application_1/features/feed/view/feed_view.dart';
 import 'package:flutter_application_1/features/home/service/daily_mood_status_service.dart';
+import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
 import 'package:flutter_application_1/features/home/view/home.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/chat/view/chat_view.dart';
@@ -57,7 +59,8 @@ class _BottomNavBarState extends State<BottomNavBar>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed &&
+        !EntryFlowGuard.shouldIgnoreResume) {
       _openRequiredDailyFlowIfNeeded();
     }
   }
@@ -130,6 +133,12 @@ class _BottomNavBarState extends State<BottomNavBar>
 
     _checkingRoleMode = true;
     try {
+      final hasSelectedModeToday =
+          await UserModeStatusService.hasSelectedModeToday();
+      if (!mounted || hasSelectedModeToday) {
+        return;
+      }
+
       _roleSelectionPageOpen = true;
       final message = await Get.to<String>(() => const RoleSelectionPage());
       _roleSelectionPageOpen = false;

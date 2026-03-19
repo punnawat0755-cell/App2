@@ -2,6 +2,11 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
+import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
+import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
+import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
+import 'package:flutter_application_1/features/home/view/play_video_page.dart';
 import 'package:flutter_application_1/features/home/view/widget/article/article_card.dart';
 import 'package:flutter_application_1/features/home/view/widget/article/article_detail.dart';
 import 'package:flutter_application_1/features/home/view/widget/home_widgets.dart';
@@ -10,6 +15,7 @@ import 'package:flutter_application_1/features/setting/view/setting.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:get/get.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,45 +25,18 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const _missionDayCount = '138';
+
   int _currentBannerIndex = 0;
   late final PageController _pageController;
+  late final Stream<List<HomeVideoClip>> _videoClipsStream;
   Timer? _timer;
+  final HomeVideoRepository _homeVideoRepository = HomeVideoRepository();
+  final ImagePicker _imagePicker = ImagePicker();
 
   bool _isNameLoading = true;
+  bool _isUploadingClip = false;
   String _displayName = 'ผู้ใช้';
-
-  final List<_HomeClip> _clipList = const [
-    _HomeClip(
-      title: 'Jellyfish',
-      subtitle: '2 week',
-      imagePath:
-          'https://i.pinimg.com/1200x/10/fd/6c/10fd6c2086373b9007700b8f997545f1.jpg',
-    ),
-    _HomeClip(
-      title: 'starfish',
-      subtitle: '1 week',
-      imagePath:
-          'https://i.pinimg.com/736x/e0/e4/4d/e0e44d1c32bf9b484430e4cb74bf2719.jpg',
-    ),
-    _HomeClip(
-      title: 'whale',
-      subtitle: '1 day',
-      imagePath:
-          'https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg',
-    ),
-    _HomeClip(
-      title: 'whale',
-      subtitle: '1 day',
-      imagePath:
-          'https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg',
-    ),
-    _HomeClip(
-      title: 'whale',
-      subtitle: '1 day',
-      imagePath:
-          'https://i.pinimg.com/1200x/2a/92/db/2a92db9b4048574f9b24f57108d3a2ef.jpg',
-    ),
-  ];
 
   final List<_HomeArticle> _articleList = const [
     _HomeArticle(
@@ -96,6 +75,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
+    _videoClipsStream = _homeVideoRepository.watchVideoClips();
     _loadUsername();
 
     _timer = Timer.periodic(const Duration(seconds: 6), (_) {
@@ -183,8 +163,169 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _handleClipTap(_HomeClip clip) {
-    debugPrint('ยังไม่มีหน้าปลายทางสำหรับ ${clip.title}');
+  void _openVideoClip(HomeVideoClip clip) {
+    Get.to(
+      () => PlayVideoPage(
+        videoPath: clip.videoUrl,
+        uploaderName: clip.authorName,
+        caption: clip.caption,
+      ),
+    );
+  }
+
+  Future<void> _pickAndUploadClip() async {
+    if (_isUploadingClip) {
+      return;
+    }
+
+    try {
+      EntryFlowGuard.ignoreResumeFor(const Duration(seconds: 10));
+      final XFile? file = await _imagePicker.pickVideo(
+        source: ImageSource.gallery,
+      );
+      if (file == null || !mounted) {
+        return;
+      }
+
+      final suggestedCaption = _fileNameWithoutExtension(file.name);
+      final caption = await _promptClipCaption(suggestedCaption);
+      if (!mounted || caption == null) {
+        return;
+      }
+
+      await _waitForModalToClose();
+      if (!mounted) {
+        return;
+      }
+
+      final videoBytes = await file.readAsBytes();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() => _isUploadingClip = true);
+      await _homeVideoRepository.createVideoClip(
+        videoBytes: videoBytes,
+        videoFileName: file.name,
+        caption: caption,
+      );
+
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('โพสต์สเรียบร้อยแล้ว!')),
+      );
+    } on HomeVideoBucketNotFoundException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'ยังไม่พบ Supabase Storage bucket ชื่อ ${error.bucketName}',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } on HomeVideoUploadUnauthorizedException catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'อัปโหลดคลิปไม่ได้ เพราะ Supabase Storage ยังไม่เปิดสิทธิ์ให้ผู้ใช้เพิ่มไฟล์',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('อัปโหลดคลิปไม่สำเร็จ: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingClip = false);
+      }
+    }
+  }
+
+  Future<String?> _promptClipCaption(String initialValue) async {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ClipCaptionSheet(
+        initialValue: initialValue,
+      ),
+    );
+  }
+
+  Future<void> _waitForModalToClose() async {
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+  }
+
+  String _fileNameWithoutExtension(String fileName) {
+    final lastDotIndex = fileName.lastIndexOf('.');
+    if (lastDotIndex <= 0) {
+      return fileName;
+    }
+    return fileName.substring(0, lastDotIndex);
+  }
+
+  Widget _buildAddClipCard() {
+    return GestureDetector(
+      onTap: _pickAndUploadClip,
+      child: Container(
+        width: 110,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE2E2E2),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Center(
+          child: _isUploadingClip
+              ? const SizedBox(
+                  width: 26,
+                  height: 26,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.6,
+                    color: Color(0xFF4489D7),
+                  ),
+                )
+              : Container(
+                  width: 45,
+                  height: 45,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.add,
+                    color: Color(0xFF8A8A8A),
+                    size: 30,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openDailyMission() async {
+    final message = await Get.to<String>(() => const DailyMoodPage());
+    if (!mounted || message == null || message.isEmpty) {
+      return;
+    }
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -201,40 +342,49 @@ class _HomePageState extends State<HomePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: GestureDetector(
-                  onTap: () async {
-                    await Get.to(() => const SettingPage());
-                    if (!mounted) {
-                      return;
-                    }
-                    await _loadUsername();
-                  },
-                  child: SizedBox(
-                    width: 50,
-                    height: 50,
-                    child: Obx(
-                      () => Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.06),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const SizedBox(width: 40),
+                  Row(
+                    children: [
+                      const SizedBox(width: 8),
+                      GestureDetector(
+                        onTap: () async {
+                          await Get.to(() => const SettingPage());
+                          if (!mounted) {
+                            return;
+                          }
+                          await _loadUsername();
+                        },
+                        child: SizedBox(
+                          width: 50,
+                          height: 50,
+                          child: Obx(
+                            () => Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border:
+                                    Border.all(color: Colors.white, width: 3),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.06),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                                image: DecorationImage(
+                                  image: avatarController.avatarImageProvider,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
                             ),
-                          ],
-                          image: DecorationImage(
-                            image: avatarController.avatarImageProvider,
-                            fit: BoxFit.cover,
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ),
-                ),
+                ],
               ),
               const SizedBox(height: 5),
               Text(
@@ -255,8 +405,11 @@ class _HomePageState extends State<HomePage> {
                       _currentBannerIndex = index;
                     });
                   },
-                  children: const [
-                    DailyMissionBanner(),
+                  children: [
+                    DailyMissionBanner(
+                      onTap: _openDailyMission,
+                      dayCount: _missionDayCount,
+                    ),
                     ClownFishBanner(),
                     LoveJobBanner(),
                   ],
@@ -285,21 +438,45 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 15),
               SizedBox(
                 height: 160,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  padding: EdgeInsets.zero,
-                  itemCount: _clipList.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 15),
-                  itemBuilder: (context, index) {
-                    final clip = _clipList[index];
-                    return InkWell(
-                      onTap: () => _handleClipTap(clip),
-                      child: ClipCard(
-                        title: clip.title,
-                        subtitle: clip.subtitle,
-                        imagePath: clip.imagePath,
-                      ),
+                child: StreamBuilder<List<HomeVideoClip>>(
+                  stream: _videoClipsStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError && !snapshot.hasData) {
+                      return ListView(
+                        scrollDirection: Axis.horizontal,
+                        clipBehavior: Clip.none,
+                        padding: EdgeInsets.zero,
+                        children: [_buildAddClipCard()],
+                      );
+                    }
+
+                    if (!snapshot.hasData) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    final clips = snapshot.data ?? const <HomeVideoClip>[];
+                    return ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      clipBehavior: Clip.none,
+                      padding: EdgeInsets.zero,
+                      itemCount: clips.length + 1,
+                      separatorBuilder: (_, __) => const SizedBox(width: 15),
+                      itemBuilder: (context, index) {
+                        if (index == 0) {
+                          return _buildAddClipCard();
+                        }
+
+                        final clip = clips[index - 1];
+                        return InkWell(
+                          onTap: () => _openVideoClip(clip),
+                          child: ClipCard(
+                            title: clip.authorName,
+                            subtitle: clip.relativeTimeLabel,
+                            imagePath: clip.videoUrl,
+                            forceVideoPreview: true,
+                          ),
+                        );
+                      },
                     );
                   },
                 ),
@@ -349,18 +526,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _HomeClip {
-  const _HomeClip({
-    required this.title,
-    required this.subtitle,
-    required this.imagePath,
-  });
-
-  final String title;
-  final String subtitle;
-  final String imagePath;
-}
-
 class _HomeArticle {
   const _HomeArticle({
     required this.title,
@@ -377,4 +542,127 @@ class _HomeArticle {
   final String detailImagePath;
   final String detailTitle;
   final String content;
+}
+
+class _ClipCaptionSheet extends StatefulWidget {
+  const _ClipCaptionSheet({
+    required this.initialValue,
+  });
+
+  final String initialValue;
+
+  @override
+  State<_ClipCaptionSheet> createState() => _ClipCaptionSheetState();
+}
+
+class _ClipCaptionSheetState extends State<_ClipCaptionSheet> {
+  late final TextEditingController _controller;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialValue);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    FocusScope.of(context).unfocus();
+    final caption = _controller.text.trim();
+    Navigator.of(context).pop(
+      caption.isEmpty ? widget.initialValue : caption,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: Material(
+            color: Colors.white,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 45,
+                        height: 5,
+                        margin: const EdgeInsets.only(bottom: 16),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[300],
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    const Text(
+                      'เพิ่มคำบรรยายคลิป',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF4489D7),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      maxLines: 3,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _submit(),
+                      decoration: InputDecoration(
+                        hintText: 'เช่น วันนี้ขอพักใจนิดนึง',
+                        filled: true,
+                        fillColor: const Color(0xFFF4FAFF),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(18),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF4489D7),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                        ),
+                        onPressed: _submit,
+                        child: const Text('บันทึกคลิป'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

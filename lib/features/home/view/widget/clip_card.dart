@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:video_player/video_player.dart';
 
 class ClipCard extends StatelessWidget {
   const ClipCard({
@@ -8,18 +9,21 @@ class ClipCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.imagePath,
+    this.forceVideoPreview = false,
   });
 
   final String title;
   final String subtitle;
   final String imagePath;
+  final bool forceVideoPreview;
 
   @override
   Widget build(BuildContext context) {
     final isNetworkImage = imagePath.startsWith('http');
     final isAssetImage = imagePath.startsWith('assets/');
     final lower = imagePath.toLowerCase();
-    final isVideo = lower.endsWith('.mp4') ||
+    final isVideo = forceVideoPreview ||
+        lower.endsWith('.mp4') ||
         lower.endsWith('.mov') ||
         lower.endsWith('.avi') ||
         lower.endsWith('.m4v');
@@ -32,15 +36,7 @@ class ClipCard extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             if (isVideo)
-              Container(
-                color: const Color(0xFFDDE7F0),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.play_circle_fill_rounded,
-                  size: 42,
-                  color: Color(0xFF8AA0B6),
-                ),
-              )
+              _VideoThumbnail(videoPath: imagePath)
             else if (isNetworkImage)
               Image.network(
                 imagePath,
@@ -125,6 +121,66 @@ class ClipCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _VideoThumbnail extends StatefulWidget {
+  const _VideoThumbnail({required this.videoPath});
+
+  final String videoPath;
+
+  @override
+  State<_VideoThumbnail> createState() => _VideoThumbnailState();
+}
+
+class _VideoThumbnailState extends State<_VideoThumbnail> {
+  late final VideoPlayerController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = widget.videoPath.startsWith('http')
+        ? VideoPlayerController.networkUrl(Uri.parse(widget.videoPath))
+        : VideoPlayerController.file(File(widget.videoPath))
+      ..initialize().then((_) async {
+        await _controller.setLooping(false);
+        await _controller.seekTo(Duration.zero);
+        await _controller.play();
+        await _controller.pause();
+        if (mounted) {
+          setState(() {});
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_controller.value.isInitialized) {
+      return Container(
+        color: const Color(0xFFDDE7F0),
+        alignment: Alignment.center,
+        child: const Icon(
+          Icons.play_circle_fill_rounded,
+          size: 42,
+          color: Color(0xFF8AA0B6),
+        ),
+      );
+    }
+
+    return FittedBox(
+      fit: BoxFit.cover,
+      child: SizedBox(
+        width: _controller.value.size.width,
+        height: _controller.value.size.height,
+        child: VideoPlayer(_controller),
       ),
     );
   }
