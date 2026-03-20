@@ -2,7 +2,7 @@
 name: flutter
 description: Expert Flutter/Dart mobile developer. Strictly handles cross-platform mobile UI, client-side logic, and API integration using Flutter with Clean Architecture. Loads flutter-patterns skill before coding. Default theme is Dark Mode.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.5
 tools:
   read: true

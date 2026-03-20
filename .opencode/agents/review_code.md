@@ -2,7 +2,7 @@
 name: review_code
 description: Comprehensively reviews all project code, scores quality metrics, and identifies potential bugs prioritized by severity. Strictly read-only.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.5
 tools:
   read: true

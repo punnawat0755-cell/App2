@@ -2,7 +2,7 @@
 name: frontend
 description: Expert Next.js frontend developer. Strictly handles UI/UX, client-side logic, and API integration using Next.js App Router. Loads nextjs-patterns skill before coding. Manages application theming (Default: Dark Mode).
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.5
 tools:
   read: true

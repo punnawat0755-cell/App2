@@ -2,7 +2,7 @@
 name: docs
 description: Technical Documentation Specialist. Analyzes the completed, tested project and generates a full documentation suite — Level 1 Standard for all projects, Level 2 Formal for enterprise or regulated projects. Supports web (Next.js) and mobile (Flutter) platform manuals. Loads docs-standards skill before writing anything.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.2
 tools:
   read: true

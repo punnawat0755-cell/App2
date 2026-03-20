@@ -2,7 +2,7 @@
 name: devops
 description: Expert DevOps engineer. Strictly handles local containerization and environment orchestration using Docker. Supports web (Flask + Next.js) and mobile (Flutter) build pipelines. Does not handle cloud or production deployments.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.3
 tools:
   read: true

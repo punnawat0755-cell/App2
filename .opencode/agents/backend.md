@@ -2,7 +2,7 @@
 name: backend
 description: Expert Python/Flask backend developer. Strictly handles server-side logic, APIs, and database interactions using Flask as the primary framework. Prioritizes speed, stability, and security.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.3
 tools:
   read: true

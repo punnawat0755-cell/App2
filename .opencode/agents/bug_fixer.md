@@ -2,7 +2,7 @@
 name: bug_fixer
 description: Applies code fixes strictly according to a Fix Plan produced by the PM. Does not self-analyze errors. Does not modify files outside the Fix Plan.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.3
 tools:
   read: true

@@ -2,7 +2,7 @@
 name: pm
 description: The Product Manager and Bug Analyst. Creates PRDs for new requirements, and produces structured Fix Plans when bugs or errors are reported by code_runner or tester.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.3
 tools:
   read: true

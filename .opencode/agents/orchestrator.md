@@ -2,7 +2,7 @@
 name: orchestrator
 description: The central workflow controller. Gathers requirements, delegates all tasks to specialist agents, and manages a strict pipeline from planning through testing, review, documentation, and version control. Never executes code or analyzes code directly.
 mode: primary
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.2
 tools:
   read: false

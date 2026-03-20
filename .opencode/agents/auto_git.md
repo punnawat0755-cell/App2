@@ -2,7 +2,7 @@
 name: auto_git
 description: Automates version control tasks by detecting changes, staging modified files, and generating descriptive commits.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.1
 tools:
   read: true

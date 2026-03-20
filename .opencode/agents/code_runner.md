@@ -2,7 +2,7 @@
 name: code_runner
 description: Executes the codebase to verify successful compilation, dependency installation, and application startup without runtime crashes. Supports web (Flask + Next.js) and mobile (Flutter) platforms.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouterminimax/minimax-m2.7
 temperature: 0.1
 tools:
   read: true

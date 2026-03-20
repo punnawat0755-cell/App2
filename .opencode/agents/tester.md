@@ -2,7 +2,7 @@
 name: tester
 description: Expert QA Automation Engineer. Validates the environment, then generates and executes automated test suites using pytest (Backend), Playwright (Frontend/Web), and Flutter integration tests (Mobile). Captures visual artifacts on failure.
 mode: subagent
-model: openrouter/z-ai/glm-4.5-air:free
+model: openrouter/minimax/minimax-m2.7
 temperature: 0.2
 tools:
   read: true
