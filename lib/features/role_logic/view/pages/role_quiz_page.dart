@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-// --------------------------------------------------------
-// 1. GetX Controller สำหรับจัดการ State
-// --------------------------------------------------------
-class QuizController extends GetxController {
-  // -1 หมายถึงยังไม่ได้เลือกตัวเลือกใดเลย
+class _RoleQuizController extends GetxController {
   var selectedIndex = (-1).obs;
 
   void selectOption(int index) {
@@ -13,8 +9,8 @@ class QuizController extends GetxController {
   }
 }
 
-class QuizSelectionResult {
-  const QuizSelectionResult({
+class RoleQuizSelectionResult {
+  const RoleQuizSelectionResult({
     required this.selectedIndex,
     required this.selectedAnswer,
   });
@@ -23,17 +19,11 @@ class QuizSelectionResult {
   final String selectedAnswer;
 }
 
-// --------------------------------------------------------
-// 2. หน้าจอ UI หลัก
-// --------------------------------------------------------
-class QuizScreen extends StatelessWidget {
-  QuizScreen({super.key});
+class RoleQuizPage extends StatelessWidget {
+  RoleQuizPage({super.key});
 
-  // เรียกใช้งาน Controller
-  final QuizController controller = Get.put(QuizController());
-
-  // รายการคำตอบ
-  final List<String> options = ["ระเบิด", "ต้นไม้", "มือสองข้าง", "ค้างคาว"];
+  final _RoleQuizController _controller = Get.put(_RoleQuizController());
+  final List<String> _options = ["ระเบิด", "ต้นไม้", "มือสองข้าง", "ค้างคาว"];
 
   @override
   Widget build(BuildContext context) {
@@ -49,7 +39,6 @@ class QuizScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // หัวข้อ
                 Text(
                   "คุณเห็นอะไรในภาพนี้\nเป็นอย่างแรก",
                   textAlign: TextAlign.center,
@@ -61,8 +50,6 @@ class QuizScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 25),
-
-                // รูปภาพ
                 Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(20),
@@ -85,8 +72,6 @@ class QuizScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // เครดิตรูปภาพ (ตัวเล็กๆ ใต้รูป)
                 Align(
                   alignment: Alignment.centerRight,
                   child: Text(
@@ -95,14 +80,12 @@ class QuizScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // ข้อความก่อนปุ่มเลือก
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Padding(
                     padding: const EdgeInsets.only(left: 16.0),
                     child: Text(
-                      "โปรดเลือกคำตอบของคุณ", // อ้างอิงคำตามรูปภาพ
+                      "โปรดเลือกคำตอบของคุณ",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -112,17 +95,15 @@ class QuizScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 16),
-
-                // สร้างปุ่มตัวเลือก
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: options.length,
+                  itemCount: _options.length,
                   itemBuilder: (context, index) {
                     return _buildOptionButton(
                       context,
                       index,
-                      options[index],
+                      _options[index],
                       const Color(0xFF4489D7),
                     );
                   },
@@ -135,9 +116,6 @@ class QuizScreen extends StatelessWidget {
     );
   }
 
-  // --------------------------------------------------------
-  // 3. Widget สำหรับปุ่มแต่ละปุ่ม (เชื่อมกับ GetX)
-  // --------------------------------------------------------
   Widget _buildOptionButton(
     BuildContext context,
     int index,
@@ -145,14 +123,13 @@ class QuizScreen extends StatelessWidget {
     Color textColor,
   ) {
     return Obx(() {
-      // ตรวจสอบว่าปุ่มนี้ถูกเลือกอยู่หรือไม่
-      bool isSelected = controller.selectedIndex.value == index;
+      final isSelected = _controller.selectedIndex.value == index;
 
       return GestureDetector(
         onTap: () {
-          controller.selectOption(index);
+          _controller.selectOption(index);
           Navigator.of(context).pop(
-            QuizSelectionResult(
+            RoleQuizSelectionResult(
               selectedIndex: index,
               selectedAnswer: title,
             ),
@@ -162,12 +139,11 @@ class QuizScreen extends StatelessWidget {
           margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 40),
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           decoration: BoxDecoration(
-            // สลับสีพื้นหลังถ้าถูกเลือก (ให้เหมือนปุ่ม 'มือสองข้าง' ในรูป)
             color:
                 isSelected ? const Color(0xFF9CE2FE) : const Color(0xFFD6F0FF),
-            borderRadius: BorderRadius.circular(30), // ขอบมนเป็นแคปซูล
+            borderRadius: BorderRadius.circular(30),
             border: Border.all(
-              color: const Color(0xFF86A8D6), // สีขอบปุ่ม
+              color: const Color(0xFF86A8D6),
               width: 1.5,
             ),
             boxShadow: [

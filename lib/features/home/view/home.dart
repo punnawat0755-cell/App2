@@ -7,9 +7,9 @@ import 'package:flutter_application_1/features/home/service/home_video_prefetch_
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/home/view/play_video_page.dart';
-import 'package:flutter_application_1/features/home/view/widget/article/article_card.dart';
-import 'package:flutter_application_1/features/home/view/widget/article/article_detail.dart';
-import 'package:flutter_application_1/features/home/view/widget/home_widgets.dart';
+import 'package:flutter_application_1/features/home/view/widgets/article/article_card.dart';
+import 'package:flutter_application_1/features/home/view/widgets/article/article_detail.dart';
+import 'package:flutter_application_1/features/home/view/widgets/home_widgets.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/setting/view/setting.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';

@@ -11,7 +11,7 @@ import 'core/services/notification_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'features/login/view/login.dart';
-import 'features/login/view/logo.dart';
+import 'features/login/view/splash_screen_page.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -99,7 +99,7 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
       stream: _authStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SplashScreenpage();
+          return const SplashScreenPage();
         }
 
         final session = snapshot.data?.session;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-class SplashScreenpage extends StatelessWidget {
-  const SplashScreenpage({super.key});
+class SplashScreenPage extends StatelessWidget {
+  const SplashScreenPage({super.key});
 
   @override
   Widget build(BuildContext context) {

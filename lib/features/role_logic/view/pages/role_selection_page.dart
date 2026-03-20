@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
-import 'package:flutter_application_1/rolelogic/view/widget/choice_card.dart';
-import 'package:flutter_application_1/rolelogic/view/widget/role_quiz_view.dart';
+import 'package:flutter_application_1/features/role_logic/view/pages/role_quiz_page.dart';
+import 'package:flutter_application_1/features/role_logic/view/widgets/choice_card.dart';
 
 class RoleSelectionPage extends StatefulWidget {
   const RoleSelectionPage({super.key});
@@ -19,9 +19,9 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   bool _isSaving = false;
 
   Future<void> _openListenerQuiz() async {
-    final result = await Navigator.of(context).push<QuizSelectionResult>(
+    final result = await Navigator.of(context).push<RoleQuizSelectionResult>(
       MaterialPageRoute(
-        builder: (_) => QuizScreen(),
+        builder: (_) => RoleQuizPage(),
       ),
     );
 

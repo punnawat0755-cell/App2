@@ -14,7 +14,7 @@ import 'package:flutter_application_1/features/profile/view/profile_view.dart';
 import 'package:flutter_application_1/features/chat_user/bindings/chat_binding.dart';
 import 'package:flutter_application_1/features/chat_user/services/chat_user_service.dart';
 import 'package:flutter_application_1/features/chat_user/models/pausechat.dart';
-import 'package:flutter_application_1/rolelogic/view/widget/rolelogic_view.dart';
+import 'package:flutter_application_1/features/role_logic/view/pages/role_selection_page.dart';
 
 class BottomNavBar extends StatefulWidget {
   const BottomNavBar({super.key});
