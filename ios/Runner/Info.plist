@@ -28,6 +28,10 @@
 	<true/>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>แอปต้องใช้สิทธิ์เข้าถึงคลังรูปเพื่อให้คุณแนบรูปใน feed ได้</string>
+	<key>NSCameraUsageDescription</key>
+	<string>แอปต้องใช้กล้องเพื่อให้คุณถ่ายวิดีโอและโพสต์คลิปได้ทันที</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>แอปต้องใช้ไมโครโฟนเพื่อบันทึกเสียงขณะถ่ายวิดีโอสำหรับโพสต์ของคุณ</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

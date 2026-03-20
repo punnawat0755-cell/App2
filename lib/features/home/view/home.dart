@@ -1,20 +1,23 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:image_picker/image_picker.dart';
+
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
 import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/home/view/play_video_page.dart';
+import 'package:flutter_application_1/features/home/view/video_capture_page.dart';
 import 'package:flutter_application_1/features/home/view/widgets/article/article_card.dart';
 import 'package:flutter_application_1/features/home/view/widgets/article/article_detail.dart';
 import 'package:flutter_application_1/features/home/view/widgets/home_widgets.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/setting/view/setting.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
-import 'package:get/get.dart';
-import 'package:image_picker/image_picker.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -207,16 +210,40 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
+    final supportsCameraCapture = _supportsCameraVideoCapture;
+    final source = await _promptClipSource();
+    if (!mounted || source == null) {
+      return;
+    }
+
+    if (supportsCameraCapture) {
+      await _waitForModalToClose();
+      if (!mounted) {
+        return;
+      }
+    }
+
+    await _pickAndUploadClipFromSource(source);
+  }
+
+  Future<void> _pickAndUploadClipFromSource(ImageSource source) async {
     try {
-      EntryFlowGuard.ignoreResumeFor(const Duration(seconds: 10));
-      final XFile? file = await _imagePicker.pickVideo(
-        source: ImageSource.gallery,
-      );
+      final XFile? file;
+      if (source == ImageSource.camera && _usesInAppCameraPage) {
+        file = await Get.to<XFile>(() => const VideoCapturePage());
+      } else {
+        EntryFlowGuard.ignoreResumeFor(const Duration(seconds: 10));
+        file = await _imagePicker.pickVideo(
+          source: source,
+        );
+      }
       if (file == null || !mounted) {
         return;
       }
 
-      final suggestedCaption = _fileNameWithoutExtension(file.name);
+      final suggestedCaption = source == ImageSource.camera
+          ? ''
+          : _fileNameWithoutExtension(file.name);
       final caption = await _promptClipCaption(suggestedCaption);
       if (!mounted || caption == null) {
         return;
@@ -243,7 +270,27 @@ class _HomePageState extends State<HomePage> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('โพสต์สเรียบร้อยแล้ว!')),
+        const SnackBar(content: Text('โพสต์เรียบร้อยแล้ว!')),
+      );
+    } on UnimplementedError catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('อุปกรณ์นี้ยังไม่รองรับการถ่ายวิดีโอจากแอป'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } on UnsupportedError catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('อุปกรณ์นี้ยังไม่รองรับการถ่ายวิดีโอจากแอป'),
+          backgroundColor: Colors.red,
+        ),
       );
     } on HomeVideoBucketNotFoundException catch (error) {
       if (!mounted) {
@@ -270,6 +317,20 @@ class _HomePageState extends State<HomePage> {
         ),
       );
     } catch (error) {
+      final message = error.toString().toLowerCase();
+      if (message.contains('source camera is not supported') ||
+          message.contains('cameradelegate')) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('อุปกรณ์นี้ยังไม่รองรับการถ่ายวิดีโอจากแอป'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
       if (!mounted) {
         return;
       }
@@ -286,6 +347,18 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<ImageSource?> _promptClipSource() async {
+    if (!_supportsCameraVideoCapture) {
+      return ImageSource.gallery;
+    }
+
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _ClipSourceSheet(),
+    );
+  }
+
   Future<String?> _promptClipCaption(String initialValue) async {
     return showModalBottomSheet<String>(
       context: context,
@@ -299,6 +372,19 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _waitForModalToClose() async {
     await Future<void>.delayed(const Duration(milliseconds: 260));
+  }
+
+  bool get _supportsCameraVideoCapture {
+    return _usesInAppCameraPage || kIsWeb;
+  }
+
+  bool get _usesInAppCameraPage {
+    if (kIsWeb) {
+      return false;
+    }
+
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
   }
 
   String _fileNameWithoutExtension(String fileName) {
@@ -588,6 +674,151 @@ class _HomeArticle {
   final String detailImagePath;
   final String detailTitle;
   final String content;
+}
+
+class _ClipSourceSheet extends StatelessWidget {
+  const _ClipSourceSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: Material(
+          color: Colors.white,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 45,
+                      height: 5,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    'เพิ่มคลิปวิดีโอ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4489D7),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'เลือกว่าจะอัดวิดีโอใหม่หรือใช้คลิปที่มีอยู่แล้ว',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black.withValues(alpha: 0.65),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _ClipSourceActionTile(
+                    icon: Icons.videocam_rounded,
+                    title: 'ถ่ายวิดีโอ',
+                    subtitle: 'เปิดกล้องเพื่ออัดคลิปแล้วนำมาโพสต์',
+                    onTap: () => Navigator.of(context).pop(ImageSource.camera),
+                  ),
+                  const SizedBox(height: 12),
+                  _ClipSourceActionTile(
+                    icon: Icons.video_library_rounded,
+                    title: 'เลือกจากคลัง',
+                    subtitle: 'ใช้วิดีโอที่มีอยู่แล้วในเครื่อง',
+                    onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClipSourceActionTile extends StatelessWidget {
+  const _ClipSourceActionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFF4FAFF),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4489D7).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  icon,
+                  color: const Color(0xFF4489D7),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: Colors.black.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF4489D7),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _ClipCaptionSheet extends StatefulWidget {
