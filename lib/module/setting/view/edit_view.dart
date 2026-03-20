@@ -17,7 +17,8 @@ class EditProfileController extends GetxController {
   final RxString profileImagePath = ''.obs;
   final RxString selectedAssetAvatar =
       ''.obs; // 💡 เก็บ Path รูปโปรไฟล์ที่เป็น Asset (สัตว์น้ำ)
-  final RxString pendingAssetAvatar = ''.obs; // รูปที่เลือกใน Panel (ยังไม่กดตกลง)
+  final RxString pendingAssetAvatar =
+      ''.obs; // รูปที่เลือกใน Panel (ยังไม่กดตกลง)
   final ImagePicker _picker = ImagePicker();
 
   // 💡 รายการรูปโปรไฟล์ (กรุณาแก้ไขชื่อไฟล์ให้ตรงกับรูปที่คุณมีในโฟลเดอร์ assets)
@@ -54,6 +55,11 @@ class EditProfileController extends GetxController {
   late TextEditingController passwordController;
   late TextEditingController emailController;
   late TextEditingController phoneController;
+  late TextEditingController oldPasswordController;
+  late TextEditingController newPasswordController;
+  late TextEditingController confirmPasswordController;
+  final RxBool showOldPassword = false.obs;
+  final RxBool showNewPassword = false.obs;
 
   @override
   void onInit() {
@@ -79,6 +85,9 @@ class EditProfileController extends GetxController {
       text: emailFull.value.split('@')[0],
     );
     phoneController = TextEditingController(text: phoneValue.value);
+    oldPasswordController = TextEditingController();
+    newPasswordController = TextEditingController();
+    confirmPasswordController = TextEditingController();
   }
 
   @override
@@ -87,6 +96,9 @@ class EditProfileController extends GetxController {
     passwordController.dispose();
     emailController.dispose();
     phoneController.dispose();
+    oldPasswordController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
     super.onClose();
   }
 
@@ -107,8 +119,7 @@ class EditProfileController extends GetxController {
 
   // --- ฟังก์ชันจัดรูปแบบ ---
   String formatPassword(String psw) {
-    if (psw.length <= 5) return psw;
-    return '${psw.substring(0, 5)}*****';
+    return '******';
   }
 
   String formatEmail(String email) {
@@ -120,8 +131,8 @@ class EditProfileController extends GetxController {
   }
 
   String formatPhone(String phone) {
-    if (phone.length <= 4) return phone;
-    return phone.replaceRange(phone.length - 4, phone.length, '****');
+    if (phone.length <= 3) return phone;
+    return phone.replaceRange(phone.length - 3, phone.length, '***');
   }
 
   // --- ฟังก์ชันการทำงาน ---
@@ -179,6 +190,61 @@ class EditProfileController extends GetxController {
       userController.gender.value = gender.value;
     }
     activeField.value = null;
+  }
+
+  void resetPasswordForm() {
+    oldPasswordController.text = '';
+    newPasswordController.text = '';
+    confirmPasswordController.text = '';
+    showOldPassword.value = false;
+    showNewPassword.value = false;
+  }
+
+  void savePasswordFromPanel() {
+    final oldPsw = oldPasswordController.text;
+    final newPsw = newPasswordController.text;
+    final confirmPsw = confirmPasswordController.text;
+
+    if (oldPsw.isEmpty || newPsw.isEmpty || confirmPsw.isEmpty) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "กรุณากรอกข้อมูลให้ครบ",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade400,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+
+    if (oldPsw != passwordValue.value) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "รหัสเดิมไม่ถูกต้อง",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade400,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+
+    if (newPsw != confirmPsw) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "รหัสใหม่ไม่ตรงกัน",
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: Colors.red.shade400,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
+      );
+      return;
+    }
+
+    passwordValue.value = newPsw;
+    originalPassword = newPsw;
+    resetPasswordForm();
+    Get.back();
   }
 }
 
@@ -257,7 +323,7 @@ class EditProfilePage extends StatelessWidget {
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFD9F0FF),
+                        color: const Color(0xFF20C2FF),
                         borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
@@ -270,7 +336,7 @@ class EditProfilePage extends StatelessWidget {
                       child: const Text(
                         'ตกลง',
                         style: TextStyle(
-                          color: Color(0xFF4489D7),
+                          color: Color(0xFFFFFFFF),
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
@@ -354,6 +420,96 @@ class EditProfilePage extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  // 💡 Panel แก้ไขรหัสผ่าน (pattern เดียวกับ Post)
+  void _showPasswordPanel(BuildContext context) {
+    controller.resetPasswordForm();
+    Get.bottomSheet(
+      ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Container(
+          color: Colors.white,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 16),
+                      width: 45,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    'แก้ไขรหัสผ่าน',
+                    style: TextStyle(
+                      color: Color(0xFF4489D7),
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildPasswordField(
+                    label: 'กรุณาใส่รหัสเดิม',
+                    controller: controller.oldPasswordController,
+                    showToggle: true,
+                    isVisible: controller.showOldPassword,
+                    onToggle: () => controller.showOldPassword.toggle(),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildPasswordField(
+                    label: 'กรุณาใส่รหัสใหม่',
+                    controller: controller.newPasswordController,
+                    showToggle: true,
+                    isVisible: controller.showNewPassword,
+                    onToggle: () => controller.showNewPassword.toggle(),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildPasswordField(
+                    label: 'กรุณายืนยันรหัส',
+                    controller: controller.confirmPasswordController,
+                  ),
+                  const SizedBox(height: 30),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: controller.savePasswordFromPanel,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF20C2FF),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text(
+                        'บันทึก',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
     );
   }
 
@@ -492,7 +648,7 @@ class EditProfilePage extends StatelessWidget {
                         controller.username.value,
                         style: const TextStyle(
                           color: Color(0xFF4489D7),
-                          fontSize: 24,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -552,7 +708,7 @@ class EditProfilePage extends StatelessWidget {
                     controller.birthday.value,
                     style: const TextStyle(
                       color: Color(0xFF4489D7),
-                      fontSize: 18,
+                      fontSize: 16,
                     ),
                   ),
                 ),
@@ -563,34 +719,17 @@ class EditProfilePage extends StatelessWidget {
                   label: 'รหัส :',
                   fieldKey: 'password',
                   iconPath: 'assets/images/pen.png',
-                  content: controller.activeField.value == 'password'
-                      ? TextField(
-                          controller: controller.passwordController,
-                          autofocus: true,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'[a-zA-Z0-9]'),
-                            ),
-                          ],
-                          style: const TextStyle(
-                            color: Color(0xFF4489D7),
-                            fontSize: 18,
-                          ),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        )
-                      : Text(
-                          controller.formatPassword(
-                            controller.passwordValue.value,
-                          ),
-                          style: const TextStyle(
-                            color: Color(0xFF4489D7),
-                            fontSize: 18,
-                          ),
-                        ),
+                  onIconTap: () => _showPasswordPanel(context),
+                  content: Text(
+                    controller.formatPassword(controller.passwordValue.value),
+                    style: const TextStyle(
+                      color: Color(0xFF4489D7),
+                      fontSize: 20,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    softWrap: false,
+                  ),
                 ),
                 const SizedBox(height: 15),
 
@@ -629,13 +768,16 @@ class EditProfilePage extends StatelessWidget {
                             color: Color(0xFF4489D7),
                             fontSize: 18,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          softWrap: false,
                         ),
                 ),
                 const SizedBox(height: 15),
 
                 // --- 5. เบอร์โทรศัพท์ ---
                 _buildEditItem(
-                  label: 'เบอร์โทรศัพท์ :',
+                  label: 'เบอร์ :',
                   fieldKey: 'phone',
                   iconPath: 'assets/images/pen.png',
                   content: controller.activeField.value == 'phone'
@@ -660,7 +802,7 @@ class EditProfilePage extends StatelessWidget {
                           controller.formatPhone(controller.phoneValue.value),
                           style: const TextStyle(
                             color: Color(0xFF4489D7),
-                            fontSize: 18,
+                            fontSize: 16,
                           ),
                         ),
                 ),
@@ -684,7 +826,7 @@ class EditProfilePage extends StatelessWidget {
                       child: ElevatedButton(
                         onPressed: controller.save,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2D4983),
+                          backgroundColor: const Color(0xFF20C2FF),
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -740,14 +882,17 @@ class EditProfilePage extends StatelessWidget {
       child: Row(
         children: [
           SizedBox(
-            width: 100,
+            width: 80,
             child: Text(
               label,
               style: const TextStyle(
                 color: Color(0xFF4489D7),
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              softWrap: false,
             ),
           ),
           Expanded(child: content),
@@ -768,6 +913,71 @@ class EditProfilePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Widget _buildPasswordField({
+    required String label,
+    required TextEditingController controller,
+    bool showToggle = false,
+    RxBool? isVisible,
+    VoidCallback? onToggle,
+  }) {
+    final field = () => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            color: Color(0xFF8D8D8D),
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 56,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F3F3),
+            borderRadius: BorderRadius.circular(28),
+          ),
+          child: TextField(
+            controller: controller,
+            obscureText: showToggle ? !(isVisible?.value ?? false) : true,
+            textAlignVertical: TextAlignVertical.center,
+            style: const TextStyle(color: Color(0xFF6A6A6A), fontSize: 18),
+            decoration: InputDecoration(
+              border: InputBorder.none,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              suffixIcon: showToggle
+                  ? GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onToggle,
+                      child: SizedBox(
+                        width: 25,
+                        height: 25,
+                        child: Icon(
+                          (isVisible?.value ?? false)
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                          color: Colors.grey,
+                          size: 25,
+                        ),
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+        ),
+      ],
+    );
+
+    if (showToggle && isVisible != null) {
+      return Obx(field);
+    }
+
+    return field();
   }
 
   // --- ปุ่มเลือกเพศ ---

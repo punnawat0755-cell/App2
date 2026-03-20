@@ -17,7 +17,7 @@ class Encouragement extends StatelessWidget {
   Widget build(BuildContext context) {
     const Color cardBgColor = Color(0xFFD6F0FF);
     const Color textColor = Color(0xFF4489D7);
-    const Color buttonColor = Color(0xFF234B83);
+    const Color buttonColor = Color(0xFF20C2FF);
     const Color cardShadowColor = Color(0xFFF3DDBC);
 
     return Scaffold(

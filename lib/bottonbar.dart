@@ -2,6 +2,7 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/chat/view/chat_view.dart';
 import 'package:flutter_application_1/module/chat/view/chatselectionpage.dart';
+import 'package:flutter_application_1/module/encouragement/view/encouragement_view.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
 import 'package:flutter_application_1/module/home/view/home_view.dart';
 import 'package:flutter_application_1/module/login/view/login2_view.dart';
@@ -24,12 +25,13 @@ class BottomNavController extends GetxController {
     // SplashScreenpage(),
     // Signup(),
     // LoginPagetwo(),
-    FavoritesPage(),
     HomePage(),
-    FeedPage(),
-    ChatSelectionPage(),
-    PetPage(),
-    // ProfilePage(),
+    Encouragement(),
+    FavoritesPage(),
+    // FeedPage(),
+    // ChatSelectionPage(),
+    // PetPage(),
+    ProfilePage(),
     // SettingPage(),
   ];
 

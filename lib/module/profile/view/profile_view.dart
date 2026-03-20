@@ -272,7 +272,7 @@ class ProfileController extends GetxController {
               ElevatedButton(
                 onPressed: () => Get.back(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5CD9FF),
+                  backgroundColor: const Color(0xFF20C2FF),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
                   ),
@@ -365,7 +365,7 @@ class ProfileController extends GetxController {
               ElevatedButton(
                 onPressed: () => Get.back(),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5CD9FF),
+                  backgroundColor: const Color(0xFF20C2FF),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
                   ),
@@ -1055,7 +1055,7 @@ class ProfilePage extends StatelessWidget {
                           }
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF2C5282),
+                          backgroundColor: const Color(0xFF20C2FF),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),
                           ),

@@ -54,6 +54,10 @@ class HomeController extends GetxController {
     },
   ].obs;
 
+  // 💡 Panel กรอกประจำเดือน (แสดงครั้งเดียวเมื่อเข้า Home)
+  bool hasShownPeriodPanel = false;
+  final TextEditingController periodRangeController = TextEditingController();
+
   // 💡 3. เพิ่มฟังก์ชัน addNewClip เพื่อให้หน้า Post เรียกใช้งาน (เส้นแดงในหน้า post.dart จะหายไป)
   void addNewClip(String videoPath, String caption) {
     clipList.insert(0, {
@@ -139,6 +143,7 @@ class HomeController extends GetxController {
   void onClose() {
     timer?.cancel();
     pageController.dispose();
+    periodRangeController.dispose();
     super.onClose();
   }
 }
@@ -153,9 +158,115 @@ class HomePage extends StatelessWidget {
       ? Get.find<HomeController>()
       : Get.put(HomeController());
 
+  void _showPeriodPanel() {
+    Get.bottomSheet(
+      ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        child: Container(
+          color: Colors.white,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 16),
+                      width: 45,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    'คุณยังไม่ได้ใส่ประจำเดือน- คุณต้องการที่จะใส่ไหม',
+                    style: TextStyle(
+                      color: Color(0xFF8E8E8E),
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 50,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF3F3F3),
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    child: TextField(
+                      textAlignVertical: TextAlignVertical.center,
+                      controller: controller.periodRangeController,
+                      readOnly: true,
+                      style: const TextStyle(
+                        color: Color(0xFF6A6A6A),
+                        fontSize: 18,
+                      ),
+                      decoration: InputDecoration(
+                        border: InputBorder.none,
+                        isDense: true,
+                        hintText: 'dd/mm/yy-dd/mm/yy',
+                        hintStyle: TextStyle(
+                          color: Color(0xFFB0B0B0),
+                          fontSize: 18,
+                        ),
+                        suffixIcon: Image.asset(
+                          "assets/images/calendar.png",
+                          width: 10,
+                          height: 10,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Get.back(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF20C2FF),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text(
+                        'บันทึก',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const name = 'Seal';
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!controller.hasShownPeriodPanel) {
+        controller.hasShownPeriodPanel = true;
+        _showPeriodPanel();
+      }
+    });
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
