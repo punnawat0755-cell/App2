@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_env.dart';
+import 'core/responsive/app_responsive_frame.dart';
 import 'firebase_options.dart';
 import 'core/services/notification_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
@@ -72,6 +73,13 @@ class MyApp extends StatelessWidget {
     return GetMaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'How Are You',
+      builder: (context, child) {
+        if (child == null) {
+          return const SizedBox.shrink();
+        }
+
+        return AppResponsiveFrame(child: child);
+      },
       theme: ThemeData(
         useMaterial3: true,
         textTheme: GoogleFonts.mitrTextTheme(Theme.of(context).textTheme),
