@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/setting/view/setting.dart';
 import 'package:get/get.dart';
@@ -1453,7 +1454,10 @@ class ProfilePage extends StatelessWidget {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth < 360 ? 14.0 : 20.0;
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final horizontalPadding = constraints.maxWidth < 360
+                ? scale.rs(12, min: 10, max: 14)
+                : scale.rs(20, min: 14, max: 20);
 
             return Obx(() {
               if (!controller.isProfileReady.value) {
@@ -1466,18 +1470,30 @@ class ProfilePage extends StatelessWidget {
                   child: SingleChildScrollView(
                     padding: EdgeInsets.symmetric(
                       horizontal: horizontalPadding,
-                      vertical: 20,
+                      vertical: scale.rs(20, min: 14, max: 20),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildHeader(controller, avatarController),
-                        const SizedBox(height: 25),
+                        _buildHeader(
+                          controller,
+                          avatarController,
+                          scale,
+                        ),
+                        SizedBox(height: scale.rs(25, min: 18, max: 25)),
                         if (controller.showsStressMenu)
-                          _buildStressContent(controller)
+                          _buildStressContent(
+                            context,
+                            controller,
+                            scale,
+                          )
                         else
-                          _buildMenstrualContent(controller),
-                        const SizedBox(height: 40),
+                          _buildMenstrualContent(
+                            context,
+                            controller,
+                            scale,
+                          ),
+                        SizedBox(height: scale.rs(40, min: 28, max: 40)),
                       ],
                     ),
                   ),
@@ -1659,26 +1675,34 @@ class ProfilePage extends StatelessWidget {
   Widget _buildHeader(
     ProfileController controller,
     ProfileAvatarController avatarController,
+    ResponsiveScale scale,
   ) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: EdgeInsets.symmetric(
+            horizontal: scale.rs(10, min: 8, max: 10),
+            vertical: scale.rs(6, min: 4, max: 6),
+          ),
           decoration: BoxDecoration(
             color: const Color(0xFFFFDA7B),
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
           ),
           child: Row(
             children: [
-              Image.asset('assets/images/k1.png', width: 35, height: 30),
-              const SizedBox(width: 1),
+              Image.asset(
+                'assets/images/k1.png',
+                width: scale.rs(35, min: 28, max: 35),
+                height: scale.rs(30, min: 24, max: 30),
+              ),
+              SizedBox(width: scale.rs(1, min: 1, max: 2)),
               Obx(() => Text(
                     "${controller.coins}",
-                    style: const TextStyle(
-                      color: Color(0xFF5D4037),
+                    style: TextStyle(
+                      color: const Color(0xFF5D4037),
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: scale.rf(16, min: 13.5, max: 16),
                     ),
                   )),
             ],
@@ -1691,7 +1715,7 @@ class ProfilePage extends StatelessWidget {
           },
           child: Obx(
             () => CircleAvatar(
-              radius: 25,
+              radius: scale.rs(25, min: 20, max: 25),
               backgroundImage: avatarController.avatarImageProvider,
             ),
           ),
@@ -1700,7 +1724,11 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildMenstrualContent(ProfileController controller) {
+  Widget _buildMenstrualContent(
+    BuildContext context,
+    ProfileController controller,
+    ResponsiveScale scale,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1710,9 +1738,9 @@ class ProfilePage extends StatelessWidget {
             Text(
               "รอบเดือนและอาการ",
               style: GoogleFonts.mitr(
-                textStyle: const TextStyle(
-                  color: Color(0xFF4489D7),
-                  fontSize: 22,
+                textStyle: TextStyle(
+                  color: const Color(0xFF4489D7),
+                  fontSize: scale.rf(22, min: 19, max: 22),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -1720,13 +1748,16 @@ class ProfilePage extends StatelessWidget {
             Obx(() => DropdownButton<String>(
                   value:
                       controller.monthNames[controller.selectedMonth.value - 1],
-                  icon: const Icon(Icons.arrow_drop_down,
-                      color: Color(0xFF757575)),
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: const Color(0xFF757575),
+                    size: scale.rs(24, min: 20, max: 24),
+                  ),
                   underline: const SizedBox(),
                   style: GoogleFonts.mitr(
-                    textStyle: const TextStyle(
-                      color: Color(0xFF757575),
-                      fontSize: 16,
+                    textStyle: TextStyle(
+                      color: const Color(0xFF757575),
+                      fontSize: scale.rf(16, min: 14, max: 16),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1742,13 +1773,16 @@ class ProfilePage extends StatelessWidget {
                 )),
           ],
         ),
-        const SizedBox(height: 15),
+        SizedBox(height: scale.rs(15, min: 12, max: 15)),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(scale.rs(16, min: 12, max: 16)),
           decoration: BoxDecoration(
             color: const Color(0xFFCEEFFE).withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: const Color(0xFF90CAF9), width: 1.5),
+            borderRadius: BorderRadius.circular(scale.rs(25, min: 20, max: 25)),
+            border: Border.all(
+              color: const Color(0xFF90CAF9),
+              width: scale.rs(1.5, min: 1.2, max: 1.5),
+            ),
           ),
           child: Column(
             children: [
@@ -1757,30 +1791,30 @@ class ProfilePage extends StatelessWidget {
                 children: ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"]
                     .map(
                       (day) => SizedBox(
-                        width: 35,
+                        width: scale.rs(35, min: 28, max: 35),
                         child: Text(
                           day,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF4489D7),
+                          style: TextStyle(
+                            color: const Color(0xFF4489D7),
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: scale.rf(16, min: 13.5, max: 16),
                           ),
                         ),
                       ),
                     )
                     .toList(),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: scale.rs(10, min: 8, max: 10)),
               Obx(
                 () => GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: controller.daysInMonth + controller.firstDayOffset,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 7,
-                    childAspectRatio: 0.65,
-                    mainAxisSpacing: 5,
+                    childAspectRatio: scale.isCompact ? 0.72 : 0.67,
+                    mainAxisSpacing: scale.rs(5, min: 3, max: 5),
                     crossAxisSpacing: 0,
                   ),
                   itemBuilder: (context, index) {
@@ -1827,8 +1861,8 @@ class ProfilePage extends StatelessWidget {
                         child: Column(
                           children: [
                             Container(
-                              width: 36,
-                              height: 36,
+                              width: scale.rs(34, min: 28, max: 34),
+                              height: scale.rs(34, min: 28, max: 34),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: bgColor,
@@ -1839,19 +1873,20 @@ class ProfilePage extends StatelessWidget {
                                 style: TextStyle(
                                   color: textColor,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: scale.rf(16, min: 13.5, max: 16),
                                 ),
                               ),
                             ),
-                            if (whaleImage != null) const SizedBox(height: 4),
+                            if (whaleImage != null)
+                              SizedBox(height: scale.rs(2, min: 1, max: 2)),
                             if (whaleImage != null)
                               Image.asset(
                                 whaleImage,
-                                width: 32,
-                                height: 32,
+                                width: scale.rs(30, min: 22, max: 30),
+                                height: scale.rs(30, min: 22, max: 30),
                                 fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) =>
-                                    const SizedBox(height: 32),
+                                errorBuilder: (_, __, ___) => SizedBox(
+                                    height: scale.rs(30, min: 22, max: 30)),
                               ),
                           ],
                         ),
@@ -1863,40 +1898,41 @@ class ProfilePage extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 25),
+        SizedBox(height: scale.rs(25, min: 18, max: 25)),
         Text(
           "บันทึกอาการ",
           style: GoogleFonts.mitr(
-            textStyle: const TextStyle(
-              color: Color(0xFF4489D7),
-              fontSize: 22,
+            textStyle: TextStyle(
+              color: const Color(0xFF4489D7),
+              fontSize: scale.rf(22, min: 19, max: 22),
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: scale.rs(20, min: 14, max: 20)),
         Obx(() {
           if (controller.selectedDate.value == 0) {
             return Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                vertical: 10,
-                horizontal: 10,
+              padding: EdgeInsets.symmetric(
+                vertical: scale.rs(10, min: 8, max: 10),
+                horizontal: scale.rs(10, min: 8, max: 10),
               ),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFDA7B),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
                 border: Border.all(
                   color: const Color(0xFF757575),
-                  width: 1.5,
+                  width: scale.rs(1.5, min: 1.2, max: 1.5),
                 ),
               ),
-              child: const Text(
+              child: Text(
                 "กรุณาเลือกวันที่ต้องการ",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Color(0xFF5D4037),
-                  fontSize: 16,
+                  color: const Color(0xFF5D4037),
+                  fontSize: scale.rf(16, min: 13.5, max: 16),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1909,24 +1945,28 @@ class ProfilePage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   _buildStatusButton(
+                    context,
                     controller,
                     "เป็นประจำเดือน",
                     const Color(0xFFA6E3F9),
                     true,
+                    scale,
                   ),
-                  const SizedBox(width: 15),
+                  SizedBox(width: scale.rs(15, min: 10, max: 15)),
                   _buildStatusButton(
+                    context,
                     controller,
                     "ไม่เป็นประจำเดือน",
                     const Color(0xFFA6E3F9),
                     false,
+                    scale,
                   ),
                 ],
               ),
-              const SizedBox(height: 30),
+              SizedBox(height: scale.rs(30, min: 20, max: 30)),
               Wrap(
-                spacing: 15,
-                runSpacing: 20,
+                spacing: scale.rs(15, min: 10, max: 15),
+                runSpacing: scale.rs(20, min: 12, max: 20),
                 alignment: WrapAlignment.center,
                 children: controller.symptomsList.map((item) {
                   final isSelected = controller
@@ -1937,20 +1977,23 @@ class ProfilePage extends StatelessWidget {
                     child: Column(
                       children: [
                         Container(
-                          width: 70,
-                          height: 70,
-                          padding: const EdgeInsets.all(10),
+                          width: scale.rs(70, min: 56, max: 70),
+                          height: scale.rs(70, min: 56, max: 70),
+                          padding:
+                              EdgeInsets.all(scale.rs(10, min: 7, max: 10)),
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? const Color(0xFFA6E3F9)
                                 : const Color(0xFFFFDA7B)
                                     .withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(15),
+                            borderRadius: BorderRadius.circular(
+                              scale.rs(15, min: 12, max: 15),
+                            ),
                             border: Border.all(
                               color: isSelected
                                   ? const Color(0xFF4489D7)
                                   : Colors.black12,
-                              width: 1.5,
+                              width: scale.rs(1.5, min: 1.2, max: 1.5),
                             ),
                           ),
                           child: Image.asset(
@@ -1958,12 +2001,12 @@ class ProfilePage extends StatelessWidget {
                             fit: BoxFit.contain,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: scale.rs(8, min: 6, max: 8)),
                         Text(
                           item['name']!,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF5D4037),
+                          style: TextStyle(
+                            fontSize: scale.rf(13, min: 11.5, max: 13),
+                            color: const Color(0xFF5D4037),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1972,21 +2015,27 @@ class ProfilePage extends StatelessWidget {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 25),
+              SizedBox(height: scale.rs(25, min: 18, max: 25)),
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
                   onPressed: () => _handleMenstrualSave(controller),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2C5282),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(18, min: 14, max: 18),
+                      vertical: scale.rs(10, min: 8, max: 10),
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius:
+                          BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     "บันทึก",
                     style: TextStyle(
                       color: Colors.white,
+                      fontSize: scale.rf(14, min: 12.5, max: 14),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -1999,7 +2048,11 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildStressContent(ProfileController controller) {
+  Widget _buildStressContent(
+    BuildContext context,
+    ProfileController controller,
+    ResponsiveScale scale,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2009,9 +2062,9 @@ class ProfilePage extends StatelessWidget {
             Text(
               "ความเครียดและอารมณ์",
               style: GoogleFonts.mitr(
-                textStyle: const TextStyle(
-                  color: Color(0xFF4489D7),
-                  fontSize: 22,
+                textStyle: TextStyle(
+                  color: const Color(0xFF4489D7),
+                  fontSize: scale.rf(22, min: 19, max: 22),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -2019,13 +2072,16 @@ class ProfilePage extends StatelessWidget {
             Obx(() => DropdownButton<String>(
                   value:
                       controller.monthNames[controller.selectedMonth.value - 1],
-                  icon: const Icon(Icons.arrow_drop_down,
-                      color: Color(0xFF757575)),
+                  icon: Icon(
+                    Icons.arrow_drop_down,
+                    color: const Color(0xFF757575),
+                    size: scale.rs(24, min: 20, max: 24),
+                  ),
                   underline: const SizedBox(),
                   style: GoogleFonts.mitr(
-                    textStyle: const TextStyle(
-                      color: Color(0xFF757575),
-                      fontSize: 16,
+                    textStyle: TextStyle(
+                      color: const Color(0xFF757575),
+                      fontSize: scale.rf(16, min: 14, max: 16),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -2041,13 +2097,16 @@ class ProfilePage extends StatelessWidget {
                 )),
           ],
         ),
-        const SizedBox(height: 15),
+        SizedBox(height: scale.rs(15, min: 12, max: 15)),
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(scale.rs(16, min: 12, max: 16)),
           decoration: BoxDecoration(
             color: const Color(0xFFCEEFFE).withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(25),
-            border: Border.all(color: const Color(0xFF90CAF9), width: 1.5),
+            borderRadius: BorderRadius.circular(scale.rs(25, min: 20, max: 25)),
+            border: Border.all(
+              color: const Color(0xFF90CAF9),
+              width: scale.rs(1.5, min: 1.2, max: 1.5),
+            ),
           ),
           child: Column(
             children: [
@@ -2056,30 +2115,30 @@ class ProfilePage extends StatelessWidget {
                 children: ["อา", "จ", "อ", "พ", "พฤ", "ศ", "ส"]
                     .map(
                       (day) => SizedBox(
-                        width: 35,
+                        width: scale.rs(35, min: 28, max: 35),
                         child: Text(
                           day,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Color(0xFF4489D7),
+                          style: TextStyle(
+                            color: const Color(0xFF4489D7),
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
+                            fontSize: scale.rf(16, min: 13.5, max: 16),
                           ),
                         ),
                       ),
                     )
                     .toList(),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: scale.rs(10, min: 8, max: 10)),
               Obx(
                 () => GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   itemCount: controller.daysInMonth + controller.firstDayOffset,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 7,
-                    childAspectRatio: 0.65,
-                    mainAxisSpacing: 5,
+                    childAspectRatio: scale.isCompact ? 0.72 : 0.67,
+                    mainAxisSpacing: scale.rs(5, min: 3, max: 5),
                     crossAxisSpacing: 0,
                   ),
                   itemBuilder: (context, index) {
@@ -2121,8 +2180,8 @@ class ProfilePage extends StatelessWidget {
                         child: Column(
                           children: [
                             Container(
-                              width: 36,
-                              height: 36,
+                              width: scale.rs(34, min: 28, max: 34),
+                              height: scale.rs(34, min: 28, max: 34),
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: bgColor,
@@ -2133,19 +2192,20 @@ class ProfilePage extends StatelessWidget {
                                 style: TextStyle(
                                   color: textColor,
                                   fontWeight: FontWeight.bold,
-                                  fontSize: 16,
+                                  fontSize: scale.rf(16, min: 13.5, max: 16),
                                 ),
                               ),
                             ),
-                            if (whaleImage != null) const SizedBox(height: 4),
+                            if (whaleImage != null)
+                              SizedBox(height: scale.rs(2, min: 1, max: 2)),
                             if (whaleImage != null)
                               Image.asset(
                                 whaleImage,
-                                width: 32,
-                                height: 32,
+                                width: scale.rs(30, min: 22, max: 30),
+                                height: scale.rs(30, min: 22, max: 30),
                                 fit: BoxFit.contain,
-                                errorBuilder: (_, __, ___) =>
-                                    const SizedBox(height: 32),
+                                errorBuilder: (_, __, ___) => SizedBox(
+                                    height: scale.rs(30, min: 22, max: 30)),
                               ),
                           ],
                         ),
@@ -2157,40 +2217,41 @@ class ProfilePage extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 25),
+        SizedBox(height: scale.rs(25, min: 18, max: 25)),
         Text(
           "บันทึกอาการ",
           style: GoogleFonts.mitr(
-            textStyle: const TextStyle(
-              color: Color(0xFF4489D7),
-              fontSize: 22,
+            textStyle: TextStyle(
+              color: const Color(0xFF4489D7),
+              fontSize: scale.rf(22, min: 19, max: 22),
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: scale.rs(20, min: 14, max: 20)),
         Obx(() {
           if (controller.selectedDate.value == 0) {
             return Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(
-                vertical: 10,
-                horizontal: 10,
+              padding: EdgeInsets.symmetric(
+                vertical: scale.rs(10, min: 8, max: 10),
+                horizontal: scale.rs(10, min: 8, max: 10),
               ),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFDA7B),
-                borderRadius: BorderRadius.circular(20),
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
                 border: Border.all(
                   color: const Color(0xFF757575),
-                  width: 1.5,
+                  width: scale.rs(1.5, min: 1.2, max: 1.5),
                 ),
               ),
-              child: const Text(
+              child: Text(
                 "กรุณาเลือกวันที่ต้องการ",
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Color(0xFF5D4037),
-                  fontSize: 16,
+                  color: const Color(0xFF5D4037),
+                  fontSize: scale.rf(16, min: 13.5, max: 16),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -2200,8 +2261,8 @@ class ProfilePage extends StatelessWidget {
           return Column(
             children: [
               Wrap(
-                spacing: 15,
-                runSpacing: 20,
+                spacing: scale.rs(15, min: 10, max: 15),
+                runSpacing: scale.rs(20, min: 12, max: 20),
                 alignment: WrapAlignment.center,
                 children: controller.maleSymptomsList.map((tag) {
                   final isSelected = controller
@@ -2213,20 +2274,23 @@ class ProfilePage extends StatelessWidget {
                     child: Column(
                       children: [
                         Container(
-                          width: 70,
-                          height: 70,
-                          padding: const EdgeInsets.all(10),
+                          width: scale.rs(70, min: 56, max: 70),
+                          height: scale.rs(70, min: 56, max: 70),
+                          padding:
+                              EdgeInsets.all(scale.rs(10, min: 7, max: 10)),
                           decoration: BoxDecoration(
                             color: isSelected
                                 ? const Color(0xFFA6E3F9)
                                 : const Color(0xFFFFDA7B)
                                     .withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(15),
+                            borderRadius: BorderRadius.circular(
+                              scale.rs(15, min: 12, max: 15),
+                            ),
                             border: Border.all(
                               color: isSelected
                                   ? const Color(0xFF4489D7)
                                   : Colors.black12,
-                              width: 1.5,
+                              width: scale.rs(1.5, min: 1.2, max: 1.5),
                             ),
                           ),
                           child: Image.asset(
@@ -2234,12 +2298,12 @@ class ProfilePage extends StatelessWidget {
                             fit: BoxFit.contain,
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        SizedBox(height: scale.rs(8, min: 6, max: 8)),
                         Text(
                           tag['name']!,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF5D4037),
+                          style: TextStyle(
+                            fontSize: scale.rf(13, min: 11.5, max: 13),
+                            color: const Color(0xFF5D4037),
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -2248,21 +2312,27 @@ class ProfilePage extends StatelessWidget {
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 25),
+              SizedBox(height: scale.rs(25, min: 18, max: 25)),
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
                   onPressed: () => controller.saveDailyData(),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF2C5282),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(18, min: 14, max: 18),
+                      vertical: scale.rs(10, min: 8, max: 10),
+                    ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius:
+                          BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
                     ),
                   ),
-                  child: const Text(
+                  child: Text(
                     "บันทึก",
                     style: TextStyle(
                       color: Colors.white,
+                      fontSize: scale.rf(14, min: 12.5, max: 14),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -2276,30 +2346,39 @@ class ProfilePage extends StatelessWidget {
   }
 
   Widget _buildStatusButton(
+    BuildContext context,
     ProfileController controller,
     String title,
     Color activeColor,
     bool isPeriodTab,
+    ResponsiveScale scale,
   ) {
     return Obx(() {
       final selectedStatus = controller.getExplicitPeriodStatusForSelectedDay();
       final isSelected = selectedStatus == isPeriodTab;
+      final buttonWidth = (MediaQuery.sizeOf(context).width * 0.42).clamp(
+          scale.rs(120, min: 112, max: 120), scale.rs(180, min: 160, max: 180));
       return GestureDetector(
         onTap: () => controller.setPeriodStatus(isPeriodTab),
         child: Container(
-          width: Get.width * 0.42,
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          width: buttonWidth.toDouble(),
+          padding: EdgeInsets.symmetric(
+            vertical: scale.rs(12, min: 9, max: 12),
+          ),
           decoration: BoxDecoration(
             color: isSelected ? activeColor : Colors.white,
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: const Color(0xFF757575), width: 1.5),
+            borderRadius: BorderRadius.circular(scale.rs(15, min: 12, max: 15)),
+            border: Border.all(
+              color: const Color(0xFF757575),
+              width: scale.rs(1.5, min: 1.2, max: 1.5),
+            ),
           ),
           child: Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: Color(0xFF424242),
-              fontSize: 16,
+            style: TextStyle(
+              color: const Color(0xFF424242),
+              fontSize: scale.rf(16, min: 13.5, max: 16),
               fontWeight: FontWeight.bold,
             ),
           ),

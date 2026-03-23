@@ -75,10 +75,12 @@ class ChatSelectionPage extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
-            final horizontalPadding = scale.rs(28, min: 16, max: 30);
+            final horizontalPadding = constraints.maxWidth < 360
+                ? scale.rs(14, min: 10, max: 16)
+                : scale.rs(24, min: 16, max: 26);
             final cardHeight = constraints.maxHeight < 700
-                ? scale.rs(250, min: 220, max: 260)
-                : scale.rs(300, min: 260, max: 310);
+                ? scale.rs(230, min: 190, max: 238)
+                : scale.rs(280, min: 220, max: 286);
 
             return Stack(
               children: [
@@ -93,12 +95,12 @@ class ChatSelectionPage extends StatelessWidget {
                           'มาแชทกันเถอะ มีคนรอคุณอยู่ในแชท',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Color(0xFF4489D7),
-                            fontSize: scale.rf(20, min: 18, max: 20.5),
+                            color: const Color(0xFF4489D7),
+                            fontSize: scale.rf(20, min: 16.5, max: 20),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        SizedBox(height: scale.rs(20, min: 12, max: 20)),
                         Padding(
                           padding: EdgeInsets.symmetric(
                             horizontal: horizontalPadding,
@@ -115,15 +117,17 @@ class ChatSelectionPage extends StatelessWidget {
                                   textColor: const Color(0xFF4489D7),
                                   isLeft: true,
                                   onTap: controller.goToStartChat,
-                                  imagePadding: const EdgeInsets.only(
-                                    top: 10,
-                                    bottom: 25,
-                                    left: 20,
+                                  imagePadding: EdgeInsets.only(
+                                    top: scale.rs(10, min: 6, max: 10),
+                                    bottom: scale.rs(25, min: 16, max: 25),
+                                    left: scale.rs(20, min: 10, max: 20),
                                   ),
-                                  imageScale: 0.95,
-                                  textPadding: const EdgeInsets.only(left: 55),
+                                  imageScale: scale.isCompact ? 0.82 : 0.92,
+                                  textPadding: EdgeInsets.only(
+                                    left: scale.rs(55, min: 30, max: 55),
+                                  ),
                                 ),
-                                const SizedBox(width: 9),
+                                SizedBox(width: scale.rs(9, min: 6, max: 10)),
                                 HalfCircleButton(
                                   title: 'ให้คำปรึกษา',
                                   imagePath: 'assets/images/fine.png',
@@ -131,12 +135,14 @@ class ChatSelectionPage extends StatelessWidget {
                                   textColor: const Color(0xFF8D6E63),
                                   isLeft: false,
                                   onTap: controller.goToCounseling,
-                                  imagePadding: const EdgeInsets.only(
-                                    bottom: 3,
-                                    right: 8,
+                                  imagePadding: EdgeInsets.only(
+                                    bottom: scale.rs(3, min: 1, max: 3),
+                                    right: scale.rs(8, min: 4, max: 8),
                                   ),
-                                  imageScale: 0.8,
-                                  textPadding: const EdgeInsets.only(right: 50),
+                                  imageScale: scale.isCompact ? 0.7 : 0.8,
+                                  textPadding: EdgeInsets.only(
+                                    right: scale.rs(50, min: 28, max: 50),
+                                  ),
                                 ),
                               ],
                             ),
@@ -245,9 +251,10 @@ class HalfCircleButton extends StatelessWidget {
           child: Stack(
             children: [
               Positioned.fill(
-                bottom: scale.rs(50, min: 42, max: 54),
+                bottom: scale.rs(50, min: 32, max: 54),
                 child: Padding(
-                  padding: imagePadding ?? const EdgeInsets.all(15.0),
+                  padding: imagePadding ??
+                      EdgeInsets.all(scale.rs(15, min: 10, max: 15)),
                   child: Transform.scale(
                     scale: imageScale,
                     child: Image.asset(
@@ -258,7 +265,7 @@ class HalfCircleButton extends StatelessWidget {
                         isLeft
                             ? Icons.sentiment_dissatisfied
                             : Icons.sentiment_satisfied_alt,
-                        size: scale.rs(80, min: 66, max: 82),
+                        size: scale.rs(80, min: 56, max: 82),
                         color: withAlpha(Colors.white, 0.5),
                       ),
                     ),
@@ -266,7 +273,7 @@ class HalfCircleButton extends StatelessWidget {
                 ),
               ),
               Positioned(
-                bottom: scale.rs(35, min: 28, max: 38),
+                bottom: scale.rs(35, min: 22, max: 38),
                 left: 0,
                 right: 0,
                 child: Padding(
@@ -276,7 +283,7 @@ class HalfCircleButton extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: textColor,
-                      fontSize: scale.rf(18, min: 16, max: 19),
+                      fontSize: scale.rf(18, min: 14, max: 18.5),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
