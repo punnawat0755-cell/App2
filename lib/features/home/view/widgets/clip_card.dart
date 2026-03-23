@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:video_player/video_player.dart';
 
 class ClipCard extends StatelessWidget {
@@ -29,9 +30,11 @@ class ClipCard extends StatelessWidget {
         lower.endsWith('.mov') ||
         lower.endsWith('.avi') ||
         lower.endsWith('.m4v');
+    final scale = context.responsive;
+    final cardWidth = scale.rs(128, min: 112, max: 132);
 
     return SizedBox(
-      width: 128,
+      width: cardWidth,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),
         child: Stack(
@@ -73,7 +76,7 @@ class ClipCard extends StatelessWidget {
               bottom: 0,
               left: 0,
               right: 0,
-              height: 82,
+              height: scale.rs(82, min: 70, max: 88),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: const BorderRadius.vertical(
@@ -91,14 +94,7 @@ class ClipCard extends StatelessWidget {
               ),
             ),
             const Center(
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.white,
-                child: Icon(
-                  Icons.play_arrow,
-                  color: Color(0xFFC8C8C8),
-                ),
-              ),
+              child: _PlayOverlayIcon(),
             ),
             Positioned(
               bottom: 10,
@@ -108,19 +104,19 @@ class ClipCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: scale.rf(12, min: 10.5, max: 12.5),
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white70,
-                      fontSize: 10,
+                      fontSize: scale.rf(10, min: 9, max: 10.5),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -130,6 +126,24 @@ class ClipCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _PlayOverlayIcon extends StatelessWidget {
+  const _PlayOverlayIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = context.responsive;
+    return CircleAvatar(
+      radius: scale.rs(18, min: 15, max: 20),
+      backgroundColor: Colors.white,
+      child: Icon(
+        Icons.play_arrow,
+        color: const Color(0xFFC8C8C8),
+        size: scale.rs(20, min: 17, max: 22),
       ),
     );
   }

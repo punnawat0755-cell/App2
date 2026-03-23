@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
 import 'package:flutter_application_1/features/role_logic/view/pages/role_quiz_page.dart';
 import 'package:flutter_application_1/features/role_logic/view/widgets/choice_card.dart';
@@ -96,104 +97,141 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       child: Scaffold(
         backgroundColor: _backgroundColor,
         body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const Text(
-                  'วันนี้คุณพร้อมเป็น\nผู้รับฟังไหม',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF4489D7),
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'ถ้าเลือกพร้อมรับฟัง ระบบจะพาไปทำแบบทดสอบก่อน\nจากนั้นค่อยบันทึก current_mode และพาไปทำ Daily Mood ต่อ',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF639CDD),
-                    height: 1.6,
-                  ),
-                ),
-                const SizedBox(height: 48),
-                const Text(
-                  'กรุณาเลือกคำตอบของคุณ',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF4489D7),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: ChoiceCard(
-                        id: 'listener',
-                        title: 'พร้อมรับฟัง',
-                        imagePath: 'assets/images/fine.png',
-                        bgColor: _cardListenerColor,
-                        textColor: const Color(0xFF4489D7),
-                        isSelected: _selectedMode == 'listener',
-                        onTap: _openListenerQuiz,
-                      ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+              final isCompact = constraints.maxWidth < 390;
+              final horizontalPadding = isCompact ? 16.0 : 24.0;
+
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 560),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: 40,
                     ),
-                    const SizedBox(width: 20),
-                    Expanded(
-                      child: ChoiceCard(
-                        id: 'seeker',
-                        title: 'ยังไม่พร้อม',
-                        imagePath: 'assets/images/sad.png',
-                        bgColor: _cardSeekerColor,
-                        textColor: const Color(0xFFC49A3E),
-                        isSelected: _selectedMode == 'seeker',
-                        onTap: () => _saveMode('seeker'),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 28),
-                if (_isSaving)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 18),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        CircularProgressIndicator(),
-                        SizedBox(height: 10),
                         Text(
-                          'กำลังบันทึกบทบาทของวันนี้...',
+                          'วันนี้คุณพร้อมเป็น\nผู้รับฟังไหม',
+                          textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: Color(0xFF4489D7),
+                            fontSize: scale.rf(26, min: 22, max: 26),
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF4489D7),
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          'ถ้าเลือกพร้อมรับฟัง ระบบจะพาไปทำแบบทดสอบก่อน\nจากนั้นค่อยบันทึก current_mode และพาไปทำ Daily Mood ต่อ',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: scale.rf(14, min: 12.5, max: 14.5),
                             fontWeight: FontWeight.w600,
+                            color: const Color(0xFF639CDD),
+                            height: 1.6,
+                          ),
+                        ),
+                        const SizedBox(height: 48),
+                        Text(
+                          'กรุณาเลือกคำตอบของคุณ',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: scale.rf(14, min: 12.5, max: 14.5),
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF4489D7),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        if (isCompact) ...[
+                          ChoiceCard(
+                            id: 'listener',
+                            title: 'พร้อมรับฟัง',
+                            imagePath: 'assets/images/fine.png',
+                            bgColor: _cardListenerColor,
+                            textColor: const Color(0xFF4489D7),
+                            isSelected: _selectedMode == 'listener',
+                            onTap: _openListenerQuiz,
+                          ),
+                          const SizedBox(height: 14),
+                          ChoiceCard(
+                            id: 'seeker',
+                            title: 'ยังไม่พร้อม',
+                            imagePath: 'assets/images/sad.png',
+                            bgColor: _cardSeekerColor,
+                            textColor: const Color(0xFFC49A3E),
+                            isSelected: _selectedMode == 'seeker',
+                            onTap: () => _saveMode('seeker'),
+                          ),
+                        ] else
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: ChoiceCard(
+                                  id: 'listener',
+                                  title: 'พร้อมรับฟัง',
+                                  imagePath: 'assets/images/fine.png',
+                                  bgColor: _cardListenerColor,
+                                  textColor: const Color(0xFF4489D7),
+                                  isSelected: _selectedMode == 'listener',
+                                  onTap: _openListenerQuiz,
+                                ),
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: ChoiceCard(
+                                  id: 'seeker',
+                                  title: 'ยังไม่พร้อม',
+                                  imagePath: 'assets/images/sad.png',
+                                  bgColor: _cardSeekerColor,
+                                  textColor: const Color(0xFFC49A3E),
+                                  isSelected: _selectedMode == 'seeker',
+                                  onTap: () => _saveMode('seeker'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        const SizedBox(height: 28),
+                        if (_isSaving)
+                          const Padding(
+                            padding: EdgeInsets.only(bottom: 18),
+                            child: Column(
+                              children: [
+                                CircularProgressIndicator(),
+                                SizedBox(height: 10),
+                                Text(
+                                  'กำลังบันทึกบทบาทของวันนี้...',
+                                  style: TextStyle(
+                                    color: Color(0xFF4489D7),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        const SizedBox(height: 24),
+                        Text(
+                          '"ผู้รับฟัง" คือผู้ที่พร้อมเป็นพื้นที่ปลอดภัยให้ใครสักคน\n'
+                          'รับฟังอย่างไม่ตัดสิน อยู่ข้างเขา และช่วยประคองใจผ่านการแชท\n'
+                          'เมื่อกด "พร้อมรับฟัง" จะเข้าสู่แบบทดสอบก่อน ส่วนถ้ายังไม่พร้อม ระบบจะบันทึก role ของวันนี้ทันที',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: scale.rf(12, min: 10.8, max: 12.5),
+                            height: 1.8,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF639CDD),
                           ),
                         ),
                       ],
                     ),
                   ),
-                const SizedBox(height: 24),
-                const Text(
-                  '"ผู้รับฟัง" คือผู้ที่พร้อมเป็นพื้นที่ปลอดภัยให้ใครสักคน\n'
-                  'รับฟังอย่างไม่ตัดสิน อยู่ข้างเขา และช่วยประคองใจผ่านการแชท\n'
-                  'เมื่อกด "พร้อมรับฟัง" จะเข้าสู่แบบทดสอบก่อน ส่วนถ้ายังไม่พร้อม ระบบจะบันทึก role ของวันนี้ทันที',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.8,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF639CDD),
-                  ),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ),
       ),

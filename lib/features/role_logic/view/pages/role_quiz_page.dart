@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:get/get.dart';
 
 class _RoleQuizController extends GetxController {
@@ -27,6 +28,11 @@ class RoleQuizPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final imageWidth = (screenWidth - 80).clamp(180.0, 260.0);
+    final optionHorizontalMargin = screenWidth < 360 ? 16.0 : 40.0;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -43,7 +49,7 @@ class RoleQuizPage extends StatelessWidget {
                   "คุณเห็นอะไรในภาพนี้\nเป็นอย่างแรก",
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 26,
+                    fontSize: scale.rf(26, min: 22, max: 26),
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF4489D7),
                     height: 1.3,
@@ -65,8 +71,8 @@ class RoleQuizPage extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                     child: Image.asset(
                       'assets/images/quiz.png',
-                      width: 230,
-                      height: 270,
+                      width: imageWidth,
+                      height: imageWidth * 1.17,
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -76,7 +82,10 @@ class RoleQuizPage extends StatelessWidget {
                   alignment: Alignment.centerRight,
                   child: Text(
                     "ขอบคุณข้อมูลจาก : lovecampus honghongworld",
-                    style: TextStyle(fontSize: 8, color: Color(0xFF4489D7)),
+                    style: TextStyle(
+                      fontSize: scale.rf(8, min: 7.5, max: 8.5),
+                      color: Color(0xFF4489D7),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -87,7 +96,7 @@ class RoleQuizPage extends StatelessWidget {
                     child: Text(
                       "โปรดเลือกคำตอบของคุณ",
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: scale.rf(16, min: 14, max: 16.5),
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF4489D7),
                       ),
@@ -105,6 +114,7 @@ class RoleQuizPage extends StatelessWidget {
                       index,
                       _options[index],
                       const Color(0xFF4489D7),
+                      horizontalMargin: optionHorizontalMargin,
                     );
                   },
                 ),
@@ -117,11 +127,8 @@ class RoleQuizPage extends StatelessWidget {
   }
 
   Widget _buildOptionButton(
-    BuildContext context,
-    int index,
-    String title,
-    Color textColor,
-  ) {
+      BuildContext context, int index, String title, Color textColor,
+      {required double horizontalMargin}) {
     return Obx(() {
       final isSelected = _controller.selectedIndex.value == index;
 
@@ -136,7 +143,10 @@ class RoleQuizPage extends StatelessWidget {
           );
         },
         child: Container(
-          margin: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 40),
+          margin: EdgeInsets.symmetric(
+            vertical: 8,
+            horizontal: horizontalMargin,
+          ),
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           decoration: BoxDecoration(
             color:

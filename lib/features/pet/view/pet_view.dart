@@ -168,13 +168,18 @@ class PetPage extends StatelessWidget {
           ),
           // Content
           SafeArea(
-            child: Column(
-              children: [
-                _buildTopBar(controller),
-                const Spacer(),
-                const Spacer(),
-                _buildBottomDock(controller),
-              ],
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final screenWidth = constraints.maxWidth;
+                return Column(
+                  children: [
+                    _buildTopBar(controller, screenWidth),
+                    const Spacer(),
+                    const Spacer(),
+                    _buildBottomDock(controller, screenWidth),
+                  ],
+                );
+              },
             ),
           ),
         ],
@@ -185,7 +190,10 @@ class PetPage extends StatelessWidget {
   // -----------------------------------------------------------
   // Widget: Top Bar
   // -----------------------------------------------------------
-  Widget _buildTopBar(Pet controller) {
+  Widget _buildTopBar(Pet controller, double screenWidth) {
+    final isCompact = screenWidth < 360;
+    final energyBarWidth =
+        isCompact ? (screenWidth * 0.43).clamp(136.0, 160.0) : 160.0;
     const double boxHeight = 39.0;
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 20, 20, 0),
@@ -194,9 +202,11 @@ class PetPage extends StatelessWidget {
           const SizedBox(height: 20),
 
           // Row 2: Stats
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.center,
+            spacing: isCompact ? 10 : 15,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.end,
             children: [
               // Coin
               Container(
@@ -236,7 +246,6 @@ class PetPage extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 15),
               // Level & Energy
               Column(
                 mainAxisSize: MainAxisSize.min,
@@ -251,7 +260,7 @@ class PetPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 5),
                   Container(
-                    width: 160,
+                    width: energyBarWidth,
                     height: boxHeight,
                     decoration: BoxDecoration(
                       color: Colors.white,
@@ -282,7 +291,9 @@ class PetPage extends StatelessWidget {
                         Align(
                           alignment: Alignment.centerLeft,
                           child: Obx(() {
-                            double maxW = 160.0, left = 15.0, right = 9.0;
+                            final maxW = energyBarWidth;
+                            const left = 15.0;
+                            const right = 9.0;
                             double currentW = (maxW - left - right) *
                                 (controller.energyPercent.value / 100);
                             return Container(
@@ -336,10 +347,14 @@ class PetPage extends StatelessWidget {
   // -----------------------------------------------------------
   // Widget: Bottom Dock
   // -----------------------------------------------------------
-  Widget _buildBottomDock(Pet controller) {
+  Widget _buildBottomDock(Pet controller, double screenWidth) {
+    final usableWidth = (screenWidth - 20).clamp(280.0, 460.0);
+    final cardWidth = ((usableWidth - 24) / 3).clamp(86.0, 110.0);
+    final cardHeight = cardWidth;
+
     return Container(
       padding: const EdgeInsets.only(bottom: 30, left: 10, right: 10),
-      height: 170,
+      height: cardHeight + 70,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -357,10 +372,11 @@ class PetPage extends StatelessWidget {
                 style: TextStyle(
                   color: isOutOfFood ? Colors.grey : const Color(0xFF1565C0),
                   fontWeight: FontWeight.w900,
-                  fontSize: 16,
+                  fontSize: screenWidth < 360 ? 14 : 16,
                 ),
               ),
               badgeCount: controller.foodCount.value,
+              cardWidth: cardWidth,
               onTap: () => controller.feedPet(),
             );
           }),
@@ -395,13 +411,14 @@ class PetPage extends StatelessWidget {
                     style: TextStyle(
                       color: Color(0xFFFFC107),
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: 14,
                     ),
                   ),
                 ],
               ),
             ),
             // [แก้ไข] เรียกใช้ feedWithCoin(2) แทน buyFood
+            cardWidth: cardWidth,
             onTap: () => controller.feedWithCoin(2),
           ),
 
@@ -421,10 +438,11 @@ class PetPage extends StatelessWidget {
                 style: TextStyle(
                   color: Color(0xFFFFC107),
                   fontWeight: FontWeight.w900,
-                  fontSize: 16,
+                  fontSize: 14,
                 ),
               ),
             ),
+            cardWidth: cardWidth,
             onTap: () => Get.to(() => const ShopPage()),
           ),
         ],
@@ -444,10 +462,10 @@ class PetPage extends StatelessWidget {
     double? customImageSize,
     double? customImageBottom,
     bool isBig = false,
+    double cardWidth = 100,
   }) {
-    final double cardWidth = 100;
-    final double cardHeight = 100;
-    final double imageSize = customImageSize ?? 80;
+    final cardHeight = cardWidth;
+    final imageSize = customImageSize ?? (cardWidth * 0.8);
     final double imageBottom = customImageBottom ?? 10;
 
     return GestureDetector(

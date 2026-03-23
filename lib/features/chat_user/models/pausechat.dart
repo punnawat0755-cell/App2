@@ -172,6 +172,13 @@ class _PauseChatPageState extends State<PauseChatPage>
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final rippleOrbit = (constraints.maxWidth * 0.92).clamp(
+                240.0,
+                350.0,
+              );
+              final outerAvatar = (rippleOrbit * 0.60).clamp(150.0, 210.0);
+              final innerAvatar = (outerAvatar * 0.81).clamp(120.0, 170.0);
+
               return SingleChildScrollView(
                 padding: const EdgeInsets.only(bottom: 24),
                 child: ConstrainedBox(
@@ -219,8 +226,8 @@ class _PauseChatPageState extends State<PauseChatPage>
                       const SizedBox(height: 30),
                       Center(
                         child: SizedBox(
-                          width: 350,
-                          height: 350,
+                          width: rippleOrbit,
+                          height: rippleOrbit,
                           child: Stack(
                             alignment: Alignment.center,
                             children: [
@@ -228,8 +235,8 @@ class _PauseChatPageState extends State<PauseChatPage>
                               _buildOneWayRipple(0.33),
                               _buildOneWayRipple(0.66),
                               Container(
-                                width: 210,
-                                height: 210,
+                                width: outerAvatar,
+                                height: outerAvatar,
                                 decoration: BoxDecoration(
                                   color: _innerPink,
                                   shape: BoxShape.circle,
@@ -245,8 +252,8 @@ class _PauseChatPageState extends State<PauseChatPage>
                                 ),
                                 child: Center(
                                   child: Container(
-                                    width: 170,
-                                    height: 170,
+                                    width: innerAvatar,
+                                    height: innerAvatar,
                                     decoration: BoxDecoration(
                                       shape: BoxShape.circle,
                                       color: const Color(0xFFFFF5F5),
@@ -294,9 +301,12 @@ class _PauseChatPageState extends State<PauseChatPage>
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final baseSize = screenWidth < 360 ? 150.0 : 210.0;
+        final spreadSize = screenWidth < 360 ? 100.0 : 140.0;
         final rawT = (_animationController.value + startDelay) % 1.0;
         final t = Curves.easeOut.transform(rawT);
-        final currentSize = 210 + (140 * t);
+        final currentSize = baseSize + (spreadSize * t);
         final opacity = 0.5 * (1.0 - rawT);
 
         return Container(

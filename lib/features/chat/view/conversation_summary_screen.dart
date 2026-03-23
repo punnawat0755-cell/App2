@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:get/get.dart';
 
 import 'package:flutter_application_1/features/chat/view/chat_confirm_dialog.dart';
@@ -119,6 +120,10 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
+    final starSize = scale.rs(55, min: 44, max: 56);
+    final avatarSize = scale.rs(150, min: 126, max: 154);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -127,178 +132,200 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
         elevation: 0,
       ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-          child: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 16),
-                const Text(
-                  'Jellyfish',
-                  style: TextStyle(
-                    color: Color(0xFF4489D7),
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = constraints.maxWidth < 360 ? 14.0 : 24.0;
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    16,
+                    horizontalPadding,
+                    24,
                   ),
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white, width: 4),
-                    color: Colors.white,
-                    image: const DecorationImage(
-                      image: NetworkImage(
-                        'https://images.unsplash.com/photo-1548681528-6a5c45b66b42?auto=format&fit=crop&w=600&q=80',
-                      ),
-                      fit: BoxFit.cover,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 5,
-                        offset: const Offset(0, 3),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 40),
-                if (!_isBlocked) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      GestureDetector(
-                        onTap: () => setState(() => _isFollowed = !_isFollowed),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 25,
-                            vertical: 10,
+                      const SizedBox(height: 16),
+                      Text(
+                        'Jellyfish',
+                        style: TextStyle(
+                          color: Color(0xFF4489D7),
+                          fontSize: scale.rf(28, min: 24, max: 28),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        width: avatarSize,
+                        height: avatarSize,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white,
+                            width: scale.rs(4, min: 3, max: 4),
                           ),
-                          decoration: BoxDecoration(
-                            color: _isFollowed
-                                ? const Color(0xFFE0E0E0)
-                                : const Color(0xFFD3ECF8),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: _isFollowed
-                                ? [
+                          color: Colors.white,
+                          image: const DecorationImage(
+                            image: NetworkImage(
+                              'https://images.unsplash.com/photo-1548681528-6a5c45b66b42?auto=format&fit=crop&w=600&q=80',
+                            ),
+                            fit: BoxFit.cover,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.1),
+                              blurRadius: 5,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      if (!_isBlocked) ...[
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 15,
+                          runSpacing: 12,
+                          children: [
+                            GestureDetector(
+                              onTap: () =>
+                                  setState(() => _isFollowed = !_isFollowed),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 25,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _isFollowed
+                                      ? const Color(0xFFE0E0E0)
+                                      : const Color(0xFFD3ECF8),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: _isFollowed
+                                      ? [
+                                          BoxShadow(
+                                            color: Colors.black
+                                                .withValues(alpha: 0.4),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ]
+                                      : [
+                                          BoxShadow(
+                                            color: const Color(0xFF4489D7)
+                                                .withValues(alpha: 0.4),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                ),
+                                child: Text(
+                                  _isFollowed ? 'ติดตามแล้ว' : 'ติดตาม',
+                                  style: TextStyle(
+                                    color: _isFollowed
+                                        ? Colors.grey[600]
+                                        : const Color(0xFF4489D7),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: scale.rf(16, min: 14, max: 16.5),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: _showBlockDialog,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 25,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
                                     BoxShadow(
                                       color:
                                           Colors.black.withValues(alpha: 0.4),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 3),
-                                    ),
-                                  ]
-                                : [
-                                    BoxShadow(
-                                      color: const Color(0xFF4489D7)
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 6,
+                                      blurRadius: 4,
                                       offset: const Offset(0, 3),
                                     ),
                                   ],
-                          ),
-                          child: Text(
-                            _isFollowed ? 'ติดตามแล้ว' : 'ติดตาม',
-                            style: TextStyle(
-                              color: _isFollowed
-                                  ? Colors.grey[600]
-                                  : const Color(0xFF4489D7),
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                                ),
+                                child: const Text(
+                                  'บล็อก',
+                                  style: TextStyle(
+                                    color: Color(0xFF4489D7),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
+                        const SizedBox(height: 30),
+                      ] else ...[
+                        const SizedBox(height: 50),
+                      ],
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(5, (index) {
+                          return GestureDetector(
+                            onTap: () => setState(() => _rating = index + 1),
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 2),
+                              child: Icon(
+                                Icons.star_rounded,
+                                size: starSize,
+                                color: index < _rating
+                                    ? const Color(0xFFFFE082)
+                                    : const Color(0xFFE0E0E0),
+                              ),
+                            ),
+                          );
+                        }),
                       ),
-                      const SizedBox(width: 15),
+                      const SizedBox(height: 32),
                       GestureDetector(
-                        onTap: _showBlockDialog,
+                        onTap: _sendingFeedback ? null : _submitFeedback,
                         child: Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 25,
+                            horizontal: 40,
                             vertical: 10,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(20),
+                            color: const Color(0xFFFFE082),
+                            borderRadius: BorderRadius.circular(30),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.4),
-                                blurRadius: 4,
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: 5,
                                 offset: const Offset(0, 3),
                               ),
                             ],
                           ),
-                          child: const Text(
-                            'บล็อก',
+                          child: Text(
+                            _sendingFeedback ? 'กำลังส่ง...' : 'บันทึก',
                             style: TextStyle(
-                              color: Color(0xFF4489D7),
+                              color: Color(0xFF6C6C6C),
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontSize: scale.rf(16, min: 14, max: 16.5),
                             ),
                           ),
                         ),
                       ),
+                      SizedBox(
+                          height: MediaQuery.of(context).padding.bottom + 16),
                     ],
                   ),
-                  const SizedBox(height: 30),
-                ] else ...[
-                  const SizedBox(height: 50),
-                ],
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(5, (index) {
-                    return GestureDetector(
-                      onTap: () => setState(() => _rating = index + 1),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: Icon(
-                          Icons.star_rounded,
-                          size: 55,
-                          color: index < _rating
-                              ? const Color(0xFFFFE082)
-                              : const Color(0xFFE0E0E0),
-                        ),
-                      ),
-                    );
-                  }),
                 ),
-                const SizedBox(height: 32),
-                GestureDetector(
-                  onTap: _sendingFeedback ? null : _submitFeedback,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 40,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFE082),
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.1),
-                          blurRadius: 5,
-                          offset: const Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Text(
-                      _sendingFeedback ? 'กำลังส่ง...' : 'บันทึก',
-                      style: const TextStyle(
-                        color: Color(0xFF6C6C6C),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(height: MediaQuery.of(context).padding.bottom + 16),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );

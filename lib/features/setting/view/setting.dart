@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/login/view/login.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/login/view/policy.dart';
@@ -104,6 +105,7 @@ class _SettingPageState extends State<SettingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     final ProfileAvatarController avatarController =
         Get.isRegistered<ProfileAvatarController>()
             ? Get.find<ProfileAvatarController>()
@@ -118,8 +120,8 @@ class _SettingPageState extends State<SettingPage> {
         leading: IconButton(
           icon: Image.asset(
             'assets/images/back.png',
-            width: 25,
-            height: 25,
+            width: scale.rs(25, min: 21, max: 25),
+            height: scale.rs(25, min: 21, max: 25),
             fit: BoxFit.contain,
           ),
           onPressed: () => Get.back(),
@@ -127,109 +129,140 @@ class _SettingPageState extends State<SettingPage> {
         title: Text(
           'การตั้งค่า',
           style: GoogleFonts.mitr(
-            textStyle: const TextStyle(
+            textStyle: TextStyle(
               color: Color(0xFF4489D7),
-              fontSize: 22,
+              fontSize: scale.rf(22, min: 19, max: 22),
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30),
-          child: Obx(
-            () => Column(
-              children: [
-                const SizedBox(height: 40),
-                GestureDetector(
-                  onTap: () => _showAvatarPicker(context, avatarController),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          image: DecorationImage(
-                            image: avatarController.avatarImageProvider,
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 4,
-                        bottom: 4,
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4489D7),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
-                          ),
-                          child: const Icon(
-                            Icons.edit_rounded,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
+      body: SafeArea(
+        top: false,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final pageScale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final horizontalPadding = constraints.maxWidth < 360
+                ? pageScale.rs(16, min: 14, max: 18)
+                : pageScale.rs(24, min: 20, max: 24);
+            final avatarSize = pageScale.rs(150, min: 118, max: 150);
+            final avatarEditPadding = pageScale.rs(8, min: 6, max: 8);
+            final avatarEditIconSize = pageScale.rs(18, min: 15, max: 18);
+            final avatarEditBorder = pageScale.rs(2, min: 1.5, max: 2.4);
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 500),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    pageScale.rs(24, min: 18, max: 24),
+                    horizontalPadding,
+                    pageScale.rs(28, min: 22, max: 28),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _isLoadingDisplayName ? '...' : _displayName,
-                  style: GoogleFonts.mitr(
-                    textStyle: const TextStyle(
-                      color: Color(0xFF4489D7),
-                      fontSize: 22,
-                      fontWeight: FontWeight.w500,
+                  child: Obx(
+                    () => Column(
+                      children: [
+                        SizedBox(height: pageScale.rs(16, min: 12, max: 16)),
+                        GestureDetector(
+                          onTap: () =>
+                              _showAvatarPicker(context, avatarController),
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: avatarSize,
+                                height: avatarSize,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  image: DecorationImage(
+                                    image: avatarController.avatarImageProvider,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: 4,
+                                bottom: 4,
+                                child: Container(
+                                  padding: EdgeInsets.all(avatarEditPadding),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4489D7),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: avatarEditBorder,
+                                    ),
+                                  ),
+                                  child: Icon(
+                                    Icons.edit_rounded,
+                                    size: avatarEditIconSize,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: pageScale.rs(16, min: 12, max: 16)),
+                        Text(
+                          _isLoadingDisplayName ? '...' : _displayName,
+                          style: GoogleFonts.mitr(
+                            textStyle: TextStyle(
+                              color: Color(0xFF4489D7),
+                              fontSize: scale.rf(22, min: 19, max: 22),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          avatarController.isSaving.value
+                              ? 'กำลังบันทึกรูปโปรไฟล์...'
+                              : 'แตะรูปเพื่อเปลี่ยนรูปโปรไฟล์',
+                          style: GoogleFonts.mitr(
+                            textStyle: TextStyle(
+                              color: Color(0xFF757575),
+                              fontSize: pageScale.rf(15, min: 13, max: 15),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: pageScale.rs(30, min: 22, max: 30)),
+                        _buildSettingItem(
+                          context,
+                          Image.asset('assets/images/person.png'),
+                          'แก้ไขข้อมูล',
+                          () async {
+                            final shouldRefresh = await Get.to<bool>(
+                                () => const EditProfilePage());
+                            if (shouldRefresh == true) {
+                              await _loadDisplayName();
+                            }
+                          },
+                        ),
+                        SizedBox(height: pageScale.rs(20, min: 14, max: 20)),
+                        _buildSettingItem(
+                          context,
+                          Image.asset('assets/images/lock.png'),
+                          'ความเป็นส่วนตัว',
+                          () => Get.to(() => const PrivacyDetailPage()),
+                        ),
+                        SizedBox(height: pageScale.rs(20, min: 14, max: 20)),
+                        _buildSettingItem(
+                          context,
+                          Image.asset('assets/images/heart.png'),
+                          'รายการโปรด',
+                          () => Get.to(() => const FavoritesPage()),
+                        ),
+                        SizedBox(height: pageScale.rs(56, min: 36, max: 56)),
+                        _buildLogoutButton(context),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  avatarController.isSaving.value
-                      ? 'กำลังบันทึกรูปโปรไฟล์...'
-                      : 'แตะรูปเพื่อเปลี่ยนรูปโปรไฟล์',
-                  style: GoogleFonts.mitr(
-                    textStyle: const TextStyle(
-                      color: Color(0xFF757575),
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 30),
-                _buildSettingItem(
-                  Image.asset('assets/images/person.png'),
-                  'แก้ไขข้อมูล',
-                  () async {
-                    final shouldRefresh =
-                        await Get.to<bool>(() => const EditProfilePage());
-                    if (shouldRefresh == true) {
-                      await _loadDisplayName();
-                    }
-                  },
-                ),
-                const SizedBox(height: 20),
-                _buildSettingItem(
-                  Image.asset('assets/images/lock.png'),
-                  'ความเป็นส่วนตัว',
-                  () => Get.to(() => const PrivacyDetailPage()),
-                ),
-                const SizedBox(height: 20),
-                _buildSettingItem(
-                  Image.asset('assets/images/heart.png'),
-                  'รายการโปรด',
-                  () => Get.to(() => const FavoritesPage()),
-                ),
-                const SizedBox(height: 56),
-                _buildLogoutButton(),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -247,98 +280,115 @@ class _SettingPageState extends State<SettingPage> {
       ),
       builder: (sheetContext) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-            child: Obx(
-              () {
-                final selectedAvatar = controller.avatarUrl.value;
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+              final crossAxisCount = constraints.maxWidth < 360 ? 3 : 4;
+              final gridSpacing = scale.rs(14, min: 10, max: 14);
 
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'เลือกรูปโปรไฟล์',
-                      style: GoogleFonts.mitr(
-                        textStyle: const TextStyle(
-                          color: Color(0xFF4489D7),
-                          fontSize: 22,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'เลือกได้เฉพาะรูปที่แอปมีให้',
-                      style: GoogleFonts.mitr(
-                        textStyle: const TextStyle(
-                          color: Color(0xFF757575),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: controller.avatarOptions.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                      ),
-                      itemBuilder: (context, index) {
-                        final avatarPath = controller.avatarOptions[index];
-                        final isSelected = selectedAvatar == avatarPath;
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  scale.rs(20, min: 16, max: 20),
+                  scale.rs(20, min: 16, max: 20),
+                  scale.rs(20, min: 16, max: 20),
+                  scale.rs(24, min: 18, max: 24),
+                ),
+                child: Obx(
+                  () {
+                    final selectedAvatar = controller.avatarUrl.value;
 
-                        return GestureDetector(
-                          onTap: () async {
-                            await controller.saveAvatar(avatarPath);
-                            if (sheetContext.mounted) {
-                              Navigator.of(sheetContext).pop();
-                            }
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? const Color(0xFF4489D7)
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                            ),
-                            padding: const EdgeInsets.all(4),
-                            child: Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                CircleAvatar(
-                                  backgroundImage: AssetImage(avatarPath),
-                                ),
-                                if (isSelected)
-                                  const Align(
-                                    alignment: Alignment.bottomRight,
-                                    child: CircleAvatar(
-                                      radius: 12,
-                                      backgroundColor: Color(0xFF4489D7),
-                                      child: Icon(
-                                        Icons.check,
-                                        size: 14,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                  ),
-                              ],
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'เลือกรูปโปรไฟล์',
+                          style: GoogleFonts.mitr(
+                            textStyle: TextStyle(
+                              color: const Color(0xFF4489D7),
+                              fontSize: scale.rf(22, min: 18, max: 22),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
+                        ),
+                        SizedBox(height: scale.rs(6, min: 4, max: 6)),
+                        Text(
+                          'เลือกได้เฉพาะรูปที่แอปมีให้',
+                          style: GoogleFonts.mitr(
+                            textStyle: TextStyle(
+                              color: const Color(0xFF757575),
+                              fontSize: scale.rf(14, min: 12, max: 14),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: scale.rs(18, min: 12, max: 18)),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: controller.avatarOptions.length,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: gridSpacing,
+                            mainAxisSpacing: gridSpacing,
+                          ),
+                          itemBuilder: (context, index) {
+                            final avatarPath = controller.avatarOptions[index];
+                            final isSelected = selectedAvatar == avatarPath;
+
+                            return GestureDetector(
+                              onTap: () async {
+                                await controller.saveAvatar(avatarPath);
+                                if (sheetContext.mounted) {
+                                  Navigator.of(sheetContext).pop();
+                                }
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFF4489D7)
+                                        : Colors.transparent,
+                                    width: scale.rs(3, min: 2, max: 3),
+                                  ),
+                                ),
+                                padding:
+                                    EdgeInsets.all(scale.rs(4, min: 2, max: 4)),
+                                child: Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    CircleAvatar(
+                                      backgroundImage: AssetImage(avatarPath),
+                                    ),
+                                    if (isSelected)
+                                      Align(
+                                        alignment: Alignment.bottomRight,
+                                        child: CircleAvatar(
+                                          radius:
+                                              scale.rs(12, min: 10, max: 12),
+                                          backgroundColor:
+                                              const Color(0xFF4489D7),
+                                          child: Icon(
+                                            Icons.check,
+                                            size:
+                                                scale.rs(14, min: 12, max: 14),
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              );
+            },
           ),
         );
       },
@@ -356,14 +406,17 @@ class _SettingPageState extends State<SettingPage> {
   }
 
   Widget _buildSettingItem(
+    BuildContext context,
     Widget leading,
     String title,
     VoidCallback onTap,
   ) {
+    final scale = context.responsive;
+
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFCEEFFE).withValues(alpha: 0.8),
-        borderRadius: BorderRadius.circular(25),
+        borderRadius: BorderRadius.circular(scale.rs(25, min: 18, max: 25)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
@@ -374,37 +427,45 @@ class _SettingPageState extends State<SettingPage> {
       ),
       child: ListTile(
         leading: SizedBox(
-          width: 50,
-          height: 50,
+          width: scale.rs(50, min: 40, max: 50),
+          height: scale.rs(50, min: 40, max: 50),
           child: leading,
         ),
         title: Text(
           title,
           style: GoogleFonts.mitr(
-            textStyle: const TextStyle(
-              color: Color(0xFF4489D7),
-              fontSize: 18,
+            textStyle: TextStyle(
+              color: const Color(0xFF4489D7),
+              fontSize: scale.rf(18, min: 15, max: 18),
               fontWeight: FontWeight.w500,
             ),
           ),
         ),
-        trailing: const Icon(
+        trailing: Icon(
           Icons.arrow_forward_ios_rounded,
-          color: Color(0xFF757575),
-          size: 20,
+          color: const Color(0xFF757575),
+          size: scale.rs(20, min: 16, max: 20),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: scale.rs(20, min: 14, max: 20),
+          vertical: scale.rs(8, min: 4, max: 8),
+        ),
         onTap: onTap,
       ),
     );
   }
 
-  Widget _buildLogoutButton() {
+  Widget _buildLogoutButton(BuildContext context) {
+    final scale = context.responsive;
+
     return InkWell(
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
       onTap: _handleLogout,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: scale.rs(12, min: 8, max: 12),
+          vertical: scale.rs(10, min: 8, max: 10),
+        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
@@ -412,18 +473,18 @@ class _SettingPageState extends State<SettingPage> {
             Text(
               'ออกจากระบบ',
               style: GoogleFonts.mitr(
-                textStyle: const TextStyle(
-                  color: Color(0xFF9E9E9E),
-                  fontSize: 18,
+                textStyle: TextStyle(
+                  color: const Color(0xFF9E9E9E),
+                  fontSize: scale.rf(18, min: 15, max: 18),
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: scale.rs(12, min: 8, max: 12)),
             Image.asset(
               'assets/images/exit.png',
-              width: 34,
-              height: 34,
+              width: scale.rs(34, min: 26, max: 34),
+              height: scale.rs(34, min: 26, max: 34),
               fit: BoxFit.contain,
             ),
           ],

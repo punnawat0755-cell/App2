@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_env.dart';
-import 'core/responsive/app_responsive_frame.dart';
 import 'firebase_options.dart';
 import 'core/services/notification_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
@@ -74,11 +73,17 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'How Are You',
       builder: (context, child) {
-        if (child == null) {
-          return const SizedBox.shrink();
-        }
+        final media = MediaQuery.of(context);
+        final widthScale = (media.size.width / 390).clamp(0.92, 1.04);
+        final userScale = media.textScaler.scale(1);
+        final mergedScale = (userScale * widthScale).clamp(0.90, 1.08);
 
-        return AppResponsiveFrame(child: child);
+        return MediaQuery(
+          data: media.copyWith(
+            textScaler: TextScaler.linear(mergedScale),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
       },
       theme: ThemeData(
         useMaterial3: true,

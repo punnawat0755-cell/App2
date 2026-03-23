@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:get/get.dart';
 
@@ -71,68 +72,83 @@ class ChatSelectionPage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFFF),
       body: SafeArea(
-        child: Stack(
-          children: [
-            const _ProfileHeader(),
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'มาแชทกันเถอะ มีคนรอคุณอยู่ในแชท',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: Color(0xFF4489D7),
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final horizontalPadding = scale.rs(28, min: 16, max: 30);
+            final cardHeight = constraints.maxHeight < 700
+                ? scale.rs(250, min: 220, max: 260)
+                : scale.rs(300, min: 260, max: 310);
+
+            return Stack(
+              children: [
+                const _ProfileHeader(),
+                Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 520),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'มาแชทกันเถอะ มีคนรอคุณอยู่ในแชท',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: scale.rf(20, min: 18, max: 20.5),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: horizontalPadding,
+                          ),
+                          child: SizedBox(
+                            height: cardHeight,
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                HalfCircleButton(
+                                  title: 'เริ่มแชท',
+                                  imagePath: 'assets/images/sad.png',
+                                  backgroundColor: const Color(0xFFAEDEF4),
+                                  textColor: const Color(0xFF4489D7),
+                                  isLeft: true,
+                                  onTap: controller.goToStartChat,
+                                  imagePadding: const EdgeInsets.only(
+                                    top: 10,
+                                    bottom: 25,
+                                    left: 20,
+                                  ),
+                                  imageScale: 0.95,
+                                  textPadding: const EdgeInsets.only(left: 55),
+                                ),
+                                const SizedBox(width: 9),
+                                HalfCircleButton(
+                                  title: 'ให้คำปรึกษา',
+                                  imagePath: 'assets/images/fine.png',
+                                  backgroundColor: const Color(0xFFFDE6A8),
+                                  textColor: const Color(0xFF8D6E63),
+                                  isLeft: false,
+                                  onTap: controller.goToCounseling,
+                                  imagePadding: const EdgeInsets.only(
+                                    bottom: 3,
+                                    right: 8,
+                                  ),
+                                  imageScale: 0.8,
+                                  textPadding: const EdgeInsets.only(right: 50),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 50),
-                    child: SizedBox(
-                      height: 300,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          HalfCircleButton(
-                            title: 'เริ่มแชท',
-                            imagePath: 'assets/images/sad.png',
-                            backgroundColor: const Color(0xFFAEDEF4),
-                            textColor: const Color(0xFF4489D7),
-                            isLeft: true,
-                            onTap: controller.goToStartChat,
-                            imagePadding: const EdgeInsets.only(
-                              top: 10,
-                              bottom: 25,
-                              left: 20,
-                            ),
-                            imageScale: 0.95,
-                            textPadding: const EdgeInsets.only(left: 55),
-                          ),
-                          const SizedBox(width: 9),
-                          HalfCircleButton(
-                            title: 'ให้คำปรึกษา',
-                            imagePath: 'assets/images/fine.png',
-                            backgroundColor: const Color(0xFFFDE6A8),
-                            textColor: const Color(0xFF8D6E63),
-                            isLeft: false,
-                            onTap: controller.goToCounseling,
-                            imagePadding: const EdgeInsets.only(
-                              bottom: 3,
-                              right: 8,
-                            ),
-                            imageScale: 0.8,
-                            textPadding: const EdgeInsets.only(right: 50),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -144,6 +160,7 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     final ProfileAvatarController avatarController =
         Get.isRegistered<ProfileAvatarController>()
             ? Get.find<ProfileAvatarController>()
@@ -151,14 +168,17 @@ class _ProfileHeader extends StatelessWidget {
 
     return Positioned(
       top: 20,
-      right: 35,
+      right: 16,
       child: Obx(
         () => Container(
-          width: 50,
-          height: 50,
+          width: scale.rs(50, min: 44, max: 52),
+          height: scale.rs(50, min: 44, max: 52),
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 2),
+            border: Border.all(
+              color: Colors.white,
+              width: scale.rs(2, min: 1.6, max: 2.4),
+            ),
             image: DecorationImage(
               image: avatarController.avatarImageProvider,
               fit: BoxFit.cover,
@@ -196,6 +216,7 @@ class HalfCircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     const double radius = 2000;
     return Expanded(
       child: GestureDetector(
@@ -224,7 +245,7 @@ class HalfCircleButton extends StatelessWidget {
           child: Stack(
             children: [
               Positioned.fill(
-                bottom: 50,
+                bottom: scale.rs(50, min: 42, max: 54),
                 child: Padding(
                   padding: imagePadding ?? const EdgeInsets.all(15.0),
                   child: Transform.scale(
@@ -237,7 +258,7 @@ class HalfCircleButton extends StatelessWidget {
                         isLeft
                             ? Icons.sentiment_dissatisfied
                             : Icons.sentiment_satisfied_alt,
-                        size: 80,
+                        size: scale.rs(80, min: 66, max: 82),
                         color: withAlpha(Colors.white, 0.5),
                       ),
                     ),
@@ -245,7 +266,7 @@ class HalfCircleButton extends StatelessWidget {
                 ),
               ),
               Positioned(
-                bottom: 35,
+                bottom: scale.rs(35, min: 28, max: 38),
                 left: 0,
                 right: 0,
                 child: Padding(
@@ -255,7 +276,7 @@ class HalfCircleButton extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: textColor,
-                      fontSize: 18,
+                      fontSize: scale.rf(18, min: 16, max: 19),
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -467,74 +488,86 @@ class _WaitingChatPageState extends State<WaitingChatPage>
             ),
           ),
         ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                _waitingHeadline,
-                style: TextStyle(
-                  color: _waitingTextColor,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _waitingSubheadline,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _waitingTextColor.withValues(alpha: 0.78),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: 450,
-                height: 450,
-                child: Stack(
-                  alignment: Alignment.center,
+        body: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final orbitSize = (constraints.maxWidth * 0.92).clamp(260.0, 450.0);
+            final innerCircle = (orbitSize * 0.53).clamp(150.0, 240.0);
+            final bottomSpace = constraints.maxHeight < 700 ? 32.0 : 80.0;
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildOneWayRipple(0.0),
-                    _buildOneWayRipple(0.33),
-                    _buildOneWayRipple(0.66),
-                    Container(
-                      width: 240,
-                      height: 240,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _waitingAccent,
-                        boxShadow: [
-                          BoxShadow(
-                            color: withAlpha(Colors.black, 0.1),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
+                    Text(
+                      _waitingHeadline,
+                      style: TextStyle(
+                        color: _waitingTextColor,
+                        fontSize: scale.rf(24, min: 21, max: 24),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _waitingSubheadline,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _waitingTextColor.withValues(alpha: 0.78),
+                        fontSize: scale.rf(15, min: 13.5, max: 15.5),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: orbitSize,
+                      height: orbitSize,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          _buildOneWayRipple(0.0),
+                          _buildOneWayRipple(0.33),
+                          _buildOneWayRipple(0.66),
+                          Container(
+                            width: innerCircle,
+                            height: innerCircle,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _waitingAccent,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: withAlpha(Colors.black, 0.1),
+                                  blurRadius: 20,
+                                  offset: const Offset(0, 10),
+                                ),
+                              ],
+                            ),
+                            child: ClipOval(
+                              child: Padding(
+                                padding: EdgeInsets.only(
+                                  top: _isListenerMode ? 10 : 30,
+                                  left: _isListenerMode ? 8 : 0,
+                                  right: _isListenerMode ? 8 : 0,
+                                  bottom: _isListenerMode ? 10 : 0,
+                                ),
+                                child: Image.asset(
+                                  _waitingImagePath,
+                                  fit: BoxFit.contain,
+                                  alignment: Alignment.bottomCenter,
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
-                      child: ClipOval(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            top: _isListenerMode ? 10 : 30,
-                            left: _isListenerMode ? 8 : 0,
-                            right: _isListenerMode ? 8 : 0,
-                            bottom: _isListenerMode ? 10 : 0,
-                          ),
-                          child: Image.asset(
-                            _waitingImagePath,
-                            fit: BoxFit.contain,
-                            alignment: Alignment.bottomCenter,
-                          ),
-                        ),
-                      ),
                     ),
+                    SizedBox(height: bottomSpace),
                   ],
                 ),
               ),
-              const SizedBox(height: 80),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -544,8 +577,11 @@ class _WaitingChatPageState extends State<WaitingChatPage>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final baseSize = screenWidth < 360 ? 170.0 : 240.0;
+        final spreadSize = screenWidth < 360 ? 120.0 : 180.0;
         final t = (_controller.value + startDelay) % 1.0;
-        final currentSize = 240 + (180 * t);
+        final currentSize = baseSize + (spreadSize * t);
         final opacity = 0.4 * (1.0 - t);
         return Container(
           width: currentSize,
@@ -854,6 +890,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     if (_showFeedback) {
       return ConversationSummaryScreen(
         chatId: widget.chatId,
@@ -874,18 +911,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       child: Scaffold(
         backgroundColor: Colors.white,
         appBar: AppBar(
-          toolbarHeight: 80,
+          toolbarHeight: scale.rs(80, min: 70, max: 82),
           backgroundColor: const Color(0xFFD3ECF8),
           elevation: 0,
           leading: IconButton(
-            icon: Image.asset('assets/images/back.png', width: 23, height: 23),
+            icon: Image.asset(
+              'assets/images/back.png',
+              width: scale.rs(23, min: 20, max: 24),
+              height: scale.rs(23, min: 20, max: 24),
+            ),
             onPressed: _goHomeWithoutEndingConversation,
           ),
-          title: const Text(
+          title: Text(
             'แชท',
             style: TextStyle(
               color: darkBlue,
-              fontSize: 24,
+              fontSize: scale.rf(24, min: 21, max: 24),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -915,10 +956,10 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
                     ),
                     child: Text(
                       _endingConversation ? 'กำลังจบ...' : 'จบการสนทนา',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Color(0xFF6C6C6C),
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: scale.rf(14, min: 12.5, max: 14.5),
                       ),
                     ),
                   ),

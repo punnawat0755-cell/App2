@@ -6,6 +6,7 @@ import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
 import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
@@ -417,35 +418,40 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildAddClipCard() {
+    final scale = context.responsive;
+    final cardWidth = scale.rs(110, min: 96, max: 118);
+    final loadingSize = scale.rs(26, min: 22, max: 28);
+    final circleSize = scale.rs(45, min: 38, max: 48);
+
     return GestureDetector(
       onTap: _pickAndUploadClip,
       child: Container(
-        width: 110,
+        width: cardWidth,
         decoration: BoxDecoration(
           color: const Color(0xFFE2E2E2),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(scale.rs(20, min: 16, max: 22)),
         ),
         child: Center(
           child: _isUploadingClip
-              ? const SizedBox(
-                  width: 26,
-                  height: 26,
+              ? SizedBox(
+                  width: loadingSize,
+                  height: loadingSize,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.6,
                     color: Color(0xFF4489D7),
                   ),
                 )
               : Container(
-                  width: 45,
-                  height: 45,
+                  width: circleSize,
+                  height: circleSize,
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.add,
-                    color: Color(0xFF8A8A8A),
-                    size: 30,
+                    color: const Color(0xFF8A8A8A),
+                    size: scale.rs(30, min: 24, max: 32),
                   ),
                 ),
         ),
@@ -473,206 +479,229 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const SizedBox(width: 40),
-                  Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final horizontalPadding = scale.rs(24, min: 14, max: 24);
+            final bannerHeight = scale.rs(160, min: 145, max: 168);
+            final articleCardWidth = scale.rs(160, min: 140, max: 168);
+            final avatarSize = scale.rs(50, min: 44, max: 52);
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: 10,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          await Get.to(() => const SettingPage());
-                          if (!mounted) {
-                            return;
-                          }
-                          await _loadUsername();
-                        },
-                        child: SizedBox(
-                          width: 50,
-                          height: 50,
-                          child: Obx(
-                            () => Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.06),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              await Get.to(() => const SettingPage());
+                              if (!mounted) {
+                                return;
+                              }
+                              await _loadUsername();
+                            },
+                            child: SizedBox(
+                              width: avatarSize,
+                              height: avatarSize,
+                              child: Obx(
+                                () => Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 3),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.06),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                    image: DecorationImage(
+                                      image:
+                                          avatarController.avatarImageProvider,
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
-                                ],
-                                image: DecorationImage(
-                                  image: avatarController.avatarImageProvider,
-                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _isNameLoading ? 'สวัสดี, ...' : 'สวัสดี,$_displayName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFF4489D7),
+                          fontSize: scale.rf(24, min: 21, max: 25),
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Text(
-                _isNameLoading ? 'สวัสดี, ...' : 'สวัสดี,$_displayName',
-                style: const TextStyle(
-                  color: Color(0xFF4489D7),
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 160,
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentBannerIndex = index;
-                    });
-                  },
-                  children: [
-                    DailyMissionBanner(
-                      onTap: _openDailyMission,
-                      dayCount: _defaultMissionDays.toString(),
-                    ),
-                    ClownFishBanner(),
-                    LoveJobBanner(),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 15),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(3, (index) {
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 800),
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: _currentBannerIndex == index ? 24 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _currentBannerIndex == index
-                          ? const Color(0xFF4489D7)
-                          : Colors.blue.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 10),
-              const HomeSectionHeader(title: 'คลิปสั้น'),
-              const SizedBox(height: 15),
-              SizedBox(
-                height: 160,
-                child: StreamBuilder<List<HomeVideoClip>>(
-                  stream: _videoClipsStream,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError && !snapshot.hasData) {
-                      return ListView(
-                        scrollDirection: Axis.horizontal,
-                        clipBehavior: Clip.none,
-                        padding: EdgeInsets.zero,
-                        children: [_buildAddClipCard()],
-                      );
-                    }
-
-                    if (!snapshot.hasData) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-
-                    final clips = snapshot.data ?? const <HomeVideoClip>[];
-                    _warmUpVisibleClips(context, clips);
-                    return ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      padding: EdgeInsets.zero,
-                      itemCount: clips.length + 1,
-                      separatorBuilder: (_, __) => const SizedBox(width: 15),
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return _buildAddClipCard();
-                        }
-
-                        final clip = clips[index - 1];
-                        return InkWell(
-                          onTap: () => _openVideoClip(clips, index - 1),
-                          child: FutureBuilder<String?>(
-                            future: index <= 2
-                                ? _homeVideoPrefetchService.prefetchVideo(
-                                    clip.videoUrl,
-                                  )
-                                : _homeVideoPrefetchService.getCachedPath(
-                                    clip.videoUrl,
-                                  ),
-                            builder: (context, previewSnapshot) {
-                              final cachedPreviewPath =
-                                  previewSnapshot.data?.trim() ?? '';
-                              return ClipCard(
-                                title: _clipCardTitle(clip),
-                                subtitle: _clipCardSubtitle(clip),
-                                imagePath: cachedPreviewPath.isNotEmpty
-                                    ? cachedPreviewPath
-                                    : clip.videoUrl,
-                                thumbnailPath: clip.thumbnailUrl,
-                                forceVideoPreview: true,
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 25),
-              const HomeSectionHeader(title: 'บทความจิตวิทยา'),
-              const SizedBox(height: 15),
-              SizedBox(
-                height: 210,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  padding: EdgeInsets.zero,
-                  itemCount: _articleList.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 15),
-                  itemBuilder: (context, index) {
-                    final article = _articleList[index];
-                    return SizedBox(
-                      width: 160,
-                      child: ArticleCard(
-                        title: article.title,
-                        subtitle: article.subtitle,
-                        imagePath: article.imagePath,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ArticleDetailPage(
-                                title: article.detailTitle,
-                                imagePath: article.detailImagePath,
-                                content: article.content,
-                              ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: bannerHeight,
+                        child: PageView(
+                          controller: _pageController,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentBannerIndex = index;
+                            });
+                          },
+                          children: [
+                            DailyMissionBanner(
+                              onTap: _openDailyMission,
+                              dayCount: _defaultMissionDays.toString(),
+                            ),
+                            ClownFishBanner(),
+                            LoveJobBanner(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (index) {
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 800),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: _currentBannerIndex == index ? 24 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _currentBannerIndex == index
+                                  ? const Color(0xFF4489D7)
+                                  : Colors.blue.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                           );
-                        },
+                        }),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 10),
+                      const HomeSectionHeader(title: 'คลิปสั้น'),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        height: scale.rs(160, min: 148, max: 168),
+                        child: StreamBuilder<List<HomeVideoClip>>(
+                          stream: _videoClipsStream,
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError && !snapshot.hasData) {
+                              return ListView(
+                                scrollDirection: Axis.horizontal,
+                                clipBehavior: Clip.none,
+                                padding: EdgeInsets.zero,
+                                children: [_buildAddClipCard()],
+                              );
+                            }
+
+                            if (!snapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            final clips =
+                                snapshot.data ?? const <HomeVideoClip>[];
+                            _warmUpVisibleClips(context, clips);
+                            return ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              clipBehavior: Clip.none,
+                              padding: EdgeInsets.zero,
+                              itemCount: clips.length + 1,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 15),
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return _buildAddClipCard();
+                                }
+
+                                final clip = clips[index - 1];
+                                return InkWell(
+                                  onTap: () => _openVideoClip(clips, index - 1),
+                                  child: FutureBuilder<String?>(
+                                    future: index <= 2
+                                        ? _homeVideoPrefetchService
+                                            .prefetchVideo(
+                                            clip.videoUrl,
+                                          )
+                                        : _homeVideoPrefetchService
+                                            .getCachedPath(
+                                            clip.videoUrl,
+                                          ),
+                                    builder: (context, previewSnapshot) {
+                                      final cachedPreviewPath =
+                                          previewSnapshot.data?.trim() ?? '';
+                                      return ClipCard(
+                                        title: _clipCardTitle(clip),
+                                        subtitle: _clipCardSubtitle(clip),
+                                        imagePath: cachedPreviewPath.isNotEmpty
+                                            ? cachedPreviewPath
+                                            : clip.videoUrl,
+                                        thumbnailPath: clip.thumbnailUrl,
+                                        forceVideoPreview: true,
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                      const HomeSectionHeader(title: 'บทความจิตวิทยา'),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        height: 210,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          clipBehavior: Clip.none,
+                          padding: EdgeInsets.zero,
+                          itemCount: _articleList.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 15),
+                          itemBuilder: (context, index) {
+                            final article = _articleList[index];
+                            return SizedBox(
+                              width: articleCardWidth,
+                              child: ArticleCard(
+                                title: article.title,
+                                subtitle: article.subtitle,
+                                imagePath: article.imagePath,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ArticleDetailPage(
+                                        title: article.detailTitle,
+                                        imagePath: article.detailImagePath,
+                                        content: article.content,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 50),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 50),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -702,6 +731,8 @@ class _ClipSourceSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: ClipRRect(
@@ -711,46 +742,51 @@ class _ClipSourceSheet extends StatelessWidget {
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              padding: EdgeInsets.fromLTRB(
+                scale.rs(24, min: 16, max: 24),
+                scale.rs(20, min: 16, max: 20),
+                scale.rs(24, min: 16, max: 24),
+                scale.rs(24, min: 20, max: 24),
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
                     child: Container(
-                      width: 45,
+                      width: scale.rs(45, min: 36, max: 46),
                       height: 5,
-                      margin: const EdgeInsets.only(bottom: 16),
+                      margin: EdgeInsets.only(bottom: scale.rs(16, min: 12, max: 16)),
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                   ),
-                  const Text(
+                  Text(
                     'เพิ่มคลิปวิดีโอ',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: scale.rf(18, min: 16, max: 19),
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF4489D7),
+                      color: const Color(0xFF4489D7),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: scale.rs(6, min: 4, max: 7)),
                   Text(
                     'เลือกว่าจะอัดวิดีโอใหม่หรือใช้คลิปที่มีอยู่แล้ว',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: scale.rf(14, min: 12.5, max: 14.5),
                       color: Colors.black.withValues(alpha: 0.65),
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: scale.rs(18, min: 14, max: 18)),
                   _ClipSourceActionTile(
                     icon: Icons.videocam_rounded,
                     title: 'ถ่ายวิดีโอ',
                     subtitle: 'เปิดกล้องเพื่ออัดคลิปแล้วนำมาโพสต์',
                     onTap: () => Navigator.of(context).pop(ImageSource.camera),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: scale.rs(12, min: 10, max: 12)),
                   _ClipSourceActionTile(
                     icon: Icons.video_library_rounded,
                     title: 'เลือกจากคลัง',

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -252,72 +253,87 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
       builder: (sheetContext) {
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
-            child: Obx(
-              () {
-                final selectedAvatar = _avatarController.avatarUrl.value;
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+              final crossAxisCount = constraints.maxWidth < 360 ? 3 : 4;
+              final spacing = scale.rs(14, min: 10, max: 14);
 
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'เลือกรูปโปรไฟล์',
-                      style: GoogleFonts.mitr(
-                        textStyle: const TextStyle(
-                          color: Color(0xFF4489D7),
-                          fontSize: 20,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _avatarController.avatarOptions.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 4,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                      ),
-                      itemBuilder: (context, index) {
-                        final avatarPath =
-                            _avatarController.avatarOptions[index];
-                        final isSelected = selectedAvatar == avatarPath;
+              return Padding(
+                padding: EdgeInsets.fromLTRB(
+                  scale.rs(24, min: 16, max: 24),
+                  scale.rs(20, min: 16, max: 20),
+                  scale.rs(24, min: 16, max: 24),
+                  scale.rs(28, min: 20, max: 28),
+                ),
+                child: Obx(
+                  () {
+                    final selectedAvatar = _avatarController.avatarUrl.value;
 
-                        return GestureDetector(
-                          onTap: () async {
-                            await _avatarController.saveAvatar(avatarPath);
-                            _didChangeProfile = true;
-                            if (sheetContext.mounted) {
-                              Navigator.of(sheetContext).pop();
-                            }
-                          },
-                          child: Container(
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? const Color(0xFF4489D7)
-                                    : Colors.transparent,
-                                width: 3,
-                              ),
-                            ),
-                            padding: const EdgeInsets.all(4),
-                            child: CircleAvatar(
-                              backgroundImage: AssetImage(avatarPath),
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'เลือกรูปโปรไฟล์',
+                          style: GoogleFonts.mitr(
+                            textStyle: TextStyle(
+                              color: const Color(0xFF4489D7),
+                              fontSize: scale.rf(20, min: 17, max: 20),
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                        );
-                      },
-                    ),
-                  ],
-                );
-              },
-            ),
+                        ),
+                        SizedBox(height: scale.rs(18, min: 12, max: 18)),
+                        GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _avatarController.avatarOptions.length,
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            crossAxisSpacing: spacing,
+                            mainAxisSpacing: spacing,
+                          ),
+                          itemBuilder: (context, index) {
+                            final avatarPath =
+                                _avatarController.avatarOptions[index];
+                            final isSelected = selectedAvatar == avatarPath;
+
+                            return GestureDetector(
+                              onTap: () async {
+                                await _avatarController.saveAvatar(avatarPath);
+                                _didChangeProfile = true;
+                                if (sheetContext.mounted) {
+                                  Navigator.of(sheetContext).pop();
+                                }
+                              },
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? const Color(0xFF4489D7)
+                                        : Colors.transparent,
+                                    width: scale.rs(3, min: 2, max: 3),
+                                  ),
+                                ),
+                                padding: EdgeInsets.all(
+                                  scale.rs(4, min: 2, max: 4),
+                                ),
+                                child: CircleAvatar(
+                                  backgroundImage: AssetImage(avatarPath),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              );
+            },
           ),
         );
       },
@@ -349,6 +365,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   Widget build(BuildContext context) {
+    final appScale = context.responsive;
+
     return PopScope<void>(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -362,22 +380,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leadingWidth: 44,
+          leadingWidth: appScale.rs(44, min: 38, max: 44),
           titleSpacing: 0,
           leading: IconButton(
             onPressed: () => Get.back(result: _didChangeProfile),
-            icon: const Icon(
+            icon: Icon(
               Icons.arrow_back_ios_new_rounded,
-              color: Color(0xFF7E7E7E),
-              size: 24,
+              color: const Color(0xFF7E7E7E),
+              size: appScale.rs(24, min: 20, max: 24),
             ),
           ),
           title: Text(
             'แก้ไขข้อมูล',
             style: GoogleFonts.mitr(
-              textStyle: const TextStyle(
-                color: Color(0xFF4B88D8),
-                fontSize: 24,
+              textStyle: TextStyle(
+                color: const Color(0xFF4B88D8),
+                fontSize: appScale.rf(24, min: 20, max: 24),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -386,236 +404,288 @@ class _EditProfilePageState extends State<EditProfilePage> {
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(28, 8, 28, 40),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 18),
-                      Obx(
-                        () => Stack(
-                          clipBehavior: Clip.none,
-                          children: [
-                            CircleAvatar(
-                              radius: 100,
-                              backgroundColor: Colors.grey.shade200,
-                              backgroundImage:
-                                  _avatarController.avatarImageProvider,
-                            ),
-                            Positioned(
-                              right: 0,
-                              bottom: 8,
-                              child: GestureDetector(
-                                onTap: _showAvatarPicker,
-                                child: Container(
-                                  width: 52,
-                                  height: 52,
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFE0E0E0),
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black
-                                            .withValues(alpha: 0.12),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 3),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final scale =
+                        ResponsiveScale.fromWidth(constraints.maxWidth);
+                    final horizontalPadding = constraints.maxWidth < 360
+                        ? scale.rs(16, min: 14, max: 18)
+                        : scale.rs(28, min: 20, max: 28);
+                    final avatarRadius = scale.rs(100, min: 72, max: 100);
+                    final actionSize = scale.rs(52, min: 40, max: 52);
+                    final titleSize = scale.rf(28, min: 22, max: 28);
+                    final editIconSize = scale.rs(28, min: 22, max: 28);
+
+                    return Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        child: SingleChildScrollView(
+                          padding: EdgeInsets.fromLTRB(
+                            horizontalPadding,
+                            scale.rs(8, min: 6, max: 8),
+                            horizontalPadding,
+                            scale.rs(40, min: 24, max: 40),
+                          ),
+                          child: Column(
+                            children: [
+                              SizedBox(height: scale.rs(18, min: 12, max: 18)),
+                              Obx(
+                                () => Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: avatarRadius,
+                                      backgroundColor: Colors.grey.shade200,
+                                      backgroundImage:
+                                          _avatarController.avatarImageProvider,
+                                    ),
+                                    Positioned(
+                                      right: 0,
+                                      bottom: scale.rs(8, min: 4, max: 8),
+                                      child: GestureDetector(
+                                        onTap: _showAvatarPicker,
+                                        child: Container(
+                                          width: actionSize,
+                                          height: actionSize,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFE0E0E0),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withValues(alpha: 0.12),
+                                                blurRadius:
+                                                    scale.rs(8, min: 6, max: 8),
+                                                offset: const Offset(0, 3),
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            Icons.sync_alt_rounded,
+                                            color: const Color(0xFF8A8A8A),
+                                            size:
+                                                scale.rs(28, min: 21, max: 28),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(height: scale.rs(28, min: 20, max: 28)),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  if (_activeField == 'name')
+                                    SizedBox(
+                                      width: scale.rs(180, min: 138, max: 190),
+                                      child: TextField(
+                                        controller: _nameController,
+                                        autofocus: true,
+                                        textAlign: TextAlign.center,
+                                        style: GoogleFonts.mitr(
+                                          textStyle: TextStyle(
+                                            color: const Color(0xFF4B88D8),
+                                            fontSize: titleSize,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        decoration: const InputDecoration(
+                                          border: InputBorder.none,
+                                          isDense: true,
+                                        ),
+                                      ),
+                                    )
+                                  else
+                                    Text(
+                                      _username,
+                                      style: GoogleFonts.mitr(
+                                        textStyle: TextStyle(
+                                          color: const Color(0xFF4B88D8),
+                                          fontSize: titleSize,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  SizedBox(width: scale.rs(8, min: 6, max: 8)),
+                                  GestureDetector(
+                                    onTap: () => _activateField('name'),
+                                    child: Icon(
+                                      Icons.edit,
+                                      color: const Color(0xFF8A8A8A),
+                                      size: editIconSize,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: scale.rs(30, min: 20, max: 30)),
+                              _buildInfoCard(
+                                scale: scale,
+                                label: 'เพศ :',
+                                value: _displayGender(_gender),
+                                fieldKey: 'gender',
+                                icon: Icons.edit,
+                              ),
+                              if (_activeField == 'gender')
+                                Padding(
+                                  padding: EdgeInsets.only(
+                                    top: scale.rs(14, min: 10, max: 14),
+                                    bottom: scale.rs(4, min: 2, max: 4),
+                                  ),
+                                  child: Wrap(
+                                    alignment: WrapAlignment.center,
+                                    spacing: scale.rs(18, min: 10, max: 18),
+                                    runSpacing: scale.rs(10, min: 6, max: 10),
+                                    children: [
+                                      _buildGenderChip('male', 'ชาย', scale),
+                                      _buildGenderChip('female', 'หญิง', scale),
+                                      _buildGenderChip(
+                                        'other',
+                                        'LGBTQ+',
+                                        scale,
                                       ),
                                     ],
                                   ),
-                                  child: const Icon(
-                                    Icons.sync_alt_rounded,
-                                    color: Color(0xFF8A8A8A),
-                                    size: 28,
+                                ),
+                              SizedBox(height: scale.rs(18, min: 12, max: 18)),
+                              _buildInfoCard(
+                                scale: scale,
+                                label: 'วันเกิด :',
+                                value: _birthDate == null
+                                    ? 'ยังไม่ได้เลือก'
+                                    : DateFormat('dd/MM/yyyy')
+                                        .format(_birthDate!),
+                                fieldKey: 'birth',
+                                icon: Icons.calendar_month_outlined,
+                                onIconTap: _selectBirthDate,
+                              ),
+                              SizedBox(height: scale.rs(18, min: 12, max: 18)),
+                              _buildInfoCard(
+                                scale: scale,
+                                label: 'รหัส :',
+                                value: _activeField == 'password'
+                                    ? null
+                                    : (_passwordController.text.trim().isEmpty
+                                        ? '******'
+                                        : _passwordController.text.trim()),
+                                fieldKey: 'password',
+                                icon: Icons.edit,
+                                editor: TextField(
+                                  controller: _passwordController,
+                                  autofocus: true,
+                                  obscureText: true,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.allow(
+                                      RegExp(
+                                          r'[a-zA-Z0-9!@#\$%\^&\*\(\)_\+\-=]'),
+                                    ),
+                                  ],
+                                  style: _cardTextStyle(scale),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                    hintText: 'กรอกรหัสผ่านใหม่',
                                   ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          if (_activeField == 'name')
-                            SizedBox(
-                              width: 180,
-                              child: TextField(
-                                controller: _nameController,
-                                autofocus: true,
-                                textAlign: TextAlign.center,
-                                style: GoogleFonts.mitr(
-                                  textStyle: const TextStyle(
-                                    color: Color(0xFF4B88D8),
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w600,
+                              SizedBox(height: scale.rs(18, min: 12, max: 18)),
+                              _buildInfoCard(
+                                scale: scale,
+                                label: 'อีเมล :',
+                                value: _activeField == 'email'
+                                    ? null
+                                    : _maskEmail(_email),
+                                fieldKey: 'email',
+                                icon: Icons.edit,
+                                editor: TextField(
+                                  controller: _emailController,
+                                  autofocus: true,
+                                  keyboardType: TextInputType.emailAddress,
+                                  style: _cardTextStyle(scale),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    isDense: true,
                                   ),
                                 ),
-                                decoration: const InputDecoration(
-                                  border: InputBorder.none,
-                                  isDense: true,
+                              ),
+                              SizedBox(height: scale.rs(18, min: 12, max: 18)),
+                              _buildInfoCard(
+                                scale: scale,
+                                label: 'เบอร์โทรศัพท์ :',
+                                value: _activeField == 'phone'
+                                    ? null
+                                    : _maskPhone(_phone),
+                                fieldKey: 'phone',
+                                icon: Icons.edit,
+                                editor: TextField(
+                                  controller: _phoneController,
+                                  autofocus: true,
+                                  keyboardType: TextInputType.phone,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  style: _cardTextStyle(scale),
+                                  decoration: const InputDecoration(
+                                    border: InputBorder.none,
+                                    isDense: true,
+                                  ),
                                 ),
                               ),
-                            )
-                          else
-                            Text(
-                              _username,
-                              style: GoogleFonts.mitr(
-                                textStyle: const TextStyle(
-                                  color: Color(0xFF4B88D8),
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.w600,
+                              if (_activeField != null) ...[
+                                SizedBox(
+                                  height: scale.rs(30, min: 20, max: 30),
                                 ),
-                              ),
-                            ),
-                          const SizedBox(width: 8),
-                          GestureDetector(
-                            onTap: () => _activateField('name'),
-                            child: const Icon(
-                              Icons.edit,
-                              color: Color(0xFF8A8A8A),
-                              size: 28,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 30),
-                      _buildInfoCard(
-                        label: 'เพศ :',
-                        value: _displayGender(_gender),
-                        fieldKey: 'gender',
-                        icon: Icons.edit,
-                      ),
-                      if (_activeField == 'gender')
-                        Padding(
-                          padding: const EdgeInsets.only(top: 14, bottom: 4),
-                          child: Wrap(
-                            alignment: WrapAlignment.center,
-                            spacing: 18,
-                            runSpacing: 10,
-                            children: [
-                              _buildGenderChip('male', 'ชาย'),
-                              _buildGenderChip('female', 'หญิง'),
-                              _buildGenderChip('other', 'LGBTQ+'),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: ElevatedButton(
+                                    onPressed:
+                                        _isSaving ? null : _saveActiveField,
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFF2D4983),
+                                      foregroundColor: Colors.white,
+                                      elevation: 0,
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal:
+                                            scale.rs(28, min: 20, max: 28),
+                                        vertical: scale.rs(10, min: 8, max: 10),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          scale.rs(22, min: 18, max: 22),
+                                        ),
+                                      ),
+                                    ),
+                                    child: _isSaving
+                                        ? SizedBox(
+                                            width:
+                                                scale.rs(18, min: 14, max: 18),
+                                            height:
+                                                scale.rs(18, min: 14, max: 18),
+                                            child:
+                                                const CircularProgressIndicator(
+                                              strokeWidth: 2.2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : Text(
+                                            'บันทึก',
+                                            style: GoogleFonts.mitr(
+                                              textStyle: TextStyle(
+                                                fontSize: scale.rf(18,
+                                                    min: 15, max: 18),
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
-                      const SizedBox(height: 18),
-                      _buildInfoCard(
-                        label: 'วันเกิด :',
-                        value: _birthDate == null
-                            ? 'ยังไม่ได้เลือก'
-                            : DateFormat('dd/MM/yyyy').format(_birthDate!),
-                        fieldKey: 'birth',
-                        icon: Icons.calendar_month_outlined,
-                        onIconTap: _selectBirthDate,
                       ),
-                      const SizedBox(height: 18),
-                      _buildInfoCard(
-                        label: 'รหัส :',
-                        value: _activeField == 'password'
-                            ? null
-                            : (_passwordController.text.trim().isEmpty
-                                ? '******'
-                                : _passwordController.text.trim()),
-                        fieldKey: 'password',
-                        icon: Icons.edit,
-                        editor: TextField(
-                          controller: _passwordController,
-                          autofocus: true,
-                          obscureText: true,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.allow(
-                              RegExp(r'[a-zA-Z0-9!@#\$%\^&\*\(\)_\+\-=]'),
-                            ),
-                          ],
-                          style: _cardTextStyle(),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                            hintText: 'กรอกรหัสผ่านใหม่',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      _buildInfoCard(
-                        label: 'อีเมล :',
-                        value:
-                            _activeField == 'email' ? null : _maskEmail(_email),
-                        fieldKey: 'email',
-                        icon: Icons.edit,
-                        editor: TextField(
-                          controller: _emailController,
-                          autofocus: true,
-                          keyboardType: TextInputType.emailAddress,
-                          style: _cardTextStyle(),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      _buildInfoCard(
-                        label: 'เบอร์โทรศัพท์ :',
-                        value:
-                            _activeField == 'phone' ? null : _maskPhone(_phone),
-                        fieldKey: 'phone',
-                        icon: Icons.edit,
-                        editor: TextField(
-                          controller: _phoneController,
-                          autofocus: true,
-                          keyboardType: TextInputType.phone,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                          ],
-                          style: _cardTextStyle(),
-                          decoration: const InputDecoration(
-                            border: InputBorder.none,
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      if (_activeField != null) ...[
-                        const SizedBox(height: 30),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _saveActiveField,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF2D4983),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 28,
-                                vertical: 10,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(22),
-                              ),
-                            ),
-                            child: _isSaving
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : Text(
-                                    'บันทึก',
-                                    style: GoogleFonts.mitr(
-                                      textStyle: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
       ),
@@ -623,6 +693,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildInfoCard({
+    required ResponsiveScale scale,
     required String label,
     required String fieldKey,
     required IconData icon,
@@ -634,16 +705,21 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 78),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      constraints: BoxConstraints(
+        minHeight: scale.rs(78, min: 64, max: 78),
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: scale.rs(18, min: 12, max: 18),
+        vertical: scale.rs(18, min: 12, max: 18),
+      ),
       decoration: BoxDecoration(
         color: const Color(0xFFBFE8FF),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(scale.rs(26, min: 18, max: 26)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.14),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+            blurRadius: scale.rs(8, min: 6, max: 8),
+            offset: Offset(0, scale.rs(4, min: 2, max: 4)),
           ),
         ],
       ),
@@ -652,20 +728,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
           Text(
             label,
             style: GoogleFonts.mitr(
-              textStyle: const TextStyle(
-                color: Color(0xFF4B88D8),
-                fontSize: 18,
+              textStyle: TextStyle(
+                color: const Color(0xFF4B88D8),
+                fontSize: scale.rf(18, min: 15, max: 18),
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: scale.rs(16, min: 10, max: 16)),
           Expanded(
             child: isActive && editor != null
                 ? editor
                 : Text(
                     value ?? '',
-                    style: _cardTextStyle(),
+                    style: _cardTextStyle(scale),
                   ),
           ),
           GestureDetector(
@@ -673,7 +749,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             child: Icon(
               icon,
               color: const Color(0xFF8A8A8A),
-              size: 34,
+              size: scale.rs(34, min: 25, max: 34),
             ),
           ),
         ],
@@ -681,16 +757,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget _buildGenderChip(String value, String label) {
+  Widget _buildGenderChip(String value, String label, ResponsiveScale scale) {
     final isSelected = _gender == value;
     return GestureDetector(
       onTap: () => setState(() => _gender = value),
       child: Container(
-        constraints: const BoxConstraints(minWidth: 98),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 9),
+        constraints: BoxConstraints(minWidth: scale.rs(98, min: 86, max: 98)),
+        padding: EdgeInsets.symmetric(
+          horizontal: scale.rs(18, min: 12, max: 18),
+          vertical: scale.rs(9, min: 6, max: 9),
+        ),
         decoration: BoxDecoration(
           color: isSelected ? const Color(0xFF8ED5FF) : Colors.white,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(scale.rs(22, min: 16, max: 22)),
           border: Border.all(
             color:
                 isSelected ? const Color(0xFF7FBFDD) : const Color(0xFF8D8D8D),
@@ -703,7 +782,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           style: GoogleFonts.mitr(
             textStyle: TextStyle(
               color: const Color(0xFF8A8A8A),
-              fontSize: 15,
+              fontSize: scale.rf(15, min: 13, max: 15),
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -712,11 +791,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  TextStyle _cardTextStyle() {
+  TextStyle _cardTextStyle(ResponsiveScale scale) {
     return GoogleFonts.mitr(
-      textStyle: const TextStyle(
-        color: Color(0xFF4B88D8),
-        fontSize: 18,
+      textStyle: TextStyle(
+        color: const Color(0xFF4B88D8),
+        fontSize: scale.rf(18, min: 15, max: 18),
         fontWeight: FontWeight.w500,
       ),
     );

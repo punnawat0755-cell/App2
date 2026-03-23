@@ -1451,27 +1451,41 @@ class ProfilePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Obx(() {
-          if (!controller.isProfileReady.value) {
-            return const Center(child: CircularProgressIndicator());
-          }
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = constraints.maxWidth < 360 ? 14.0 : 20.0;
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildHeader(controller, avatarController),
-                const SizedBox(height: 25),
-                if (controller.showsStressMenu)
-                  _buildStressContent(controller)
-                else
-                  _buildMenstrualContent(controller),
-                const SizedBox(height: 40),
-              ],
-            ),
-          );
-        }),
+            return Obx(() {
+              if (!controller.isProfileReady.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              return Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 620),
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: 20,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeader(controller, avatarController),
+                        const SizedBox(height: 25),
+                        if (controller.showsStressMenu)
+                          _buildStressContent(controller)
+                        else
+                          _buildMenstrualContent(controller),
+                        const SizedBox(height: 40),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            });
+          },
+        ),
       ),
     );
   }

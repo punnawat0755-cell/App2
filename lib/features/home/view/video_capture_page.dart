@@ -462,10 +462,21 @@ class _VideoCapturePageState extends State<VideoCapturePage>
       );
     }
 
-    return Center(
-      child: AspectRatio(
-        aspectRatio: controller.value.aspectRatio,
-        child: CameraPreview(controller),
+    final previewSize = controller.value.previewSize;
+    if (previewSize == null) {
+      return CameraPreview(controller);
+    }
+
+    return ClipRect(
+      child: SizedBox.expand(
+        child: FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: previewSize.height,
+            height: previewSize.width,
+            child: CameraPreview(controller),
+          ),
+        ),
       ),
     );
   }

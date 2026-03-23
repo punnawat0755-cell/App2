@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
@@ -261,8 +262,9 @@ class _RegisterPageState extends State<RegisterPage> {
     required VoidCallback? onPressed,
     required bool loading,
   }) {
+    final scale = context.responsive;
     return SizedBox(
-      height: 55,
+      height: scale.rs(55, min: 50, max: 56),
       width: double.infinity,
       child: ElevatedButton(
         onPressed: onPressed,
@@ -281,8 +283,8 @@ class _RegisterPageState extends State<RegisterPage> {
               )
             : Text(
                 text,
-                style: const TextStyle(
-                  fontSize: 20,
+                style: TextStyle(
+                  fontSize: scale.rf(20, min: 17.5, max: 20.5),
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
@@ -296,111 +298,125 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
-              child: Column(
-                children: [
-                  const SizedBox(height: 10),
-                  const Text(
-                    'สร้างบัญชีใหม่',
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: _mainBlue,
-                    ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final horizontalPadding = constraints.maxWidth < 360 ? 18.0 : 28.0;
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: 20,
                   ),
-                  const SizedBox(height: 30),
-                  _buildInputLabel('ชื่อผู้ใช้งาน', isRequired: true),
-                  _buildTextField(
-                      controller: _usernameController, hint: 'แมวน้ำ'),
-                  _buildInputLabel('วันเกิด', isRequired: true),
-                  _buildTextField(
-                    controller: _birthdayController,
-                    hint: '17/12/2004',
-                    readOnly: true,
-                    onTap: _pickBirthday,
-                    suffixIcon: Icons.calendar_today_outlined,
-                    suffix: IconButton(
-                      onPressed: _pickBirthday,
-                      icon: const Icon(Icons.calendar_today_outlined,
-                          color: Colors.grey),
-                    ),
-                  ),
-                  _buildInputLabel('เพศ', isRequired: true),
-                  Row(
+                  child: Column(
                     children: [
-                      _sexButton('Male'),
-                      const SizedBox(width: 10),
-                      _sexButton('Female'),
-                      const SizedBox(width: 10),
-                      _sexButton('None'),
-                    ],
-                  ),
-                  _buildInputLabel('อีเมล'),
-                  _buildTextField(
-                    controller: _emailController,
-                    hint: '',
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  _buildInputLabel('เบอร์โทรศัพท์'),
-                  _buildTextField(
-                    controller: _phoneController,
-                    hint: '',
-                    keyboardType: TextInputType.phone,
-                  ),
-                  _buildInputLabel('รหัสผ่าน', isRequired: true),
-                  _buildTextField(
-                    controller: _passwordController,
-                    hint: '',
-                    obscure: _hidePw,
-                    suffix: IconButton(
-                      onPressed: () => setState(() => _hidePw = !_hidePw),
-                      icon: Icon(
-                        _hidePw ? Icons.visibility : Icons.visibility_off,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-                  _primaryButton(
-                    text: 'ลงทะเบียน',
-                    onPressed: _isLoading ? null : _register,
-                    loading: _isLoading,
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Text(
-                        'มีบัญชีอยู่แล้ว? ',
-                        style: TextStyle(color: Colors.grey, fontSize: 14),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LoginPage()),
+                      const SizedBox(height: 10),
+                      Text(
+                        'สร้างบัญชีใหม่',
+                        style: TextStyle(
+                          fontSize: scale.rf(28, min: 24, max: 28),
+                          fontWeight: FontWeight.bold,
+                          color: _mainBlue,
                         ),
-                        child: const Text(
-                          'เข้าสู่ระบบ',
-                          style: TextStyle(
-                            color: _lightBlue,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            decoration: TextDecoration.underline,
-                            decorationColor: _lightBlue,
+                      ),
+                      const SizedBox(height: 30),
+                      _buildInputLabel('ชื่อผู้ใช้งาน', isRequired: true),
+                      _buildTextField(
+                          controller: _usernameController, hint: 'แมวน้ำ'),
+                      _buildInputLabel('วันเกิด', isRequired: true),
+                      _buildTextField(
+                        controller: _birthdayController,
+                        hint: '17/12/2004',
+                        readOnly: true,
+                        onTap: _pickBirthday,
+                        suffixIcon: Icons.calendar_today_outlined,
+                        suffix: IconButton(
+                          onPressed: _pickBirthday,
+                          icon: const Icon(
+                            Icons.calendar_today_outlined,
+                            color: Colors.grey,
                           ),
                         ),
                       ),
+                      _buildInputLabel('เพศ', isRequired: true),
+                      Row(
+                        children: [
+                          _sexButton('Male'),
+                          const SizedBox(width: 10),
+                          _sexButton('Female'),
+                          const SizedBox(width: 10),
+                          _sexButton('None'),
+                        ],
+                      ),
+                      _buildInputLabel('อีเมล'),
+                      _buildTextField(
+                        controller: _emailController,
+                        hint: '',
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      _buildInputLabel('เบอร์โทรศัพท์'),
+                      _buildTextField(
+                        controller: _phoneController,
+                        hint: '',
+                        keyboardType: TextInputType.phone,
+                      ),
+                      _buildInputLabel('รหัสผ่าน', isRequired: true),
+                      _buildTextField(
+                        controller: _passwordController,
+                        hint: '',
+                        obscure: _hidePw,
+                        suffix: IconButton(
+                          onPressed: () => setState(() => _hidePw = !_hidePw),
+                          icon: Icon(
+                            _hidePw ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 40),
+                      _primaryButton(
+                        text: 'ลงทะเบียน',
+                        onPressed: _isLoading ? null : _register,
+                        loading: _isLoading,
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            'มีบัญชีอยู่แล้ว? ',
+                            style: TextStyle(color: Colors.grey, fontSize: 14),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const LoginPage(),
+                              ),
+                            ),
+                            child: const Text(
+                              'เข้าสู่ระบบ',
+                              style: TextStyle(
+                                color: _lightBlue,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                decoration: TextDecoration.underline,
+                                decorationColor: _lightBlue,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         ),
       ),
     );

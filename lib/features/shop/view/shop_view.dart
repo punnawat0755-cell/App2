@@ -38,164 +38,182 @@ class ShopPage extends StatelessWidget {
       body: SafeArea(
         top: false,
         bottom: false,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // -------------------------------------------------------
-              // 1. Banner
-              // -------------------------------------------------------
-              Image.asset(
-                'assets/images/shop1.png',
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: double.infinity,
-                  height: 120,
-                  color: const Color(0xFF8D6E63),
-                  child: const Center(
-                    child: Text(
-                      "BANNER IMAGE",
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final horizontalPadding = constraints.maxWidth < 360 ? 14.0 : 20.0;
+            final isCompact = constraints.maxWidth < 360;
+            final crossAxisCount = isCompact ? 2 : 3;
+            final crossAxisSpacing = isCompact ? 10.0 : 15.0;
 
-              const SizedBox(height: 20),
-
-              // -------------------------------------------------------
-              // 2. Header
-              // -------------------------------------------------------
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                height: 50,
-                child: Stack(
-                  children: [
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 24,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFCEEFFE),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: const Color(0xFF4489D7),
-                            width: 2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 4),
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // -------------------------------------------------------
+                      // 1. Banner
+                      // -------------------------------------------------------
+                      Image.asset(
+                        'assets/images/shop1.png',
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: double.infinity,
+                          height: 120,
+                          color: const Color(0xFF8D6E63),
+                          child: const Center(
+                            child: Text(
+                              "BANNER IMAGE",
+                              style: TextStyle(color: Colors.white),
                             ),
-                          ],
-                        ),
-                        child: const Text(
-                          "Fish Shop",
-                          style: TextStyle(
-                            color: Color(0xFF4489D7),
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
                           ),
                         ),
                       ),
-                    ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        InkWell(
-                          onTap: () => Get.back(),
-                          child: Image.asset(
-                            'assets/images/back.png',
-                            width: 25,
-                            height: 25,
-                            fit: BoxFit.contain,
-                          ),
+                      const SizedBox(height: 20),
+                      // -------------------------------------------------------
+                      // 2. Header
+                      // -------------------------------------------------------
+                      Container(
+                        margin: EdgeInsets.symmetric(
+                          horizontal: horizontalPadding,
+                          vertical: 8,
                         ),
-                        Transform.translate(
-                          offset: const Offset(0, -15),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFA600),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Image.asset(
-                                  'assets/images/coin2.png',
-                                  width: 20,
-                                  height: 20,
-                                  fit: BoxFit.contain,
+                        height: 50,
+                        child: Stack(
+                          children: [
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 8,
                                 ),
-                                const SizedBox(width: 5),
-                                Obx(
-                                  () => Text(
-                                    "${controller.coins}",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFCEEFFE),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: const Color(0xFF4489D7),
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.1),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ],
+                                ),
+                                child: const Text(
+                                  "Fish Shop",
+                                  style: TextStyle(
+                                    color: Color(0xFF4489D7),
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 18,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                InkWell(
+                                  onTap: () => Get.back(),
+                                  child: Image.asset(
+                                    'assets/images/back.png',
+                                    width: 25,
+                                    height: 25,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                Transform.translate(
+                                  offset: const Offset(0, -15),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFA600),
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Image.asset(
+                                          'assets/images/coin2.png',
+                                          width: 20,
+                                          height: 20,
+                                          fit: BoxFit.contain,
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Obx(
+                                          () => Text(
+                                            "${controller.coins}",
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ],
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // -------------------------------------------------------
-              // 3. Grid สินค้า (Updated)
-              // -------------------------------------------------------
-              Padding(
-                padding: const EdgeInsets.fromLTRB(35, 18, 35, 25),
-                child: GridView.builder(
-                  padding: EdgeInsets.zero,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    childAspectRatio: 0.90,
-                    crossAxisSpacing: 15,
-                    mainAxisSpacing: 10,
+                      ),
+                      // -------------------------------------------------------
+                      // 3. Grid สินค้า
+                      // -------------------------------------------------------
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          horizontalPadding,
+                          18,
+                          horizontalPadding,
+                          25,
+                        ),
+                        child: GridView.builder(
+                          padding: EdgeInsets.zero,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: crossAxisCount,
+                            childAspectRatio: 0.90,
+                            crossAxisSpacing: crossAxisSpacing,
+                            mainAxisSpacing: 10,
+                          ),
+                          itemCount: shopItems.length,
+                          itemBuilder: (context, index) {
+                            return _buildShopItemCard(
+                              index,
+                              shopItems[index],
+                              controller,
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      // -------------------------------------------------------
+                      // 4. Footer Image
+                      // -------------------------------------------------------
+                      Image.asset(
+                        'assets/images/shop2.png',
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, o, s) =>
+                            Container(height: 80, color: Colors.grey[300]),
+                      ),
+                    ],
                   ),
-                  itemCount: shopItems.length,
-                  itemBuilder: (context, index) {
-                    // ส่งข้อมูลทั้งหมดไปให้ Widget สร้างการ์ด
-                    return _buildShopItemCard(
-                      index,
-                      shopItems[index],
-                      controller,
-                    );
-                  },
                 ),
               ),
-
-              const SizedBox(height: 2),
-
-              // -------------------------------------------------------
-              // 4. Footer Image
-              // -------------------------------------------------------
-              Image.asset(
-                'assets/images/shop2.png',
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (c, o, s) =>
-                    Container(height: 80, color: Colors.grey[300]),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
