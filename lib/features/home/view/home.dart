@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:video_player/video_player.dart';
 
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
@@ -11,13 +12,14 @@ import 'package:flutter_application_1/features/home/service/home_video_prefetch_
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/home/view/play_video_page.dart';
+import 'package:flutter_application_1/features/home/view/video_preview_controller_factory.dart';
 import 'package:flutter_application_1/features/home/view/video_capture_page.dart';
 import 'package:flutter_application_1/features/home/view/widgets/article/article_card.dart';
 import 'package:flutter_application_1/features/home/view/widgets/article/article_detail.dart';
 import 'package:flutter_application_1/features/home/view/widgets/home_widgets.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/setting/view/setting.dart';
-import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -244,7 +246,11 @@ class _HomePageState extends State<HomePage> {
       final suggestedCaption = source == ImageSource.camera
           ? ''
           : _fileNameWithoutExtension(file.name);
-      final caption = await _promptClipCaption(suggestedCaption);
+      final caption = await _promptClipCaption(
+        initialValue: suggestedCaption,
+        videoFileName: file.name,
+        videoFilePath: file.path,
+      );
       if (!mounted || caption == null) {
         return;
       }
@@ -359,13 +365,28 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Future<String?> _promptClipCaption(String initialValue) async {
+  ImageProvider<Object> _composerAvatarImageProvider() {
+    final avatarController = Get.isRegistered<ProfileAvatarController>()
+        ? Get.find<ProfileAvatarController>()
+        : Get.put(ProfileAvatarController());
+    return avatarController.avatarImageProvider;
+  }
+
+  Future<String?> _promptClipCaption({
+    required String initialValue,
+    required String videoFileName,
+    required String videoFilePath,
+  }) async {
     return showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ClipCaptionSheet(
         initialValue: initialValue,
+        composerName: _displayName.trim().isEmpty ? 'ผู้ใช้' : _displayName,
+        avatarImageProvider: _composerAvatarImageProvider(),
+        videoFileName: videoFileName,
+        videoFilePath: videoFilePath,
       ),
     );
   }
@@ -824,9 +845,17 @@ class _ClipSourceActionTile extends StatelessWidget {
 class _ClipCaptionSheet extends StatefulWidget {
   const _ClipCaptionSheet({
     required this.initialValue,
+    required this.composerName,
+    required this.avatarImageProvider,
+    required this.videoFileName,
+    required this.videoFilePath,
   });
 
   final String initialValue;
+  final String composerName;
+  final ImageProvider<Object> avatarImageProvider;
+  final String videoFileName;
+  final String videoFilePath;
 
   @override
   State<_ClipCaptionSheet> createState() => _ClipCaptionSheetState();
@@ -835,11 +864,17 @@ class _ClipCaptionSheet extends StatefulWidget {
 class _ClipCaptionSheetState extends State<_ClipCaptionSheet> {
   late final TextEditingController _controller;
   final FocusNode _focusNode = FocusNode();
+  VideoPlayerController? _previewController;
+  bool _isSubmitting = false;
+  bool _isPreviewLoading = true;
+  bool _isPreviewPlaying = false;
+  bool _isPreviewUnavailable = false;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialValue);
+    _initializeVideoPreview();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -848,14 +883,93 @@ class _ClipCaptionSheetState extends State<_ClipCaptionSheet> {
     });
   }
 
+  Future<void> _initializeVideoPreview() async {
+    final controller = createVideoPreviewController(widget.videoFilePath);
+    try {
+      await controller.setLooping(true);
+      await controller.initialize();
+      controller.addListener(_handlePreviewControllerChanged);
+
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
+
+      setState(() {
+        _previewController = controller;
+        _isPreviewLoading = false;
+        _isPreviewUnavailable = false;
+        _isPreviewPlaying = controller.value.isPlaying;
+      });
+    } catch (_) {
+      await controller.dispose();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _previewController = null;
+        _isPreviewLoading = false;
+        _isPreviewUnavailable = true;
+        _isPreviewPlaying = false;
+      });
+    }
+  }
+
+  void _handlePreviewControllerChanged() {
+    final controller = _previewController;
+    if (controller == null || !mounted) {
+      return;
+    }
+
+    final isPlaying = controller.value.isPlaying;
+    if (isPlaying != _isPreviewPlaying) {
+      setState(() => _isPreviewPlaying = isPlaying);
+    }
+  }
+
+  Future<void> _togglePreviewPlayback() async {
+    final controller = _previewController;
+    if (controller == null || !controller.value.isInitialized) {
+      return;
+    }
+
+    if (controller.value.isPlaying) {
+      await controller.pause();
+      return;
+    }
+
+    await controller.play();
+  }
+
+  void _removeSelectedVideo() {
+    if (_isSubmitting) {
+      return;
+    }
+    Navigator.of(context).pop();
+  }
+
+  double get _previewAspectRatio {
+    final ratio = _previewController?.value.aspectRatio ?? (9 / 16);
+    if (!ratio.isFinite || ratio <= 0) {
+      return 9 / 16;
+    }
+    return ratio;
+  }
+
   @override
   void dispose() {
+    _previewController?.removeListener(_handlePreviewControllerChanged);
+    unawaited(_previewController?.dispose());
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
   }
 
   void _submit() {
+    if (_isSubmitting) {
+      return;
+    }
+    setState(() => _isSubmitting = true);
     FocusScope.of(context).unfocus();
     final caption = _controller.text.trim();
     Navigator.of(context).pop(
@@ -866,75 +980,322 @@ class _ClipCaptionSheetState extends State<_ClipCaptionSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final canSubmit = !_isSubmitting;
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: Align(
-        alignment: Alignment.bottomCenter,
+      child: FractionallySizedBox(
+        heightFactor: 0.85,
         child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           child: Material(
             color: Colors.white,
             child: SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 45,
-                        height: 5,
-                        margin: const EdgeInsets.only(bottom: 16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(999),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 10),
+                      width: 45,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 15,
+                      vertical: 5,
+                    ),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: GestureDetector(
+                            onTap: () => Navigator.of(context).maybePop(),
+                            child: const Text(
+                              'Cancel',
+                              style: TextStyle(
+                                color: Color(0xFF8D8D8D),
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                    const Text(
-                      'เพิ่มคำบรรยายคลิป',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF4489D7),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      maxLines: 3,
-                      textInputAction: TextInputAction.done,
-                      onSubmitted: (_) => _submit(),
-                      decoration: InputDecoration(
-                        hintText: 'เช่น วันนี้ขอพักใจนิดนึง',
-                        filled: true,
-                        fillColor: const Color(0xFFF4FAFF),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          borderSide: BorderSide.none,
+                        const Text(
+                          'NewClip',
+                          style: TextStyle(
+                            color: Color(0xFF6C6C6C),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF4489D7),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  Divider(height: 1, thickness: 1, color: Colors.grey[200]),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            image: DecorationImage(
+                              image: widget.avatarImageProvider,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
                         ),
-                        onPressed: _submit,
-                        child: const Text('บันทึกคลิป'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            widget.composerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF6C6C6C),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.image_rounded,
+                            color: Colors.grey.shade600,
+                            size: 26,
+                          ),
+                          onPressed: null,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: TextField(
+                              focusNode: _focusNode,
+                              autofocus: true,
+                              controller: _controller,
+                              maxLines: null,
+                              maxLength: 120,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              style: const TextStyle(fontSize: 16),
+                              textInputAction: TextInputAction.newline,
+                              decoration: const InputDecoration(
+                                hintText: 'คุณกำลังคิดอะไรอยู่.....',
+                                hintStyle: TextStyle(
+                                  color: Color(0xFFCAC9C9),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                border: InputBorder.none,
+                                counterText: '',
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                            child: Center(
+                              child: ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 240),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(18),
+                                  child: AspectRatio(
+                                    aspectRatio: _previewAspectRatio,
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        if (_isPreviewLoading)
+                                          const ColoredBox(
+                                            color: Color(0xFFF1F1F1),
+                                            child: Center(
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Color(0xFF5CD9FF),
+                                              ),
+                                            ),
+                                          )
+                                        else if (_isPreviewUnavailable)
+                                          ColoredBox(
+                                            color: const Color(0xFFF1F1F1),
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: 14,
+                                              ),
+                                              child: Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    Icons.videocam_off_rounded,
+                                                    size: 34,
+                                                    color: Colors.grey.shade600,
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Text(
+                                                    widget.videoFileName,
+                                                    maxLines: 2,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      color:
+                                                          Colors.grey.shade700,
+                                                      fontSize: 12,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          )
+                                        else if (_previewController != null)
+                                          GestureDetector(
+                                            onTap: _togglePreviewPlayback,
+                                            child: VideoPlayer(
+                                              _previewController!,
+                                            ),
+                                          ),
+                                        Positioned(
+                                          top: 8,
+                                          right: 8,
+                                          child: Material(
+                                            color: Colors.black45,
+                                            shape: const CircleBorder(),
+                                            child: InkWell(
+                                              customBorder:
+                                                  const CircleBorder(),
+                                              onTap: _removeSelectedVideo,
+                                              child: const Padding(
+                                                padding: EdgeInsets.all(4),
+                                                child: Icon(
+                                                  Icons.close,
+                                                  color: Colors.white,
+                                                  size: 16,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        if (!_isPreviewLoading &&
+                                            !_isPreviewUnavailable &&
+                                            !_isPreviewPlaying)
+                                          Center(
+                                            child: Material(
+                                              color: Colors.white,
+                                              shape: const CircleBorder(),
+                                              child: InkWell(
+                                                customBorder:
+                                                    const CircleBorder(),
+                                                onTap: _togglePreviewPlayback,
+                                                child: const Padding(
+                                                  padding: EdgeInsets.all(12),
+                                                  child: Icon(
+                                                    Icons.play_arrow_rounded,
+                                                    size: 32,
+                                                    color: Colors.black87,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      right: 15,
+                      left: 15,
+                      top: 5,
+                      bottom: 12,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${_controller.text.length}/120',
+                              style: const TextStyle(
+                                color: Color(0xFFC3C3C3),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            GestureDetector(
+                              onTap: canSubmit ? _submit : null,
+                              child: AnimatedOpacity(
+                                duration: const Duration(milliseconds: 150),
+                                opacity: canSubmit ? 1 : 0.55,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 26,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF5CD9FF),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: _isSubmitting
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'POST',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
           ),

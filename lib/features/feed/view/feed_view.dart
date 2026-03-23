@@ -1,11 +1,12 @@
 import 'dart:async';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
 import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
+import 'package:flutter_application_1/features/feed/view/feed_photo_capture_page.dart';
 import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -506,8 +507,26 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
     super.dispose();
   }
 
+  Future<ImageSource?> _promptImageSource() async {
+    return showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const _FeedImageSourceSheet(),
+    );
+  }
+
+  Future<void> _waitForModalToClose() async {
+    await Future<void>.delayed(const Duration(milliseconds: 260));
+  }
+
   Future<void> _pickImage() async {
     if (_isPickingImage || _isSubmitting) {
+      return;
+    }
+
+    final source = await _promptImageSource();
+    if (!mounted || source == null) {
+      _focusNode.requestFocus();
       return;
     }
 
@@ -515,20 +534,31 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
     setState(() => _isPickingImage = true);
 
     try {
-      final image = await _imagePicker.pickImage(
-        source: ImageSource.gallery,
-        imageQuality: 88,
-        maxWidth: 2200,
-      );
+      final XFile? image;
+      if (source == ImageSource.camera && _usesInAppCameraPage) {
+        await _waitForModalToClose();
+        if (!mounted) {
+          return;
+        }
+        image = await Navigator.of(context).push<XFile>(
+          MaterialPageRoute(
+            builder: (_) => const FeedPhotoCapturePage(),
+          ),
+        );
+      } else {
+        image = await _imagePicker.pickImage(
+          source: source,
+          imageQuality: 88,
+          maxWidth: 2200,
+        );
+      }
 
-      if (image == null) {
-        if (!mounted) return;
-        setState(() => _isPickingImage = false);
-        _focusNode.requestFocus();
+      final selectedImage = image;
+      if (selectedImage == null) {
         return;
       }
 
-      final imageBytes = await image.readAsBytes();
+      final imageBytes = await selectedImage.readAsBytes();
       if (!mounted) return;
 
       if (imageBytes.lengthInBytes > _maxImageBytes) {
@@ -538,16 +568,13 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
             backgroundColor: Colors.red,
           ),
         );
-        setState(() => _isPickingImage = false);
         return;
       }
 
       setState(() {
         _selectedImageBytes = imageBytes;
-        _selectedImageName = image.name;
-        _isPickingImage = false;
+        _selectedImageName = selectedImage.name;
       });
-      _focusNode.requestFocus();
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -556,9 +583,21 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
           backgroundColor: Colors.red,
         ),
       );
-      setState(() => _isPickingImage = false);
-      _focusNode.requestFocus();
+    } finally {
+      if (mounted) {
+        setState(() => _isPickingImage = false);
+        _focusNode.requestFocus();
+      }
     }
+  }
+
+  bool get _usesInAppCameraPage {
+    if (kIsWeb) {
+      return false;
+    }
+
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
   }
 
   void _removeSelectedImage() {
@@ -741,6 +780,29 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: TextField(
+                              focusNode: _focusNode,
+                              autofocus: true,
+                              controller: _controller,
+                              maxLines: null,
+                              maxLength: 120,
+                              autocorrect: false,
+                              enableSuggestions: false,
+                              style: const TextStyle(fontSize: 16),
+                              decoration: const InputDecoration(
+                                hintText: 'คุณกำลังคิดอะไรอยู่.....',
+                                hintStyle: TextStyle(
+                                  color: Color(0xFFCAC9C9),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                border: InputBorder.none,
+                                counterText: '',
+                              ),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
                           if (hasSelectedImage) ...[
                             Padding(
                               padding: const EdgeInsets.fromLTRB(10, 4, 10, 14),
@@ -807,29 +869,6 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                             ),
                             const SizedBox(height: 8),
                           ],
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            child: TextField(
-                              focusNode: _focusNode,
-                              autofocus: true,
-                              controller: _controller,
-                              maxLines: null,
-                              maxLength: 120,
-                              autocorrect: false,
-                              enableSuggestions: false,
-                              style: const TextStyle(fontSize: 16),
-                              decoration: const InputDecoration(
-                                hintText: 'คุณกำลังคิดอะไรอยู่.....',
-                                hintStyle: TextStyle(
-                                  color: Color(0xFFCAC9C9),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                border: InputBorder.none,
-                                counterText: '',
-                              ),
-                              onChanged: (_) => setState(() {}),
-                            ),
-                          ),
                         ],
                       ),
                     ),
@@ -910,6 +949,151 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedImageSourceSheet extends StatelessWidget {
+  const _FeedImageSourceSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        child: Material(
+          color: Colors.white,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 45,
+                      height: 5,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const Text(
+                    'เพิ่มรูปภาพ',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4489D7),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'เลือกรูปจากกล้องหรือรูปที่มีอยู่ในเครื่อง',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.black.withValues(alpha: 0.65),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _FeedImageSourceTile(
+                    icon: Icons.camera_alt_rounded,
+                    title: 'ถ่ายรูป',
+                    subtitle: 'เปิดกล้องเพื่อถ่ายรูปแล้วนำมาโพสต์',
+                    onTap: () => Navigator.of(context).pop(ImageSource.camera),
+                  ),
+                  const SizedBox(height: 12),
+                  _FeedImageSourceTile(
+                    icon: Icons.photo_library_rounded,
+                    title: 'เลือกจากคลัง',
+                    subtitle: 'ใช้รูปภาพที่มีอยู่แล้วในเครื่อง',
+                    onTap: () => Navigator.of(context).pop(ImageSource.gallery),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeedImageSourceTile extends StatelessWidget {
+  const _FeedImageSourceTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFF4FAFF),
+      borderRadius: BorderRadius.circular(22),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4489D7).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  icon,
+                  color: const Color(0xFF4489D7),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.35,
+                        color: Colors.black.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: Color(0xFF4489D7),
+              ),
+            ],
           ),
         ),
       ),
@@ -1094,9 +1278,8 @@ class _FeedPostCardState extends State<FeedPostCard> {
                   _displayLikeCount.toString(),
                   style: TextStyle(
                     color: Colors.grey,
-                    fontWeight: _displayIsLiked
-                        ? FontWeight.bold
-                        : FontWeight.normal,
+                    fontWeight:
+                        _displayIsLiked ? FontWeight.bold : FontWeight.normal,
                   ),
                 ),
               ],
