@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
+import 'package:flutter_application_1/core/services/post_moderation_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
 import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
@@ -531,6 +532,8 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
+  final PostModerationService _postModerationService =
+      PostModerationService.instance;
 
   bool _isSubmitting = false;
   bool _isPickingImage = false;
@@ -682,6 +685,28 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
 
     setState(() => _isSubmitting = true);
     try {
+      // PRE-POST MODERATION HOOK: block submission unless webhook allows it.
+      final moderationResult = await _postModerationService.moderateImage(
+        userId: supabase.auth.currentUser?.id ?? '',
+        caption: content,
+        imageUrls: const <String>[],
+        imageNotes: <String>[
+          if ((_selectedImageName ?? '').trim().isNotEmpty)
+            (_selectedImageName ?? '').trim(),
+        ],
+      );
+      if (!mounted) return;
+      if (moderationResult.allowed != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(moderationResult.summary),
+            backgroundColor: Colors.red,
+          ),
+        );
+        setState(() => _isSubmitting = false);
+        return;
+      }
+
       await widget.repository.createPost(
         content: content,
         imageBytes: _selectedImageBytes,

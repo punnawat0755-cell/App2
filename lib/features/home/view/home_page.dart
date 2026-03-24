@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
+import 'package:flutter_application_1/core/services/post_moderation_service.dart';
 import 'package:flutter_application_1/features/home/data/mock/home_articles_mock.dart';
 import 'package:flutter_application_1/features/home/model/home_article.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
@@ -41,6 +42,8 @@ class _HomePageState extends State<HomePage> {
   final HomeVideoRepository _homeVideoRepository = HomeVideoRepository();
   final HomeVideoPrefetchService _homeVideoPrefetchService =
       HomeVideoPrefetchService.instance;
+  final PostModerationService _postModerationService =
+      PostModerationService.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isNameLoading = true;
@@ -238,6 +241,29 @@ class _HomePageState extends State<HomePage> {
       }
 
       setState(() => _isUploadingClip = true);
+      // PRE-POST MODERATION HOOK: block submission unless webhook allows it.
+      final moderationResult = await _postModerationService.moderateVideo(
+        userId: supabase.auth.currentUser?.id ?? '',
+        caption: caption,
+        transcript: '',
+        frameNotes: <String>[
+          if (file.name.trim().isNotEmpty) file.name.trim(),
+        ],
+        frameUrls: const <String>[],
+      );
+      if (!mounted) {
+        return;
+      }
+      if (moderationResult.allowed != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(moderationResult.summary),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
       await _homeVideoRepository.createVideoClip(
         videoBytes: videoBytes,
         videoFileName: file.name,
