@@ -10,7 +10,7 @@ import 'firebase_options.dart';
 import 'core/services/notification_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
-import 'features/login/view/login.dart';
+import 'features/login/view/login_page.dart';
 import 'features/login/view/splash_screen_page.dart';
 
 @pragma('vm:entry-point')

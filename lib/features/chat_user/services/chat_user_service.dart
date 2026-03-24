@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
-import 'package:flutter_application_1/features/chat_user/models/usermessage.model.dart';
+import 'package:flutter_application_1/features/chat_user/models/user_message.dart';
 
 /// สถานะผลลัพธ์หลังการพยายามส่งข้อความจาก UI
 enum SendMessageStatus { sent, blocked, skipped }

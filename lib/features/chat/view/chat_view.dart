@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
+import 'package:flutter_application_1/core/services/firebase_chat_identity_service.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:get/get.dart';
 
@@ -11,9 +11,8 @@ import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/features/chat/view/chat_confirm_dialog.dart';
 import 'package:flutter_application_1/features/chat_user/bindings/chat_binding.dart';
 import 'package:flutter_application_1/features/chat/view/conversation_summary_screen.dart';
-import 'package:flutter_application_1/features/chat_user/models/pausechat.dart';
+import 'package:flutter_application_1/features/chat_user/view/pause_chat_page.dart';
 import 'package:flutter_application_1/features/chat_user/services/chat_user_service.dart';
-import 'package:flutter_application_1/features/login/view/login.dart';
 
 Color withAlpha(Color color, double opacity) {
   final alpha = (opacity.clamp(0.0, 1.0) * 255).round();
@@ -30,9 +29,13 @@ class ChatSelectionController extends GetxController {
   }
 
   Future<void> _openChatEntry(MatchRole role) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = await FirebaseChatIdentityService.ensureSignedIn();
     if (user == null) {
-      Get.offAll(() => const LoginPage());
+      Get.snackbar(
+        'ไม่สามารถเริ่มแชทได้',
+        'ระบบแชท Firebase ยังไม่พร้อมใช้งาน',
+        snackPosition: SnackPosition.BOTTOM,
+      );
       return;
     }
 

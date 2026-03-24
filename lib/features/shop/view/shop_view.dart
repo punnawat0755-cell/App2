@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/pet/view/pet_view.dart';
+import 'package:flutter_application_1/features/shop/data/mock/shop_items_mock.dart';
+import 'package:flutter_application_1/features/shop/model/shop_item.dart';
 import 'package:get/get.dart';
 
 class ShopPage extends StatelessWidget {
@@ -18,21 +20,7 @@ class ShopPage extends StatelessWidget {
       controller = Get.put(Pet());
     }
 
-    // ข้อมูลสินค้า
-    final List<Map<String, dynamic>> shopItems = [
-      {'img': 'assets/images/s1.png', 'price': 25},
-      {'img': 'assets/images/s2.png', 'price': 35},
-      {'img': 'assets/images/s3.png', 'price': 45},
-      {'img': 'assets/images/s4.png', 'price': 50},
-      {'img': 'assets/images/s5.png', 'price': 65},
-      {'img': 'assets/images/s6.png', 'price': 85},
-      {'img': 'assets/images/s7.png', 'price': 95},
-      {'img': 'assets/images/s8.png', 'price': 95},
-      {'img': 'assets/images/s9.png', 'price': 95},
-      {'img': 'assets/images/s10.png', 'price': 65},
-      {'img': 'assets/images/s11.png', 'price': 85},
-      {'img': 'assets/images/s12.png', 'price': 95},
-    ];
+    final List<ShopItem> shopItems = shopItemsMock;
 
     return Scaffold(
       backgroundColor: const Color(0xFFE6F7FF),
@@ -235,7 +223,7 @@ class ShopPage extends StatelessWidget {
   // Widget ย่อย: การ์ดสินค้าแต่ละชิ้น (เพิ่ม Logic การซื้อ)
   Widget _buildShopItemCard(
     int index,
-    Map<String, dynamic> item,
+    ShopItem item,
     Pet controller,
     ResponsiveScale scale,
   ) {
@@ -254,7 +242,7 @@ class ShopPage extends StatelessWidget {
             alignment: Alignment.center,
             padding: EdgeInsets.all(scale.rs(10, min: 8, max: 10)),
             child: Image.asset(
-              item['img'],
+              item.imagePath,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) =>
                   const Icon(Icons.image_not_supported, color: Colors.grey),
@@ -309,7 +297,7 @@ class ShopPage extends StatelessWidget {
               // --- [กรณี 2: ยังไม่ซื้อ] แสดงราคาและกดซื้อได้ ---
               return GestureDetector(
                 onTap: () {
-                  int price = item['price'];
+                  final price = item.price;
                   if (controller.coins.value >= price) {
                     // เงินพอ: หักเงิน + เพิ่มเข้าของที่มี
                     controller.coins.value -= price;
@@ -359,7 +347,7 @@ class ShopPage extends StatelessWidget {
                       ),
                       SizedBox(width: scale.rs(5, min: 3, max: 5)),
                       Text(
-                        "${item['price']}",
+                        '${item.price}',
                         style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

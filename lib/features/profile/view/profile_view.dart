@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
-import 'package:flutter_application_1/features/setting/view/setting.dart';
+import 'package:flutter_application_1/features/setting/view/setting_page.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;

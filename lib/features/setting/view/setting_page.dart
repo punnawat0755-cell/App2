@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
-import 'package:flutter_application_1/features/login/view/login.dart';
+import 'package:flutter_application_1/features/login/view/login_page.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
-import 'package:flutter_application_1/features/login/view/policy.dart';
+import 'package:flutter_application_1/features/login/view/privacy_policy_page.dart';
 import 'package:flutter_application_1/features/setting/view/edit_profile_page.dart';
 import 'package:flutter_application_1/features/setting/view/favorites_page.dart';
 import 'package:get/get.dart';
@@ -86,6 +87,7 @@ class _SettingPageState extends State<SettingPage> {
   Future<void> _handleLogout() async {
     try {
       await _supabase.auth.signOut();
+      await FirebaseAuth.instance.signOut();
 
       if (!mounted) {
         return;

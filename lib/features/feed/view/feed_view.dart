@@ -175,105 +175,118 @@ class _FeedPageState extends State<FeedPage> {
             return Center(
               child: SizedBox(
                 width: maxContentWidth,
-                child: Column(
-                  children: [
-                    _FeedHeader(
+                child: StreamBuilder<List<FeedPost>>(
+                  stream: _repository.watchPosts(),
+                  builder: (context, postSnapshot) {
+                    final feedHeader = _FeedHeader(
                       composerAvatarUrl: _composerAvatarUrl,
                       isLoadingComposer: _isLoadingComposer,
                       onComposerTap: () => _openComposer(),
                       onImageTap: () =>
                           _openComposer(openImagePickerOnOpen: true),
-                    ),
-                    Expanded(
-                      child: StreamBuilder<List<FeedPost>>(
-                        stream: _repository.watchPosts(),
-                        builder: (context, postSnapshot) {
-                          if (postSnapshot.hasError) {
-                            return _FeedMessageState(
-                              icon: Icons.cloud_off_rounded,
-                              title: 'โหลด feed ไม่สำเร็จ',
-                              subtitle: '${postSnapshot.error}',
-                              actionLabel: 'ลองใหม่',
-                              onAction: _refreshFeed,
-                            );
-                          }
+                    );
 
-                          if (!postSnapshot.hasData) {
-                            return const Center(
-                                child: CircularProgressIndicator());
-                          }
+                    if (postSnapshot.hasError) {
+                      return RefreshIndicator(
+                        onRefresh: _refreshFeed,
+                        child: ListView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: EdgeInsets.only(
+                            bottom: scale.rs(120, min: 90, max: 120),
+                          ),
+                          children: [
+                            feedHeader,
+                            SizedBox(
+                              height: scale.rs(320, min: 240, max: 320),
+                              child: _FeedMessageState(
+                                icon: Icons.cloud_off_rounded,
+                                title: 'โหลด feed ไม่สำเร็จ',
+                                subtitle: '${postSnapshot.error}',
+                                actionLabel: 'ลองใหม่',
+                                onAction: _refreshFeed,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
 
-                          return StreamBuilder<Set<String>>(
-                            stream:
-                                _repository.watchLikedPostIds(currentUser.id),
-                            builder: (context, likeSnapshot) {
-                              final likedPostIds =
-                                  likeSnapshot.data ?? const <String>{};
-                              final posts =
-                                  postSnapshot.data ?? const <FeedPost>[];
+                    if (!postSnapshot.hasData) {
+                      return ListView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        children: [
+                          feedHeader,
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: scale.rs(72, min: 54, max: 72),
+                            ),
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return StreamBuilder<Set<String>>(
+                      stream: _repository.watchLikedPostIds(currentUser.id),
+                      builder: (context, likeSnapshot) {
+                        final likedPostIds =
+                            likeSnapshot.data ?? const <String>{};
+                        final posts = postSnapshot.data ?? const <FeedPost>[];
+
+                        return RefreshIndicator(
+                          onRefresh: _refreshFeed,
+                          child: ListView.separated(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.only(
+                              bottom: scale.rs(120, min: 90, max: 120),
+                            ),
+                            itemCount: posts.isEmpty ? 2 : posts.length + 1,
+                            separatorBuilder: (context, index) => Divider(
+                              thickness: 1,
+                              color: Colors.grey.shade200,
+                            ),
+                            itemBuilder: (context, index) {
+                              if (index == 0) {
+                                return feedHeader;
+                              }
 
                               if (posts.isEmpty) {
-                                return RefreshIndicator(
-                                  onRefresh: _refreshFeed,
-                                  child: ListView(
-                                    physics:
-                                        const AlwaysScrollableScrollPhysics(),
-                                    padding: EdgeInsets.fromLTRB(
-                                      scale.rs(24, min: 16, max: 24),
-                                      scale.rs(48, min: 30, max: 48),
-                                      scale.rs(24, min: 16, max: 24),
-                                      scale.rs(120, min: 90, max: 120),
-                                    ),
-                                    children: [
-                                      _FeedEmptyState(
-                                        onCreatePost: () => _openComposer(),
-                                      ),
-                                    ],
+                                return Padding(
+                                  padding: EdgeInsets.fromLTRB(
+                                    scale.rs(24, min: 16, max: 24),
+                                    scale.rs(48, min: 30, max: 48),
+                                    scale.rs(24, min: 16, max: 24),
+                                    0,
+                                  ),
+                                  child: _FeedEmptyState(
+                                    onCreatePost: () => _openComposer(),
                                   ),
                                 );
                               }
 
-                              return RefreshIndicator(
-                                onRefresh: _refreshFeed,
-                                child: ListView.separated(
-                                  physics:
-                                      const AlwaysScrollableScrollPhysics(),
-                                  padding: EdgeInsets.only(
-                                    bottom: scale.rs(120, min: 90, max: 120),
-                                  ),
-                                  itemCount: posts.length,
-                                  separatorBuilder: (context, index) => Divider(
-                                    thickness: 1,
-                                    color: Colors.grey.shade200,
-                                  ),
-                                  itemBuilder: (context, index) {
-                                    final post = posts[index];
-                                    final isLiked =
-                                        likedPostIds.contains(post.id);
+                              final post = posts[index - 1];
+                              final isLiked = likedPostIds.contains(post.id);
 
-                                    return FeedPostCard(
-                                      key: ValueKey(post.id),
-                                      post: post,
-                                      isLiked: isLiked,
-                                      onAuthorTap: () =>
-                                          _openAuthorProfile(post),
-                                      onToggleLike:
-                                          _repository.supportsLikeActions
-                                              ? () => _toggleLike(post, isLiked)
-                                              : null,
-                                      onDelete: post.authorId == currentUser.id
-                                          ? () => _deletePost(post)
-                                          : null,
-                                    );
-                                  },
-                                ),
+                              return FeedPostCard(
+                                key: ValueKey(post.id),
+                                post: post,
+                                isLiked: isLiked,
+                                onAuthorTap: () => _openAuthorProfile(post),
+                                onToggleLike: _repository.supportsLikeActions
+                                    ? () => _toggleLike(post, isLiked)
+                                    : null,
+                                onDelete: post.authorId == currentUser.id
+                                    ? () => _deletePost(post)
+                                    : null,
                               );
                             },
-                          );
-                        },
-                      ),
-                    ),
-                  ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             );

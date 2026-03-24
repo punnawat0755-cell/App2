@@ -8,6 +8,8 @@ import 'package:video_player/video_player.dart';
 
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
+import 'package:flutter_application_1/features/home/data/mock/home_articles_mock.dart';
+import 'package:flutter_application_1/features/home/model/home_article.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
 import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
@@ -20,7 +22,7 @@ import 'package:flutter_application_1/features/home/view/widgets/article/article
 import 'package:flutter_application_1/features/home/view/widgets/home_widgets.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
-import 'package:flutter_application_1/features/setting/view/setting.dart';
+import 'package:flutter_application_1/features/setting/view/setting_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -46,38 +48,7 @@ class _HomePageState extends State<HomePage> {
   String _displayName = 'ผู้ใช้';
   String _lastWarmupSignature = '';
 
-  final List<_HomeArticle> _articleList = const [
-    _HomeArticle(
-      title: 'วาฬ 52Hz\nไม่ได้อยู่คนเดียว',
-      subtitle: '1 Month Ago',
-      imagePath: 'assets/images/article1.png',
-      detailImagePath: 'assets/images/article1.png',
-      detailTitle: 'วาฬ 52Hz ไม่ได้อยู่คนเดียว',
-      content: '''
-เคยถูกใช้เป็นภาพสะท้อนความเหงาที่รุนแรงที่สุดของมนุษย์ เรามักฉายภาพความกลัวการถูกทอดทิ้งและความรู้สึกแปลกแยกของตัวเองลงไปที่มัน จนกลายเป็นสัญลักษณ์ของการ "มีเสียงที่ไม่มีใครได้ยิน"
-
-แต่ในทางจิตวิทยา เมื่อวิทยาศาสตร์เริ่มค้นพบว่ามันอาจไม่ได้อยู่ลำพัง และอาจมีวาฬตัวอื่นที่ใช้คลื่นความถี่นี้เช่นกัน การตีความจึงเปลี่ยนไปอย่างสิ้นเชิง จากเดิมที่เป็นโศกนาฏกรรมของความโดดเดี่ยว กลายมาเป็นบทเรียนสำคัญเรื่อง "ความแตกต่างของการสื่อสาร" (Communication Differences)
-
-การที่มันส่งเสียงในคลื่นความถี่ที่ไม่เหมือนใครไม่ได้หมายความว่ามันบกพร่อง หรือไร้ค่า แต่อาจเป็นเพียงการแสดงออกถึงตัวตนที่แท้จริงในรูปแบบเฉพาะทาง ซึ่งสะท้อนให้เห็นว่าในสังคมมนุษย์ การที่เราไม่ได้คิดหรือพูดเหมือนคนส่วนใหญ่ ไม่ได้แปลว่าเราผิดปกติแต่อาจเป็นเพียงความแตกต่างของคลื่นความถี่ที่เราเลือกใช้เท่านั้น
-
-การเปลี่ยนมุมมองนี้ช่วยเยียวยาจิตใจได้ดีกว่าเดิม เพราะมันย้ำเตือนเราว่า "ความแตกต่าง" ไม่ได้เท่ากับ "ความเดียวดาย" เสมอไป ในทางจิตวิทยา การยอมรับและยืนหยัดในความเป็นตัวเอง (Authenticity) แม้จะดูแปลกแยกในตอนแรก คือก้าวสำคัญของสุขภาพจิตที่ดี
-
-เราไม่จำเป็นต้องพยายามบิดเบือนคลื่นเสียงของตัวเองให้กลายเป็น 15-25Hz เหมือนวาฬส่วนใหญ่เพียงเพื่อให้ถูกนับรวมเข้าฝูง เพราะการฝืนทำในสิ่งที่ไม่ใช่ตัวเองจะนำไปสู่ความเหงาภายในที่ลึกซึ้งยิ่งกว่า
-
-บทสรุปใหม่ของวาฬ 52Hz จึงให้ความหวังว่า การดำรงอยู่ด้วยความเป็นตัวเองอย่างแท้จริงนั้นมีคุณค่าเสมอ และที่ไหนสักแห่งในมหาสมุทรอันกว้างใหญ่นี้ ย่อมมีผู้ที่พร้อมจะรับฟังหรือเข้าใจคลื่นความถี่ที่เป็นเอกลักษณ์ของคุณอยู่จริง''',
-    ),
-    _HomeArticle(
-      title: 'อยู่คนเดียวก็มีความ\nสุขดีนะ',
-      subtitle: '3 Month Ago',
-      imagePath: 'assets/images/article2.png',
-      detailImagePath: 'assets/images/article2.png',
-      detailTitle: 'อยู่คนเดียวก็มีความสุขดีนะ',
-      content: '''
-การอยู่คนเดียวไม่ได้หมายความว่าต้องเหงาเสมอไป การได้ใช้เวลากับตัวเองคือโอกาสที่ดีในการทำความเข้าใจความต้องการของตัวเอง พัฒนาทักษะใหม่ๆ และเติมพลังให้กับจิตใจ
-
-ความสุขไม่ได้ขึ้นอยู่กับจำนวนคนรอบข้าง แต่อยู่ที่ความพึงพอใจในตัวเองและการมองเห็นคุณค่าในสิ่งเล็กๆ น้อยๆ รอบตัว ลองหาเวลาวันละนิดเพื่อทำสิ่งที่ชอบ หรือแค่นั่งจิบกาแฟเงียบๆ ก็อาจเป็นช่วงเวลาที่มีคุณภาพที่สุดของวันได้''',
-    ),
-  ];
+  final List<HomeArticle> _articleList = homeArticlesMock;
 
   @override
   void initState() {
@@ -708,24 +679,6 @@ class _HomePageState extends State<HomePage> {
   }
 }
 
-class _HomeArticle {
-  const _HomeArticle({
-    required this.title,
-    required this.subtitle,
-    required this.imagePath,
-    required this.detailImagePath,
-    required this.detailTitle,
-    required this.content,
-  });
-
-  final String title;
-  final String subtitle;
-  final String imagePath;
-  final String detailImagePath;
-  final String detailTitle;
-  final String content;
-}
-
 class _ClipSourceSheet extends StatelessWidget {
   const _ClipSourceSheet();
 
@@ -756,7 +709,8 @@ class _ClipSourceSheet extends StatelessWidget {
                     child: Container(
                       width: scale.rs(45, min: 36, max: 46),
                       height: 5,
-                      margin: EdgeInsets.only(bottom: scale.rs(16, min: 12, max: 16)),
+                      margin: EdgeInsets.only(
+                          bottom: scale.rs(16, min: 12, max: 16)),
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
                         borderRadius: BorderRadius.circular(999),

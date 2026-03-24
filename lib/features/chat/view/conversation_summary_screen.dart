@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
+import 'package:flutter_application_1/features/chat/data/mock/conversation_partner_mock.dart';
 import 'package:get/get.dart';
 
 import 'package:flutter_application_1/features/chat/view/chat_confirm_dialog.dart';
@@ -151,7 +152,7 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
                     children: [
                       const SizedBox(height: 16),
                       Text(
-                        'Jellyfish',
+                        conversationPartnerNameMock,
                         style: TextStyle(
                           color: Color(0xFF4489D7),
                           fontSize: scale.rf(28, min: 24, max: 28),
@@ -171,7 +172,7 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
                           color: Colors.white,
                           image: const DecorationImage(
                             image: NetworkImage(
-                              'https://images.unsplash.com/photo-1548681528-6a5c45b66b42?auto=format&fit=crop&w=600&q=80',
+                              conversationPartnerAvatarUrlMock,
                             ),
                             fit: BoxFit.cover,
                           ),

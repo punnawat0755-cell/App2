@@ -1,12 +1,10 @@
 import 'package:get/get.dart';
-import 'package:flutter_application_1/features/chat_user/models/usermessage.model.dart';
+import 'package:flutter_application_1/features/chat_user/models/user_message.dart';
 import 'package:flutter_application_1/features/chat_user/services/chat_user_service.dart';
 
 class ChatUserController extends GetxController {
   ChatUserController({ChatUserService? chatUserService})
       : userChatService = chatUserService ?? Get.find<ChatUserService>();
-
-      
 
   final ChatUserService userChatService;
 
@@ -18,5 +16,4 @@ class ChatUserController extends GetxController {
     String recipientUserId,
   ) =>
       userChatService.createChatRoom(currentUserId, recipientUserId);
-    
 }

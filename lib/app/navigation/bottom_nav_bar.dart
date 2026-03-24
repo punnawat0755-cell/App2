@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
+import 'package:flutter_application_1/core/services/firebase_chat_identity_service.dart';
 import 'package:get/get.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
 import 'package:flutter_application_1/features/feed/view/feed_view.dart';
 import 'package:flutter_application_1/features/home/service/daily_mood_status_service.dart';
-import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
-import 'package:flutter_application_1/features/home/view/home.dart';
+import 'package:flutter_application_1/features/home/view/home_page.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/chat/view/chat_view.dart';
 import 'package:flutter_application_1/features/pet/view/pet_view.dart';
 import 'package:flutter_application_1/features/profile/view/profile_view.dart';
 import 'package:flutter_application_1/features/chat_user/bindings/chat_binding.dart';
 import 'package:flutter_application_1/features/chat_user/services/chat_user_service.dart';
-import 'package:flutter_application_1/features/chat_user/models/pausechat.dart';
+import 'package:flutter_application_1/features/chat_user/view/pause_chat_page.dart';
 import 'package:flutter_application_1/features/role_logic/view/pages/role_selection_page.dart';
 
 class BottomNavBar extends StatefulWidget {
@@ -72,7 +71,7 @@ class _BottomNavBarState extends State<BottomNavBar>
     }
 
     _checkingPausedChat = true;
-    final user = FirebaseAuth.instance.currentUser;
+    final user = await FirebaseChatIdentityService.ensureSignedIn();
     try {
       if (user == null) {
         return;
@@ -136,12 +135,6 @@ class _BottomNavBarState extends State<BottomNavBar>
 
     _checkingRoleMode = true;
     try {
-      final hasSelectedModeToday =
-          await UserModeStatusService.hasSelectedModeToday();
-      if (!mounted || hasSelectedModeToday) {
-        return;
-      }
-
       _roleSelectionPageOpen = true;
       final message = await Get.to<String>(() => const RoleSelectionPage());
       _roleSelectionPageOpen = false;
@@ -161,11 +154,6 @@ class _BottomNavBarState extends State<BottomNavBar>
 
   Future<void> _openRequiredDailyFlowIfNeeded() async {
     if (!mounted || _runningEntryFlow) {
-      return;
-    }
-
-    final currentRoute = ModalRoute.of(context);
-    if (currentRoute != null && !currentRoute.isCurrent) {
       return;
     }
 
