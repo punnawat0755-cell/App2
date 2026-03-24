@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
 import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
 import 'package:video_player/video_player.dart';
@@ -314,6 +315,7 @@ class _PlayVideoPageState extends State<PlayVideoPage>
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     final totalClips = widget.clips.length;
     final controller = _controller;
     final isReady = !_isPreparingVideo &&
@@ -364,21 +366,21 @@ class _PlayVideoPageState extends State<PlayVideoPage>
                   if (isCurrent && isReady && isBuffering)
                     const _PlaybackLoadingOverlay(),
                   if (isCurrent && isReady && _showManualPlayOverlay)
-                    const Center(
+                    Center(
                       child: CircleAvatar(
-                        radius: 35,
+                        radius: scale.rs(35, min: 28, max: 35),
                         backgroundColor: Colors.white,
                         child: Icon(
                           Icons.play_arrow,
-                          size: 45,
+                          size: scale.rs(45, min: 36, max: 45),
                           color: Colors.orange,
                         ),
                       ),
                     ),
                   Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 42,
+                    left: scale.rs(20, min: 14, max: 20),
+                    right: scale.rs(20, min: 14, max: 20),
+                    bottom: scale.rs(42, min: 28, max: 42),
                     child: _ClipMeta(
                       clip: clip,
                       showSwipeHint: isCurrent,
@@ -390,23 +392,26 @@ class _PlayVideoPageState extends State<PlayVideoPage>
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: scale.rs(20, min: 14, max: 20),
+                vertical: scale.rs(12, min: 8, max: 12),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.of(context).maybePop(),
-                    child: const Icon(
+                    child: Icon(
                       Icons.arrow_back_ios,
                       color: Colors.white,
-                      size: 28,
+                      size: scale.rs(28, min: 22, max: 28),
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(12, min: 9, max: 12),
+                      vertical: scale.rs(6, min: 4, max: 6),
                     ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.34),
@@ -414,9 +419,9 @@ class _PlayVideoPageState extends State<PlayVideoPage>
                     ),
                     child: Text(
                       '${_currentIndex + 1}/$totalClips',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 12,
+                        fontSize: scale.rf(12, min: 10.5, max: 12),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -470,6 +475,7 @@ class _ClipMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     final caption = clip.caption.trim();
 
     return Column(
@@ -477,28 +483,31 @@ class _ClipMeta extends StatelessWidget {
       children: [
         Text(
           clip.authorName,
-          style: const TextStyle(
+          style: TextStyle(
             color: Colors.white,
-            fontSize: 18,
+            fontSize: scale.rf(18, min: 15.5, max: 18),
             fontWeight: FontWeight.bold,
           ),
         ),
         if (caption.isNotEmpty) ...[
-          const SizedBox(height: 5),
+          SizedBox(height: scale.rs(5, min: 3, max: 5)),
           Text(
             caption,
-            style: const TextStyle(color: Colors.white, fontSize: 14),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: scale.rf(14, min: 12, max: 14),
+            ),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
         ],
         if (showSwipeHint) ...[
-          const SizedBox(height: 14),
+          SizedBox(height: scale.rs(14, min: 10, max: 14)),
           Text(
             'เลื่อนขึ้นหรือลงเพื่อดูคลิปต่อไป',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.82),
-              fontSize: 12,
+              fontSize: scale.rf(12, min: 10.5, max: 12),
             ),
           ),
         ],
@@ -520,6 +529,7 @@ class _VideoLoadingPreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     final path = thumbnailPath?.trim() ?? '';
     final hasError = errorText != null && errorText!.trim().isNotEmpty;
 
@@ -529,23 +539,25 @@ class _VideoLoadingPreview extends StatelessWidget {
         _ClipBackdrop(previewPath: path),
         Center(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28),
+            padding: EdgeInsets.symmetric(
+              horizontal: scale.rs(28, min: 20, max: 28),
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (!hasError)
                   const CircularProgressIndicator(color: Colors.white),
-                const SizedBox(height: 16),
+                SizedBox(height: scale.rs(16, min: 12, max: 16)),
                 Text(
                   hasError ? errorText! : 'กำลังเตรียมวิดีโอ...',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: Colors.white,
-                    fontSize: 18,
+                    fontSize: scale.rf(18, min: 15.5, max: 18),
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: scale.rs(8, min: 6, max: 8)),
                 Text(
                   hasError
                       ? 'ลองโหลดใหม่อีกครั้งได้เลย'
@@ -553,11 +565,11 @@ class _VideoLoadingPreview extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.85),
-                    fontSize: 13,
+                    fontSize: scale.rf(13, min: 11.5, max: 13),
                   ),
                 ),
                 if (hasError && onRetry != null) ...[
-                  const SizedBox(height: 18),
+                  SizedBox(height: scale.rs(18, min: 12, max: 18)),
                   FilledButton(
                     onPressed: onRetry,
                     style: FilledButton.styleFrom(

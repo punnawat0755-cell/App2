@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_1/features/profile/view/profile_view.dart';
@@ -400,207 +401,242 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
         body: _isLoading
             ? const Center(child: CircularProgressIndicator())
             : SafeArea(
-                child: SingleChildScrollView(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 24, vertical: 30),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      const Text(
-                        'วันนี้คุณรู้สึกยังไง ?',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 26,
-                          fontWeight: FontWeight.bold,
-                          color: mainBlue,
-                        ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final scale =
+                        ResponsiveScale.fromWidth(constraints.maxWidth);
+                    final horizontalPadding = constraints.maxWidth < 360
+                        ? scale.rs(14, min: 10, max: 14)
+                        : scale.rs(24, min: 16, max: 24);
+
+                    return SingleChildScrollView(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                        vertical: scale.rs(30, min: 20, max: 30),
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: List.generate(_moodOptions.length, (index) {
-                          final option = _moodOptions[index];
-                          final isSelected = _selectedMoodIndex == index;
-                          final hasSelection = _selectedMoodIndex >= 0;
-                          final currentOpacity =
-                              isSelected ? 1.0 : (hasSelection ? 0.4 : 1.0);
-                          return Expanded(
-                            child: GestureDetector(
-                              onTap: canSelectMood
-                                  ? () => setState(() {
-                                        _selectedMoodIndex = index;
-                                        _selectedTags.clear();
-                                      })
-                                  : null,
-                              child: Column(
-                                children: [
-                                  AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 200),
-                                    opacity: currentOpacity,
-                                    child: AnimatedScale(
-                                      duration:
-                                          const Duration(milliseconds: 200),
-                                      scale: isSelected ? 1.4 : 1.0,
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(2),
-                                        child: Image.asset(
-                                          _moodImages[index],
-                                          width: 50,
-                                          height: 50,
-                                          errorBuilder: (_, __, ___) => Icon(
-                                            option.icon,
-                                            size: 45,
-                                            color: mainBlue,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  FittedBox(
-                                    fit: BoxFit.scaleDown,
-                                    child: Text(
-                                      option.label,
-                                      style: TextStyle(
-                                        color: mainBlue,
-                                        fontSize: 13,
-                                        fontWeight: isSelected
-                                            ? FontWeight.bold
-                                            : FontWeight.normal,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                      const SizedBox(height: 32),
-                      Column(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _buildTagRow(currentTags.sublist(0, 4),
-                              enabled: canSelectMood),
-                          const SizedBox(height: 12),
-                          _buildTagRow(currentTags.sublist(4, 8),
-                              enabled: canSelectMood),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      const Text(
-                        'บันทึกเรื่องราวของวันนี้',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: mainBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildPulseTextField(
-                        controller: _noteCtrl,
-                        enabled: canSelectMood,
-                        maxLength: 200,
-                        height: 120,
-                      ),
-                      const SizedBox(height: 8),
-                      if (!_isLoggedIn)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 4),
-                          child: Text(
-                            'ยังไม่ได้ล็อกอิน: จะบันทึกลงเครื่องเท่านั้น',
+                          Text(
+                            'วันนี้คุณรู้สึกยังไง ?',
+                            textAlign: TextAlign.center,
                             style: TextStyle(
-                                color: Color(0xFF607D8B), fontSize: 12),
-                          ),
-                        ),
-                      if (_isLoggedIn &&
-                          !canSelectMood &&
-                          ((_serverNote?.isNotEmpty ?? false) ||
-                              (_serverHealingQuote?.isNotEmpty ?? false)))
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Text(
-                            'ข้อมูลล่าสุดถูกโหลดจากบัญชีของคุณแล้ว',
-                            style: TextStyle(
-                              color: mainBlue.withValues(alpha: 0.72),
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-                      Row(
-                        children: [
-                          const Text(
-                            'ประโยคฮีลใจประจำวัน',
-                            style: TextStyle(
-                              fontSize: 18,
+                              fontSize: scale.rf(26, min: 21, max: 26),
                               fontWeight: FontWeight.bold,
                               color: mainBlue,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            '+2 coin',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFFBBF24),
-                            ),
-                          ),
-                          const SizedBox(width: 3),
-                          Image.asset('assets/images/coin2.png',
-                              width: 18, height: 18),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      _buildPulseTextField(
-                        controller: _healingCtrl,
-                        enabled: canSelectMood,
-                        maxLength: 50,
-                        height: 84,
-                      ),
-                      const SizedBox(height: 40),
-                      Center(
-                        child: SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.85,
-                          height: 55,
-                          child: ElevatedButton(
-                            onPressed: canSelectMood
-                                ? () => _submitMood(selectedOption)
-                                : null,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFB5EFFF),
-                              disabledBackgroundColor: const Color(0xFFDBEEF7),
-                              elevation: 6,
-                              shadowColor: Colors.black.withValues(alpha: 0.25),
-                              padding: EdgeInsets.zero,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Image.asset(
-                                  'assets/images/heart.png',
-                                  height: 40,
-                                  width: 40,
-                                ),
-                                const SizedBox(width: 10),
-                                const Text(
-                                  'ส่งพลังใจ (Energy)',
-                                  style: TextStyle(
-                                    color: mainBlue,
-                                    fontWeight: FontWeight.w500,
-                                    fontSize: 18,
+                          SizedBox(height: scale.rs(16, min: 12, max: 16)),
+                          Row(
+                            children:
+                                List.generate(_moodOptions.length, (index) {
+                              final option = _moodOptions[index];
+                              final isSelected = _selectedMoodIndex == index;
+                              final hasSelection = _selectedMoodIndex >= 0;
+                              final currentOpacity =
+                                  isSelected ? 1.0 : (hasSelection ? 0.4 : 1.0);
+                              return Expanded(
+                                child: GestureDetector(
+                                  onTap: canSelectMood
+                                      ? () => setState(() {
+                                            _selectedMoodIndex = index;
+                                            _selectedTags.clear();
+                                          })
+                                      : null,
+                                  child: Column(
+                                    children: [
+                                      AnimatedOpacity(
+                                        duration:
+                                            const Duration(milliseconds: 200),
+                                        opacity: currentOpacity,
+                                        child: AnimatedScale(
+                                          duration:
+                                              const Duration(milliseconds: 200),
+                                          scale: isSelected ? 1.4 : 1.0,
+                                          child: Padding(
+                                            padding: EdgeInsets.all(
+                                              scale.rs(2, min: 1, max: 2),
+                                            ),
+                                            child: Image.asset(
+                                              _moodImages[index],
+                                              width: scale.rs(50,
+                                                  min: 40, max: 50),
+                                              height: scale.rs(50,
+                                                  min: 40, max: 50),
+                                              errorBuilder: (_, __, ___) =>
+                                                  Icon(
+                                                option.icon,
+                                                size: scale.rs(45,
+                                                    min: 35, max: 45),
+                                                color: mainBlue,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(
+                                          height: scale.rs(4, min: 2, max: 4)),
+                                      FittedBox(
+                                        fit: BoxFit.scaleDown,
+                                        child: Text(
+                                          option.label,
+                                          style: TextStyle(
+                                            color: mainBlue,
+                                            fontSize:
+                                                scale.rf(13, min: 11, max: 13),
+                                            fontWeight: isSelected
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
+                              );
+                            }),
+                          ),
+                          SizedBox(height: scale.rs(32, min: 20, max: 32)),
+                          Column(
+                            children: [
+                              _buildTagRow(currentTags.sublist(0, 4),
+                                  enabled: canSelectMood, scale: scale),
+                              SizedBox(height: scale.rs(12, min: 8, max: 12)),
+                              _buildTagRow(currentTags.sublist(4, 8),
+                                  enabled: canSelectMood, scale: scale),
+                            ],
+                          ),
+                          SizedBox(height: scale.rs(24, min: 16, max: 24)),
+                          Text(
+                            'บันทึกเรื่องราวของวันนี้',
+                            style: TextStyle(
+                              fontSize: scale.rf(18, min: 15.5, max: 18),
+                              fontWeight: FontWeight.bold,
+                              color: mainBlue,
                             ),
                           ),
-                        ),
+                          SizedBox(height: scale.rs(10, min: 8, max: 10)),
+                          _buildPulseTextField(
+                            controller: _noteCtrl,
+                            enabled: canSelectMood,
+                            maxLength: 200,
+                            height: 120,
+                            scale: scale,
+                          ),
+                          SizedBox(height: scale.rs(8, min: 6, max: 8)),
+                          if (!_isLoggedIn)
+                            Padding(
+                              padding: EdgeInsets.only(
+                                  left: scale.rs(4, min: 3, max: 4)),
+                              child: Text(
+                                'ยังไม่ได้ล็อกอิน: จะบันทึกลงเครื่องเท่านั้น',
+                                style: TextStyle(
+                                  color: const Color(0xFF607D8B),
+                                  fontSize: scale.rf(12, min: 10.5, max: 12),
+                                ),
+                              ),
+                            ),
+                          if (_isLoggedIn &&
+                              !canSelectMood &&
+                              ((_serverNote?.isNotEmpty ?? false) ||
+                                  (_serverHealingQuote?.isNotEmpty ?? false)))
+                            Padding(
+                              padding: EdgeInsets.only(
+                                  left: scale.rs(4, min: 3, max: 4)),
+                              child: Text(
+                                'ข้อมูลล่าสุดถูกโหลดจากบัญชีของคุณแล้ว',
+                                style: TextStyle(
+                                  color: mainBlue.withValues(alpha: 0.72),
+                                  fontSize: scale.rf(12, min: 10.5, max: 12),
+                                ),
+                              ),
+                            ),
+                          SizedBox(height: scale.rs(24, min: 16, max: 24)),
+                          Row(
+                            children: [
+                              Text(
+                                'ประโยคฮีลใจประจำวัน',
+                                style: TextStyle(
+                                  fontSize: scale.rf(18, min: 15.5, max: 18),
+                                  fontWeight: FontWeight.bold,
+                                  color: mainBlue,
+                                ),
+                              ),
+                              SizedBox(width: scale.rs(8, min: 6, max: 8)),
+                              Text(
+                                '+2 coin',
+                                style: TextStyle(
+                                  fontSize: scale.rf(16, min: 14, max: 16),
+                                  fontWeight: FontWeight.bold,
+                                  color: const Color(0xFFFBBF24),
+                                ),
+                              ),
+                              SizedBox(width: scale.rs(3, min: 2, max: 3)),
+                              Image.asset('assets/images/coin2.png',
+                                  width: scale.rs(18, min: 14, max: 18),
+                                  height: scale.rs(18, min: 14, max: 18)),
+                            ],
+                          ),
+                          SizedBox(height: scale.rs(10, min: 8, max: 10)),
+                          _buildPulseTextField(
+                            controller: _healingCtrl,
+                            enabled: canSelectMood,
+                            maxLength: 50,
+                            height: 84,
+                            scale: scale,
+                          ),
+                          SizedBox(height: scale.rs(40, min: 24, max: 40)),
+                          Center(
+                            child: SizedBox(
+                              width: scale.rw(0.85, min: 220, max: 420),
+                              height: scale.rs(55, min: 46, max: 55),
+                              child: ElevatedButton(
+                                onPressed: canSelectMood
+                                    ? () => _submitMood(selectedOption)
+                                    : null,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFB5EFFF),
+                                  disabledBackgroundColor:
+                                      const Color(0xFFDBEEF7),
+                                  elevation: 6,
+                                  shadowColor:
+                                      Colors.black.withValues(alpha: 0.25),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(
+                                      scale.rs(20, min: 16, max: 20),
+                                    ),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Image.asset(
+                                      'assets/images/heart.png',
+                                      height: scale.rs(40, min: 32, max: 40),
+                                      width: scale.rs(40, min: 32, max: 40),
+                                    ),
+                                    SizedBox(
+                                        width: scale.rs(10, min: 8, max: 10)),
+                                    Text(
+                                      'ส่งพลังใจ (Energy)',
+                                      style: TextStyle(
+                                        color: mainBlue,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize:
+                                            scale.rf(18, min: 15.5, max: 18),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: scale.rs(30, min: 20, max: 30)),
+                        ],
                       ),
-                      const SizedBox(height: 30),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
       ),
@@ -612,15 +648,16 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     required bool enabled,
     required int maxLength,
     required double height,
+    required ResponsiveScale scale,
   }) {
     const mainBlue = Color(0xFF4A89D8);
     const fillBlue = Color(0xFFE0F2FE);
 
     return Container(
-      height: height,
+      height: scale.rs(height, min: height * 0.8, max: height),
       decoration: BoxDecoration(
         color: fillBlue,
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(scale.rs(15, min: 12, max: 15)),
         border: Border.all(color: mainBlue, width: 1),
       ),
       child: Stack(
@@ -631,26 +668,36 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
             maxLines: null,
             keyboardType: TextInputType.multiline,
             enabled: enabled,
-            style: const TextStyle(color: mainBlue, fontSize: 16),
-            decoration: const InputDecoration(
+            style: TextStyle(
+              color: mainBlue,
+              fontSize: scale.rf(16, min: 14, max: 16),
+            ),
+            decoration: InputDecoration(
               hintText: 'มาเริ่มการบันทึกกันเถอะ......',
-              hintStyle: TextStyle(color: Colors.black38),
+              hintStyle: TextStyle(
+                color: Colors.black38,
+                fontSize: scale.rf(14, min: 12, max: 14),
+              ),
               border: InputBorder.none,
-              contentPadding:
-                  EdgeInsets.only(left: 15, right: 15, top: 15, bottom: 25),
+              contentPadding: EdgeInsets.only(
+                left: scale.rs(15, min: 12, max: 15),
+                right: scale.rs(15, min: 12, max: 15),
+                top: scale.rs(15, min: 12, max: 15),
+                bottom: scale.rs(25, min: 18, max: 25),
+              ),
               counterText: '',
             ),
           ),
           Positioned(
-            bottom: 8,
-            right: 12,
+            bottom: scale.rs(8, min: 6, max: 8),
+            right: scale.rs(12, min: 9, max: 12),
             child: ValueListenableBuilder<TextEditingValue>(
               valueListenable: controller,
               builder: (_, value, __) => Text(
                 '${value.text.length}/$maxLength',
                 style: TextStyle(
                   color: mainBlue.withValues(alpha: 0.5),
-                  fontSize: 12,
+                  fontSize: scale.rf(12, min: 10.5, max: 12),
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -661,7 +708,11 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     );
   }
 
-  Widget _buildTagRow(List<String> rowTags, {required bool enabled}) {
+  Widget _buildTagRow(
+    List<String> rowTags, {
+    required bool enabled,
+    required ResponsiveScale scale,
+  }) {
     const mainBlue = Color(0xFF4A89D8);
     const lightFillBlue = Color(0xFFE0F2FE);
     const tagFillBlue = Color(0xFF93C5FD);
@@ -671,7 +722,9 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
         final isSelected = _selectedTags.contains(tag);
         return Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.symmetric(
+              horizontal: scale.rs(4, min: 2, max: 4),
+            ),
             child: GestureDetector(
               onTap: enabled
                   ? () {
@@ -686,21 +739,26 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                   : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                height: 42,
+                height: scale.rs(42, min: 34, max: 42),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: isSelected ? tagFillBlue : lightFillBlue,
-                  borderRadius: BorderRadius.circular(25),
-                  border: Border.all(color: mainBlue, width: 1.2),
+                  borderRadius: BorderRadius.circular(
+                    scale.rs(25, min: 18, max: 25),
+                  ),
+                  border: Border.all(
+                    color: mainBlue,
+                    width: scale.rs(1.2, min: 1, max: 1.2),
+                  ),
                 ),
                 child: FittedBox(
                   fit: BoxFit.scaleDown,
                   child: Text(
                     tag,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: mainBlue,
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: scale.rf(14, min: 12, max: 14),
                     ),
                   ),
                 ),

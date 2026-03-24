@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/shop/view/shop_view.dart';
 import 'package:get/get.dart';
 
@@ -171,12 +172,13 @@ class PetPage extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final screenWidth = constraints.maxWidth;
+                final scale = ResponsiveScale.fromWidth(screenWidth);
                 return Column(
                   children: [
-                    _buildTopBar(controller, screenWidth),
+                    _buildTopBar(controller, screenWidth, scale),
                     const Spacer(),
                     const Spacer(),
-                    _buildBottomDock(controller, screenWidth),
+                    _buildBottomDock(controller, screenWidth, scale),
                   ],
                 );
               },
@@ -190,28 +192,44 @@ class PetPage extends StatelessWidget {
   // -----------------------------------------------------------
   // Widget: Top Bar
   // -----------------------------------------------------------
-  Widget _buildTopBar(Pet controller, double screenWidth) {
+  Widget _buildTopBar(
+    Pet controller,
+    double screenWidth,
+    ResponsiveScale scale,
+  ) {
     final isCompact = screenWidth < 360;
     final energyBarWidth =
         isCompact ? (screenWidth * 0.43).clamp(136.0, 160.0) : 160.0;
-    const double boxHeight = 39.0;
+    final boxHeight = scale.rs(39, min: 33, max: 39);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 20, 20, 0),
+      padding: EdgeInsets.fromLTRB(
+        scale.rs(10, min: 8, max: 10),
+        scale.rs(20, min: 14, max: 20),
+        scale.rs(20, min: 14, max: 20),
+        0,
+      ),
       child: Column(
         children: [
-          const SizedBox(height: 20),
+          SizedBox(height: scale.rs(20, min: 14, max: 20)),
 
           // Row 2: Stats
           Wrap(
             alignment: WrapAlignment.center,
-            spacing: isCompact ? 10 : 15,
-            runSpacing: 8,
+            spacing: isCompact
+                ? scale.rs(10, min: 8, max: 10)
+                : scale.rs(15, min: 10, max: 15),
+            runSpacing: scale.rs(8, min: 6, max: 8),
             crossAxisAlignment: WrapCrossAlignment.end,
             children: [
               // Coin
               Container(
                 height: boxHeight,
-                padding: const EdgeInsets.fromLTRB(5, 0, 15, 0),
+                padding: EdgeInsets.fromLTRB(
+                  scale.rs(5, min: 4, max: 5),
+                  0,
+                  scale.rs(15, min: 10, max: 15),
+                  0,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(30),
@@ -228,18 +246,18 @@ class PetPage extends StatelessWidget {
                   children: [
                     Image.asset(
                       'assets/images/coin.png',
-                      width: 35,
-                      height: 35,
+                      width: scale.rs(35, min: 28, max: 35),
+                      height: scale.rs(35, min: 28, max: 35),
                       fit: BoxFit.contain,
                     ),
-                    const SizedBox(width: 9),
+                    SizedBox(width: scale.rs(9, min: 6, max: 9)),
                     Obx(
                       () => Text(
                         "${controller.coins}",
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w900,
-                          fontSize: 18,
-                          color: Color(0xFF5D4037),
+                          fontSize: scale.rf(18, min: 15, max: 18),
+                          color: const Color(0xFF5D4037),
                         ),
                       ),
                     ),
@@ -250,15 +268,15 @@ class PetPage extends StatelessWidget {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
+                  Text(
                     "เลเวล 1",
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
-                      fontSize: 18,
+                      fontSize: scale.rf(18, min: 15, max: 18),
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  SizedBox(height: scale.rs(5, min: 3, max: 5)),
                   Container(
                     width: energyBarWidth,
                     height: boxHeight,
@@ -313,8 +331,8 @@ class PetPage extends StatelessWidget {
                             padding: const EdgeInsets.only(left: 1),
                             child: Image.asset(
                               'assets/images/t1.png',
-                              width: 34,
-                              height: 34,
+                              width: scale.rs(34, min: 27, max: 34),
+                              height: scale.rs(34, min: 27, max: 34),
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -324,10 +342,10 @@ class PetPage extends StatelessWidget {
                           child: Obx(
                             () => Text(
                               " ${controller.energyPercent.value} %",
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFF634917),
-                                fontSize: 16,
+                                color: const Color(0xFF634917),
+                                fontSize: scale.rf(16, min: 13.5, max: 16),
                               ),
                             ),
                           ),
@@ -347,14 +365,22 @@ class PetPage extends StatelessWidget {
   // -----------------------------------------------------------
   // Widget: Bottom Dock
   // -----------------------------------------------------------
-  Widget _buildBottomDock(Pet controller, double screenWidth) {
+  Widget _buildBottomDock(
+    Pet controller,
+    double screenWidth,
+    ResponsiveScale scale,
+  ) {
     final usableWidth = (screenWidth - 20).clamp(280.0, 460.0);
     final cardWidth = ((usableWidth - 24) / 3).clamp(86.0, 110.0);
     final cardHeight = cardWidth;
 
     return Container(
-      padding: const EdgeInsets.only(bottom: 30, left: 10, right: 10),
-      height: cardHeight + 70,
+      padding: EdgeInsets.only(
+        bottom: scale.rs(30, min: 20, max: 30),
+        left: scale.rs(10, min: 8, max: 10),
+        right: scale.rs(10, min: 8, max: 10),
+      ),
+      height: cardHeight + scale.rs(70, min: 56, max: 70),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
@@ -365,18 +391,21 @@ class PetPage extends StatelessWidget {
 
             return _buildItemCard(
               imagePath: 'assets/images/fish1.png',
-              customImageSize: 90,
-              customImageBottom: 10,
+              customImageSize: scale.rs(90, min: 72, max: 90),
+              customImageBottom: scale.rs(10, min: 6, max: 10),
               labelWidget: Text(
                 isOutOfFood ? controller.remainingTime.value : "00:00:00",
                 style: TextStyle(
                   color: isOutOfFood ? Colors.grey : const Color(0xFF1565C0),
                   fontWeight: FontWeight.w900,
-                  fontSize: screenWidth < 360 ? 14 : 16,
+                  fontSize: screenWidth < 360
+                      ? scale.rf(14, min: 12, max: 14)
+                      : scale.rf(16, min: 13.5, max: 16),
                 ),
               ),
               badgeCount: controller.foodCount.value,
               cardWidth: cardWidth,
+              scale: scale,
               onTap: () => controller.feedPet(),
             );
           }),
@@ -384,34 +413,38 @@ class PetPage extends StatelessWidget {
           // 2. ปุ่มกลาง (Fish 2 - ใช้เหรียญ)
           _buildItemCard(
             imagePath: 'assets/images/fish2.png',
-            customImageSize: 100,
+            customImageSize: scale.rs(100, min: 80, max: 100),
             isBig: true,
-            customImageBottom: -9,
+            customImageBottom: -scale.rs(9, min: 6, max: 9),
             topBadgeWidget: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+              padding: EdgeInsets.symmetric(
+                horizontal: scale.rs(9, min: 7, max: 9),
+                vertical: scale.rs(6, min: 4, max: 6),
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   CircleAvatar(
-                    radius: 8,
+                    radius: scale.rs(8, min: 6, max: 8),
                     backgroundColor: const Color(0xFFFFC107),
                     child: Image.asset(
                       'assets/images/coin2.png',
-                      width: 16,
-                      height: 16,
+                      width: scale.rs(16, min: 12, max: 16),
+                      height: scale.rs(16, min: 12, max: 16),
                     ),
                   ),
-                  const SizedBox(width: 5),
-                  const Text(
+                  SizedBox(width: scale.rs(5, min: 3, max: 5)),
+                  Text(
                     "2 coin",
                     style: TextStyle(
-                      color: Color(0xFFFFC107),
+                      color: const Color(0xFFFFC107),
                       fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                      fontSize: scale.rf(14, min: 12, max: 14),
                     ),
                   ),
                 ],
@@ -419,30 +452,36 @@ class PetPage extends StatelessWidget {
             ),
             // [แก้ไข] เรียกใช้ feedWithCoin(2) แทน buyFood
             cardWidth: cardWidth,
+            scale: scale,
             onTap: () => controller.feedWithCoin(2),
           ),
 
           // 3. ปุ่มขวา (Shop)
           _buildItemCard(
             imagePath: 'assets/images/shop.png',
-            customImageSize: 80,
-            customImageBottom: 5,
+            customImageSize: scale.rs(80, min: 64, max: 80),
+            customImageBottom: scale.rs(5, min: 3, max: 5),
             topBadgeWidget: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: EdgeInsets.symmetric(
+                horizontal: scale.rs(16, min: 12, max: 16),
+                vertical: scale.rs(6, min: 4, max: 6),
+              ),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
               ),
-              child: const Text(
+              child: Text(
                 "SHOP",
                 style: TextStyle(
-                  color: Color(0xFFFFC107),
+                  color: const Color(0xFFFFC107),
                   fontWeight: FontWeight.w900,
-                  fontSize: 14,
+                  fontSize: scale.rf(14, min: 12, max: 14),
                 ),
               ),
             ),
             cardWidth: cardWidth,
+            scale: scale,
             onTap: () => Get.to(() => const ShopPage()),
           ),
         ],
@@ -463,6 +502,7 @@ class PetPage extends StatelessWidget {
     double? customImageBottom,
     bool isBig = false,
     double cardWidth = 100,
+    required ResponsiveScale scale,
   }) {
     final cardHeight = cardWidth;
     final imageSize = customImageSize ?? (cardWidth * 0.8);
@@ -472,7 +512,7 @@ class PetPage extends StatelessWidget {
       onTap: onTap,
       child: SizedBox(
         width: cardWidth,
-        height: cardHeight + 40,
+        height: cardHeight + scale.rs(40, min: 30, max: 40),
         child: Stack(
           alignment: Alignment.bottomCenter,
           clipBehavior: Clip.none,
@@ -482,12 +522,13 @@ class PetPage extends StatelessWidget {
               height: cardHeight,
               decoration: BoxDecoration(
                 color: const Color(0xFFE3F2FD),
-                borderRadius: BorderRadius.circular(30),
+                borderRadius:
+                    BorderRadius.circular(scale.rs(30, min: 22, max: 30)),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
+                    blurRadius: scale.rs(8, min: 6, max: 8),
+                    offset: Offset(0, scale.rs(4, min: 2, max: 4)),
                   ),
                 ],
               ),
@@ -496,7 +537,9 @@ class PetPage extends StatelessWidget {
                 children: [
                   if (labelWidget != null)
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 2),
+                      padding: EdgeInsets.only(
+                        bottom: scale.rs(2, min: 1, max: 2),
+                      ),
                       child: labelWidget,
                     ),
                 ],
@@ -519,26 +562,26 @@ class PetPage extends StatelessWidget {
             ),
             if (topBadgeWidget != null)
               Positioned(
-                top: 25,
+                top: scale.rs(25, min: 18, max: 25),
                 left: 0,
                 right: 0,
                 child: Center(child: topBadgeWidget),
               ),
             if (badgeCount > 0)
               Positioned(
-                top: 23,
+                top: scale.rs(23, min: 16, max: 23),
                 right: -3,
                 child: Container(
-                  padding: const EdgeInsets.all(10),
+                  padding: EdgeInsets.all(scale.rs(10, min: 7, max: 10)),
                   decoration: const BoxDecoration(
                     color: Colors.redAccent,
                     shape: BoxShape.circle,
                   ),
                   child: Text(
                     "$badgeCount",
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 15,
+                      fontSize: scale.rf(15, min: 12.5, max: 15),
                       fontWeight: FontWeight.bold,
                     ),
                   ),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 
 class VideoCapturePage extends StatefulWidget {
   const VideoCapturePage({super.key});
@@ -308,6 +309,7 @@ class _VideoCapturePageState extends State<VideoCapturePage>
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
+    final scale = context.responsive;
 
     return PopScope<void>(
       canPop: !_isRecording,
@@ -326,9 +328,9 @@ class _VideoCapturePageState extends State<VideoCapturePage>
                 child: _buildPreview(controller),
               ),
               Positioned(
-                top: 12,
-                left: 16,
-                right: 16,
+                top: scale.rs(12, min: 8, max: 12),
+                left: scale.rs(16, min: 12, max: 16),
+                right: scale.rs(16, min: 12, max: 16),
                 child: Row(
                   children: [
                     _CameraOverlayButton(
@@ -344,7 +346,7 @@ class _VideoCapturePageState extends State<VideoCapturePage>
               Positioned(
                 left: 0,
                 right: 0,
-                bottom: 28,
+                bottom: scale.rs(28, min: 18, max: 28),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -352,46 +354,55 @@ class _VideoCapturePageState extends State<VideoCapturePage>
                       _isRecording
                           ? 'แตะปุ่มสีแดงเพื่อหยุดบันทึก'
                           : 'แตะปุ่มด้านล่างเพื่อเริ่มอัดวิดีโอ',
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: Colors.white,
-                        fontSize: 14,
+                        fontSize: scale.rf(14, min: 12, max: 14),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: scale.rs(18, min: 12, max: 18)),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const SizedBox(width: 64),
+                        SizedBox(width: scale.rs(64, min: 40, max: 64)),
                         GestureDetector(
                           onTap: _isBusy ? null : _toggleRecording,
                           child: Container(
-                            width: 88,
-                            height: 88,
+                            width: scale.rs(88, min: 72, max: 88),
+                            height: scale.rs(88, min: 72, max: 88),
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 5),
+                              border: Border.all(
+                                color: Colors.white,
+                                width: scale.rs(5, min: 4, max: 5),
+                              ),
                               color: Colors.white.withValues(alpha: 0.12),
                             ),
                             child: Center(
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 180),
-                                width: _isRecording ? 34 : 64,
-                                height: _isRecording ? 34 : 64,
+                                width: _isRecording
+                                    ? scale.rs(34, min: 26, max: 34)
+                                    : scale.rs(64, min: 50, max: 64),
+                                height: _isRecording
+                                    ? scale.rs(34, min: 26, max: 34)
+                                    : scale.rs(64, min: 50, max: 64),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFFF4B4B),
                                   shape: _isRecording
                                       ? BoxShape.rectangle
                                       : BoxShape.circle,
                                   borderRadius: _isRecording
-                                      ? BorderRadius.circular(12)
+                                      ? BorderRadius.circular(
+                                          scale.rs(12, min: 9, max: 12),
+                                        )
                                       : null,
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 28),
+                        SizedBox(width: scale.rs(28, min: 18, max: 28)),
                         Opacity(
                           opacity:
                               (_cameras.length > 1 && !_isBusy && !_isRecording)
@@ -422,26 +433,28 @@ class _VideoCapturePageState extends State<VideoCapturePage>
     if (_errorMessage != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.responsive.rs(28, min: 20, max: 28),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.videocam_off_rounded,
                 color: Colors.white,
-                size: 52,
+                size: context.responsive.rs(52, min: 42, max: 52),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: context.responsive.rs(16, min: 12, max: 16)),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
+                  fontSize: context.responsive.rf(16, min: 14, max: 16),
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: context.responsive.rs(20, min: 14, max: 20)),
               FilledButton(
                 onPressed: _loadAvailableCameras,
                 child: const Text('ลองอีกครั้ง'),
@@ -493,6 +506,7 @@ class _CameraOverlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Material(
       color: Colors.black.withValues(alpha: 0.35),
       shape: const CircleBorder(),
@@ -500,11 +514,12 @@ class _CameraOverlayButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: SizedBox(
-          width: 48,
-          height: 48,
+          width: scale.rs(48, min: 40, max: 48),
+          height: scale.rs(48, min: 40, max: 48),
           child: Icon(
             icon,
             color: Colors.white,
+            size: scale.rs(24, min: 20, max: 24),
           ),
         ),
       ),
@@ -521,11 +536,15 @@ class _RecordingBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: EdgeInsets.symmetric(
+        horizontal: scale.rs(12, min: 9, max: 12),
+        vertical: scale.rs(8, min: 6, max: 8),
+      ),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(999),
@@ -534,19 +553,19 @@ class _RecordingBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 9,
-            height: 9,
+            width: scale.rs(9, min: 7, max: 9),
+            height: scale.rs(9, min: 7, max: 9),
             decoration: const BoxDecoration(
               color: Color(0xFFFF4B4B),
               shape: BoxShape.circle,
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: scale.rs(8, min: 6, max: 8)),
           Text(
             '$minutes:$seconds',
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 13,
+              fontSize: scale.rf(13, min: 11.5, max: 13),
               fontWeight: FontWeight.w600,
             ),
           ),

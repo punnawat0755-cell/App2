@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:get/get.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
 import 'package:flutter_application_1/features/feed/view/feed_view.dart';
@@ -183,30 +184,44 @@ class _BottomNavBarState extends State<BottomNavBar>
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
+
     return Scaffold(
       extendBody: true,
       body: _pages[_page],
       bottomNavigationBar: CurvedNavigationBar(
         key: _bottomNavigationKey,
         index: 0,
-        height: 60.0,
-        items: const <Widget>[
-          Icon(Icons.home, size: 30, color: Color.fromARGB(255, 244, 244, 244)),
+        height: scale.rs(60, min: 54, max: 60),
+        items: <Widget>[
+          Icon(
+            Icons.home,
+            size: scale.rs(30, min: 26, max: 30),
+            color: const Color.fromARGB(255, 244, 244, 244),
+          ),
           Icon(
             Icons.newspaper,
-            size: 30,
-            color: Color.fromARGB(255, 244, 244, 244),
+            size: scale.rs(30, min: 26, max: 30),
+            color: const Color.fromARGB(255, 244, 244, 244),
           ),
-          Icon(Icons.chat, size: 30, color: Color.fromARGB(255, 244, 244, 244)),
-          Icon(Icons.pets, size: 30, color: Color.fromARGB(255, 244, 244, 244)),
+          Icon(
+            Icons.chat,
+            size: scale.rs(30, min: 26, max: 30),
+            color: const Color.fromARGB(255, 244, 244, 244),
+          ),
+          Icon(
+            Icons.pets,
+            size: scale.rs(30, min: 26, max: 30),
+            color: const Color.fromARGB(255, 244, 244, 244),
+          ),
           Icon(
             Icons.person,
-            size: 30,
-            color: Color.fromARGB(255, 244, 244, 244),
+            size: scale.rs(30, min: 26, max: 30),
+            color: const Color.fromARGB(255, 244, 244, 244),
           ),
         ],
-        color: Color(0xFF5CD9FF),
-        buttonBackgroundColor: Color(0xFF5CD9FF),
+        color: const Color(0xFF5CD9FF),
+        buttonBackgroundColor: const Color(0xFF5CD9FF),
         backgroundColor: Colors.transparent,
         animationCurve: Curves.easeInOut,
         animationDuration: const Duration(milliseconds: 300),

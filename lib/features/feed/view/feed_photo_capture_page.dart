@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 
 class FeedPhotoCapturePage extends StatefulWidget {
   const FeedPhotoCapturePage({super.key});
@@ -222,6 +223,7 @@ class _FeedPhotoCapturePageState extends State<FeedPhotoCapturePage>
   @override
   Widget build(BuildContext context) {
     final controller = _controller;
+    final scale = context.responsive;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -232,9 +234,9 @@ class _FeedPhotoCapturePageState extends State<FeedPhotoCapturePage>
               child: _buildPreview(controller),
             ),
             Positioned(
-              top: 12,
-              left: 16,
-              right: 16,
+              top: scale.rs(12, min: 8, max: 12),
+              left: scale.rs(16, min: 12, max: 16),
+              right: scale.rs(16, min: 12, max: 16),
               child: Row(
                 children: [
                   _CameraOverlayButton(
@@ -247,7 +249,7 @@ class _FeedPhotoCapturePageState extends State<FeedPhotoCapturePage>
             Positioned(
               left: 0,
               right: 0,
-              bottom: 28,
+              bottom: scale.rs(28, min: 18, max: 28),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -255,44 +257,47 @@ class _FeedPhotoCapturePageState extends State<FeedPhotoCapturePage>
                     _isCapturingPhoto
                         ? 'กำลังบันทึกรูป...'
                         : 'แตะปุ่มด้านล่างเพื่อถ่ายรูป',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 14,
+                      fontSize: scale.rf(14, min: 12, max: 14),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: scale.rs(18, min: 12, max: 18)),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const SizedBox(width: 64),
+                      SizedBox(width: scale.rs(64, min: 40, max: 64)),
                       GestureDetector(
                         onTap: _isBusy ? null : _capturePhoto,
                         child: Container(
-                          width: 88,
-                          height: 88,
+                          width: scale.rs(88, min: 72, max: 88),
+                          height: scale.rs(88, min: 72, max: 88),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 5),
+                            border: Border.all(
+                              color: Colors.white,
+                              width: scale.rs(5, min: 4, max: 5),
+                            ),
                             color: Colors.white.withValues(alpha: 0.12),
                           ),
                           child: Center(
                             child: Container(
-                              width: 64,
-                              height: 64,
+                              width: scale.rs(64, min: 50, max: 64),
+                              height: scale.rs(64, min: 50, max: 64),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFFFFF),
                                 shape: BoxShape.circle,
                                 border: Border.all(
                                   color: const Color(0xFFDFDFDF),
-                                  width: 2,
+                                  width: scale.rs(2, min: 1.5, max: 2),
                                 ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 28),
+                      SizedBox(width: scale.rs(28, min: 18, max: 28)),
                       Opacity(
                         opacity: (_cameras.length > 1 && !_isBusy) ? 1 : 0.45,
                         child: _CameraOverlayButton(
@@ -317,26 +322,28 @@ class _FeedPhotoCapturePageState extends State<FeedPhotoCapturePage>
     if (_errorMessage != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          padding: EdgeInsets.symmetric(
+            horizontal: context.responsive.rs(28, min: 20, max: 28),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.camera_alt_outlined,
                 color: Colors.white,
-                size: 52,
+                size: context.responsive.rs(52, min: 42, max: 52),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: context.responsive.rs(16, min: 12, max: 16)),
               Text(
                 _errorMessage!,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
-                  fontSize: 16,
+                  fontSize: context.responsive.rf(16, min: 14, max: 16),
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: context.responsive.rs(20, min: 14, max: 20)),
               FilledButton(
                 onPressed: _loadAvailableCameras,
                 child: const Text('ลองอีกครั้ง'),
@@ -388,6 +395,7 @@ class _CameraOverlayButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Material(
       color: Colors.black.withValues(alpha: 0.35),
       shape: const CircleBorder(),
@@ -395,11 +403,12 @@ class _CameraOverlayButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: SizedBox(
-          width: 48,
-          height: 48,
+          width: scale.rs(48, min: 40, max: 48),
+          height: scale.rs(48, min: 40, max: 48),
           child: Icon(
             icon,
             color: Colors.white,
+            size: scale.rs(24, min: 20, max: 24),
           ),
         ),
       ),

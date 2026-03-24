@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/pet/view/pet_view.dart';
 import 'package:get/get.dart';
 
@@ -40,10 +41,15 @@ class ShopPage extends StatelessWidget {
         bottom: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth < 360 ? 14.0 : 20.0;
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final horizontalPadding = constraints.maxWidth < 360
+                ? scale.rs(14, min: 10, max: 14)
+                : scale.rs(20, min: 14, max: 20);
             final isCompact = constraints.maxWidth < 360;
             final crossAxisCount = isCompact ? 2 : 3;
-            final crossAxisSpacing = isCompact ? 10.0 : 15.0;
+            final crossAxisSpacing = isCompact
+                ? scale.rs(10, min: 8, max: 10)
+                : scale.rs(15, min: 10, max: 15);
 
             return Center(
               child: ConstrainedBox(
@@ -60,7 +66,7 @@ class ShopPage extends StatelessWidget {
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Container(
                           width: double.infinity,
-                          height: 120,
+                          height: scale.rs(120, min: 96, max: 120),
                           color: const Color(0xFF8D6E63),
                           child: const Center(
                             child: Text(
@@ -70,7 +76,7 @@ class ShopPage extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: scale.rs(20, min: 14, max: 20)),
                       // -------------------------------------------------------
                       // 2. Header
                       // -------------------------------------------------------
@@ -79,7 +85,7 @@ class ShopPage extends StatelessWidget {
                           horizontal: horizontalPadding,
                           vertical: 8,
                         ),
-                        height: 50,
+                        height: scale.rs(50, min: 42, max: 50),
                         child: Stack(
                           children: [
                             Center(
@@ -90,10 +96,12 @@ class ShopPage extends StatelessWidget {
                                 ),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFCEEFFE),
-                                  borderRadius: BorderRadius.circular(20),
+                                  borderRadius: BorderRadius.circular(
+                                    scale.rs(20, min: 16, max: 20),
+                                  ),
                                   border: Border.all(
                                     color: const Color(0xFF4489D7),
-                                    width: 2,
+                                    width: scale.rs(2, min: 1.5, max: 2),
                                   ),
                                   boxShadow: [
                                     BoxShadow(
@@ -121,13 +129,14 @@ class ShopPage extends StatelessWidget {
                                   onTap: () => Get.back(),
                                   child: Image.asset(
                                     'assets/images/back.png',
-                                    width: 25,
-                                    height: 25,
+                                    width: scale.rs(25, min: 20, max: 25),
+                                    height: scale.rs(25, min: 20, max: 25),
                                     fit: BoxFit.contain,
                                   ),
                                 ),
                                 Transform.translate(
-                                  offset: const Offset(0, -15),
+                                  offset: Offset(
+                                      0, -scale.rs(15, min: 10, max: 15)),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 10,
@@ -142,8 +151,9 @@ class ShopPage extends StatelessWidget {
                                       children: [
                                         Image.asset(
                                           'assets/images/coin2.png',
-                                          width: 20,
-                                          height: 20,
+                                          width: scale.rs(20, min: 16, max: 20),
+                                          height:
+                                              scale.rs(20, min: 16, max: 20),
                                           fit: BoxFit.contain,
                                         ),
                                         const SizedBox(width: 5),
@@ -172,9 +182,9 @@ class ShopPage extends StatelessWidget {
                       Padding(
                         padding: EdgeInsets.fromLTRB(
                           horizontalPadding,
-                          18,
+                          scale.rs(18, min: 12, max: 18),
                           horizontalPadding,
-                          25,
+                          scale.rs(25, min: 18, max: 25),
                         ),
                         child: GridView.builder(
                           padding: EdgeInsets.zero,
@@ -185,7 +195,7 @@ class ShopPage extends StatelessWidget {
                             crossAxisCount: crossAxisCount,
                             childAspectRatio: 0.90,
                             crossAxisSpacing: crossAxisSpacing,
-                            mainAxisSpacing: 10,
+                            mainAxisSpacing: scale.rs(10, min: 8, max: 10),
                           ),
                           itemCount: shopItems.length,
                           itemBuilder: (context, index) {
@@ -193,11 +203,12 @@ class ShopPage extends StatelessWidget {
                               index,
                               shopItems[index],
                               controller,
+                              scale,
                             );
                           },
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: scale.rs(2, min: 1, max: 2)),
                       // -------------------------------------------------------
                       // 4. Footer Image
                       // -------------------------------------------------------
@@ -205,8 +216,10 @@ class ShopPage extends StatelessWidget {
                         'assets/images/shop2.png',
                         width: double.infinity,
                         fit: BoxFit.cover,
-                        errorBuilder: (c, o, s) =>
-                            Container(height: 80, color: Colors.grey[300]),
+                        errorBuilder: (c, o, s) => Container(
+                          height: scale.rs(80, min: 64, max: 80),
+                          color: Colors.grey[300],
+                        ),
                       ),
                     ],
                   ),
@@ -224,21 +237,22 @@ class ShopPage extends StatelessWidget {
     int index,
     Map<String, dynamic> item,
     Pet controller,
+    ResponsiveScale scale,
   ) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFFCBEAF8),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // รูปสินค้า
           Container(
-            height: 75,
+            height: scale.rs(75, min: 60, max: 75),
             width: double.infinity,
             alignment: Alignment.center,
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(scale.rs(10, min: 8, max: 10)),
             child: Image.asset(
               item['img'],
               fit: BoxFit.contain,
@@ -271,21 +285,22 @@ class ShopPage extends StatelessWidget {
                   // ใส่ Logic การเปลี่ยนชุดตรงนี้ได้เลย
                 },
                 child: Container(
-                  margin: const EdgeInsets.only(bottom: 5),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 4,
+                  margin: EdgeInsets.only(bottom: scale.rs(5, min: 3, max: 5)),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: scale.rs(12, min: 8, max: 12),
+                    vertical: scale.rs(4, min: 2, max: 4),
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFD54F), // สีเหลืองอ่อน (ใช้เลย)
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius:
+                        BorderRadius.circular(scale.rs(25, min: 18, max: 25)),
                   ),
-                  child: const Text(
+                  child: Text(
                     "ใช้เลย",
                     style: TextStyle(
-                      color: Color(0xFF5D4037),
+                      color: const Color(0xFF5D4037),
                       fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      fontSize: scale.rf(12, min: 10.5, max: 12),
                     ),
                   ),
                 ),
@@ -323,31 +338,32 @@ class ShopPage extends StatelessWidget {
                   }
                 },
                 child: Container(
-                  margin: const EdgeInsets.only(bottom: 5),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
+                  margin: EdgeInsets.only(bottom: scale.rs(5, min: 3, max: 5)),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: scale.rs(8, min: 6, max: 8),
+                    vertical: scale.rs(2, min: 1, max: 2),
                   ),
                   decoration: BoxDecoration(
                     color: const Color(0xFFFFA600), // สีส้ม (ราคา)
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius:
+                        BorderRadius.circular(scale.rs(25, min: 18, max: 25)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Image.asset(
                         'assets/images/coin2.png',
-                        width: 22,
-                        height: 22,
+                        width: scale.rs(22, min: 18, max: 22),
+                        height: scale.rs(22, min: 18, max: 22),
                         fit: BoxFit.contain,
                       ),
-                      const SizedBox(width: 5),
+                      SizedBox(width: scale.rs(5, min: 3, max: 5)),
                       Text(
                         "${item['price']}",
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          fontSize: 14,
+                          fontSize: scale.rf(14, min: 12, max: 14),
                         ),
                       ),
                     ],

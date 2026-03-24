@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
@@ -167,6 +168,7 @@ class _FeedPageState extends State<FeedPage> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
             final maxContentWidth =
                 constraints.maxWidth > 620 ? 620.0 : constraints.maxWidth;
 
@@ -216,11 +218,11 @@ class _FeedPageState extends State<FeedPage> {
                                   child: ListView(
                                     physics:
                                         const AlwaysScrollableScrollPhysics(),
-                                    padding: const EdgeInsets.fromLTRB(
-                                      24,
-                                      48,
-                                      24,
-                                      120,
+                                    padding: EdgeInsets.fromLTRB(
+                                      scale.rs(24, min: 16, max: 24),
+                                      scale.rs(48, min: 30, max: 48),
+                                      scale.rs(24, min: 16, max: 24),
+                                      scale.rs(120, min: 90, max: 120),
                                     ),
                                     children: [
                                       _FeedEmptyState(
@@ -236,7 +238,9 @@ class _FeedPageState extends State<FeedPage> {
                                 child: ListView.separated(
                                   physics:
                                       const AlwaysScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.only(bottom: 120),
+                                  padding: EdgeInsets.only(
+                                    bottom: scale.rs(120, min: 90, max: 120),
+                                  ),
                                   itemCount: posts.length,
                                   separatorBuilder: (context, index) => Divider(
                                     thickness: 1,
@@ -376,6 +380,7 @@ class FeedProfilePage extends StatelessWidget {
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {
+          final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
           final maxContentWidth =
               constraints.maxWidth > 620 ? 620.0 : constraints.maxWidth;
 
@@ -395,9 +400,9 @@ class FeedProfilePage extends StatelessWidget {
                           totalLikes: 0,
                         ),
                         Divider(thickness: 1, color: Colors.grey.shade300),
-                        const SizedBox(height: 32),
+                        SizedBox(height: scale.rs(32, min: 22, max: 32)),
                         SizedBox(
-                          height: 280,
+                          height: scale.rs(280, min: 220, max: 280),
                           child: _FeedMessageState(
                             icon: Icons.cloud_off_rounded,
                             title: 'โหลดโปรไฟล์ไม่สำเร็จ',
@@ -430,7 +435,9 @@ class FeedProfilePage extends StatelessWidget {
                         onRefresh: _refreshProfile,
                         child: ListView.separated(
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.only(bottom: 32),
+                          padding: EdgeInsets.only(
+                            bottom: scale.rs(32, min: 24, max: 32),
+                          ),
                           itemCount: posts.isEmpty ? 2 : posts.length + 1,
                           separatorBuilder: (context, index) => Divider(
                               thickness: 1, color: Colors.grey.shade200),
@@ -445,8 +452,8 @@ class FeedProfilePage extends StatelessWidget {
                             }
 
                             if (posts.isEmpty) {
-                              return const SizedBox(
-                                height: 280,
+                              return SizedBox(
+                                height: scale.rs(280, min: 220, max: 280),
                                 child: _FeedMessageState(
                                   icon: Icons.article_outlined,
                                   title: 'ยังไม่มีโพสต์',
@@ -713,6 +720,7 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
     final hasSelectedImage =
         _selectedImageBytes != null && _selectedImageBytes!.isNotEmpty;
@@ -728,7 +736,9 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       child: FractionallySizedBox(
         heightFactor: 0.85,
         child: ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(scale.rs(20, min: 16, max: 20)),
+          ),
           child: Material(
             color: Colors.white,
             child: SafeArea(
@@ -738,9 +748,12 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                 children: [
                   Center(
                     child: Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 10),
-                      width: 45,
-                      height: 5,
+                      margin: EdgeInsets.only(
+                        top: scale.rs(12, min: 8, max: 12),
+                        bottom: scale.rs(10, min: 8, max: 10),
+                      ),
+                      width: scale.rs(45, min: 35, max: 45),
+                      height: scale.rs(5, min: 4, max: 5),
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
                         borderRadius: BorderRadius.circular(10),
@@ -748,9 +761,9 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 15,
-                      vertical: 5,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(15, min: 10, max: 15),
+                      vertical: scale.rs(5, min: 3, max: 5),
                     ),
                     child: Stack(
                       alignment: Alignment.center,
@@ -769,11 +782,11 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                             ),
                           ),
                         ),
-                        const Text(
+                        Text(
                           'NewPost',
                           style: TextStyle(
                             color: Color(0xFF6C6C6C),
-                            fontSize: 18,
+                            fontSize: scale.rf(18, min: 15.5, max: 18),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -782,25 +795,25 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                   ),
                   Divider(height: 1, thickness: 1, color: Colors.grey[200]),
                   Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(10, min: 8, max: 10),
+                      vertical: scale.rs(5, min: 3, max: 5),
                     ),
                     child: Row(
                       children: [
                         _AuthorAvatar(
                           name: widget.composerName,
                           avatarUrl: widget.composerAvatarUrl,
-                          radius: 18,
+                          radius: scale.rs(18, min: 15, max: 18),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: scale.rs(12, min: 8, max: 12)),
                         Expanded(
                           child: Text(
                             widget.composerName,
-                            style: const TextStyle(
-                              fontSize: 18,
+                            style: TextStyle(
+                              fontSize: scale.rf(18, min: 15.5, max: 18),
                               fontWeight: FontWeight.bold,
-                              color: Color(0xFF6C6C6C),
+                              color: const Color(0xFF6C6C6C),
                             ),
                           ),
                         ),
@@ -808,8 +821,8 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                           onTap: _pickImage,
                           child: Image.asset(
                             'assets/images/Picture.png',
-                            width: 50,
-                            height: 50,
+                            width: scale.rs(50, min: 40, max: 50),
+                            height: scale.rs(50, min: 40, max: 50),
                           ),
                         ),
                       ],
@@ -817,12 +830,16 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                   ),
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(bottom: 16),
+                      padding: EdgeInsets.only(
+                        bottom: scale.rs(16, min: 12, max: 16),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: scale.rs(10, min: 8, max: 10),
+                            ),
                             child: TextField(
                               focusNode: _focusNode,
                               autofocus: true,
@@ -831,12 +848,15 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                               maxLength: 120,
                               autocorrect: false,
                               enableSuggestions: false,
-                              style: const TextStyle(fontSize: 16),
-                              decoration: const InputDecoration(
+                              style: TextStyle(
+                                fontSize: scale.rf(16, min: 14, max: 16),
+                              ),
+                              decoration: InputDecoration(
                                 hintText: 'คุณกำลังคิดอะไรอยู่.....',
                                 hintStyle: TextStyle(
                                   color: Color(0xFFCAC9C9),
                                   fontWeight: FontWeight.bold,
+                                  fontSize: scale.rf(14, min: 12, max: 14),
                                 ),
                                 border: InputBorder.none,
                                 counterText: '',
@@ -846,11 +866,18 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                           ),
                           if (hasSelectedImage) ...[
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(10, 4, 10, 14),
+                              padding: EdgeInsets.fromLTRB(
+                                scale.rs(10, min: 8, max: 10),
+                                scale.rs(4, min: 2, max: 4),
+                                scale.rs(10, min: 8, max: 10),
+                                scale.rs(14, min: 10, max: 14),
+                              ),
                               child: Stack(
                                 children: [
                                   ClipRRect(
-                                    borderRadius: BorderRadius.circular(18),
+                                    borderRadius: BorderRadius.circular(
+                                      scale.rs(18, min: 14, max: 18),
+                                    ),
                                     child: AspectRatio(
                                       aspectRatio: 1,
                                       child: Image.memory(
@@ -860,20 +887,23 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                                     ),
                                   ),
                                   Positioned(
-                                    top: 10,
-                                    right: 10,
+                                    top: scale.rs(10, min: 6, max: 10),
+                                    right: scale.rs(10, min: 6, max: 10),
                                     child: Material(
                                       color: Colors.black54,
                                       shape: const CircleBorder(),
                                       child: InkWell(
                                         customBorder: const CircleBorder(),
                                         onTap: _removeSelectedImage,
-                                        child: const Padding(
-                                          padding: EdgeInsets.all(6),
+                                        child: Padding(
+                                          padding: EdgeInsets.all(
+                                            scale.rs(6, min: 4, max: 6),
+                                          ),
                                           child: Icon(
                                             Icons.close,
                                             color: Colors.white,
-                                            size: 18,
+                                            size:
+                                                scale.rs(18, min: 14, max: 18),
                                           ),
                                         ),
                                       ),
@@ -883,16 +913,17 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                               ),
                             ),
                             Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 12),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: scale.rs(12, min: 8, max: 12),
+                              ),
                               child: Row(
                                 children: [
                                   Icon(
                                     Icons.image_outlined,
-                                    size: 18,
+                                    size: scale.rs(18, min: 14, max: 18),
                                     color: Colors.grey.shade500,
                                   ),
-                                  const SizedBox(width: 6),
+                                  SizedBox(width: scale.rs(6, min: 4, max: 6)),
                                   Expanded(
                                     child: Text(
                                       _selectedImageName ?? 'รูปที่เลือก',
@@ -900,7 +931,8 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: Colors.grey.shade600,
-                                        fontSize: 13,
+                                        fontSize:
+                                            scale.rf(13, min: 11.5, max: 13),
                                         fontWeight: FontWeight.w600,
                                       ),
                                     ),
@@ -908,18 +940,18 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: scale.rs(8, min: 6, max: 8)),
                           ],
                         ],
                       ),
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.only(
-                      right: 15,
-                      left: 15,
-                      top: 5,
-                      bottom: 12,
+                    padding: EdgeInsets.only(
+                      right: scale.rs(15, min: 10, max: 15),
+                      left: scale.rs(15, min: 10, max: 15),
+                      top: scale.rs(5, min: 3, max: 5),
+                      bottom: scale.rs(12, min: 8, max: 12),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.end,
@@ -929,19 +961,21 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                           children: [
                             Text(
                               '${_controller.text.length}/120',
-                              style: const TextStyle(
-                                color: Color(0xFFC3C3C3),
-                                fontSize: 13,
+                              style: TextStyle(
+                                color: const Color(0xFFC3C3C3),
+                                fontSize: scale.rf(13, min: 11.5, max: 13),
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: scale.rs(8, min: 6, max: 8)),
                             if (_isPickingImage)
-                              const Padding(
-                                padding: EdgeInsets.only(bottom: 8),
+                              Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: scale.rs(8, min: 6, max: 8),
+                                ),
                                 child: SizedBox(
-                                  width: 18,
-                                  height: 18,
+                                  width: scale.rs(18, min: 14, max: 18),
+                                  height: scale.rs(18, min: 14, max: 18),
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: Color(0xFF5CD9FF),
@@ -954,29 +988,33 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                                 duration: const Duration(milliseconds: 150),
                                 opacity: canSubmit ? 1 : 0.55,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 26,
-                                    vertical: 8,
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: scale.rs(26, min: 20, max: 26),
+                                    vertical: scale.rs(8, min: 6, max: 8),
                                   ),
                                   decoration: BoxDecoration(
                                     color: const Color(0xFF5CD9FF),
-                                    borderRadius: BorderRadius.circular(20),
+                                    borderRadius: BorderRadius.circular(
+                                      scale.rs(20, min: 16, max: 20),
+                                    ),
                                   ),
                                   child: _isSubmitting
-                                      ? const SizedBox(
-                                          width: 18,
-                                          height: 18,
+                                      ? SizedBox(
+                                          width: scale.rs(18, min: 14, max: 18),
+                                          height:
+                                              scale.rs(18, min: 14, max: 18),
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
                                             color: Colors.white,
                                           ),
                                         )
-                                      : const Text(
+                                      : Text(
                                           'POST',
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 16,
+                                            fontSize:
+                                                scale.rf(16, min: 14, max: 16),
                                           ),
                                         ),
                                 ),
@@ -1002,55 +1040,65 @@ class _FeedImageSourceSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Align(
       alignment: Alignment.bottomCenter,
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(scale.rs(28, min: 20, max: 28)),
+        ),
         child: Material(
           color: Colors.white,
           child: SafeArea(
             top: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+              padding: EdgeInsets.fromLTRB(
+                scale.rs(24, min: 16, max: 24),
+                scale.rs(20, min: 14, max: 20),
+                scale.rs(24, min: 16, max: 24),
+                scale.rs(24, min: 16, max: 24),
+              ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
                     child: Container(
-                      width: 45,
-                      height: 5,
-                      margin: const EdgeInsets.only(bottom: 16),
+                      width: scale.rs(45, min: 35, max: 45),
+                      height: scale.rs(5, min: 4, max: 5),
+                      margin: EdgeInsets.only(
+                        bottom: scale.rs(16, min: 10, max: 16),
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.grey[300],
                         borderRadius: BorderRadius.circular(999),
                       ),
                     ),
                   ),
-                  const Text(
+                  Text(
                     'เพิ่มรูปภาพ',
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: scale.rf(18, min: 15.5, max: 18),
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF4489D7),
+                      color: const Color(0xFF4489D7),
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  SizedBox(height: scale.rs(6, min: 4, max: 6)),
                   Text(
                     'เลือกรูปจากกล้องหรือรูปที่มีอยู่ในเครื่อง',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: scale.rf(14, min: 12, max: 14),
                       color: Colors.black.withValues(alpha: 0.65),
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: scale.rs(18, min: 12, max: 18)),
                   _FeedImageSourceTile(
                     icon: Icons.camera_alt_rounded,
                     title: 'ถ่ายรูป',
                     subtitle: 'เปิดกล้องเพื่อถ่ายรูปแล้วนำมาโพสต์',
                     onTap: () => Navigator.of(context).pop(ImageSource.camera),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: scale.rs(12, min: 8, max: 12)),
                   _FeedImageSourceTile(
                     icon: Icons.photo_library_rounded,
                     title: 'เลือกจากคลัง',
@@ -1082,46 +1130,49 @@ class _FeedImageSourceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Material(
       color: const Color(0xFFF4FAFF),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(scale.rs(22, min: 16, max: 22)),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(scale.rs(22, min: 16, max: 22)),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(scale.rs(16, min: 12, max: 16)),
           child: Row(
             children: [
               Container(
-                width: 46,
-                height: 46,
+                width: scale.rs(46, min: 36, max: 46),
+                height: scale.rs(46, min: 36, max: 46),
                 decoration: BoxDecoration(
                   color: const Color(0xFF4489D7).withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius:
+                      BorderRadius.circular(scale.rs(16, min: 12, max: 16)),
                 ),
                 child: Icon(
                   icon,
                   color: const Color(0xFF4489D7),
+                  size: scale.rs(24, min: 20, max: 24),
                 ),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: scale.rs(14, min: 10, max: 14)),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
-                        fontSize: 16,
+                      style: TextStyle(
+                        fontSize: scale.rf(16, min: 14, max: 16),
                         fontWeight: FontWeight.w700,
                         color: Colors.black87,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: scale.rs(4, min: 2, max: 4)),
                     Text(
                       subtitle,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: scale.rf(13, min: 11.5, max: 13),
                         height: 1.35,
                         color: Colors.black.withValues(alpha: 0.6),
                       ),
@@ -1129,10 +1180,11 @@ class _FeedImageSourceTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              const Icon(
+              SizedBox(width: scale.rs(12, min: 8, max: 12)),
+              Icon(
                 Icons.chevron_right_rounded,
                 color: Color(0xFF4489D7),
+                size: scale.rs(24, min: 20, max: 24),
               ),
             ],
           ),
@@ -1221,8 +1273,12 @@ class _FeedPostCardState extends State<FeedPostCard> {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: scale.rs(16, min: 12, max: 16),
+        vertical: scale.rs(12, min: 8, max: 12),
+      ),
       color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1234,18 +1290,18 @@ class _FeedPostCardState extends State<FeedPostCard> {
                 child: _AuthorAvatar(
                   name: widget.post.authorName,
                   avatarUrl: widget.post.authorAvatarUrl,
-                  radius: 20,
+                  radius: scale.rs(20, min: 16, max: 20),
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: scale.rs(10, min: 8, max: 10)),
               Expanded(
                 child: GestureDetector(
                   onTap: widget.onAuthorTap,
                   child: Text(
                     widget.post.authorName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 16,
+                      fontSize: scale.rf(16, min: 14, max: 16),
                       color: Colors.grey,
                     ),
                   ),
@@ -1268,7 +1324,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
             ],
           ),
           if (widget.post.content.trim().isNotEmpty) ...[
-            const SizedBox(height: 10),
+            SizedBox(height: scale.rs(10, min: 8, max: 10)),
             Text(
               widget.post.content,
               style: const TextStyle(
@@ -1278,7 +1334,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
             ),
           ],
           if ((widget.post.imageUrl ?? '').isNotEmpty) ...[
-            const SizedBox(height: 12),
+            SizedBox(height: scale.rs(12, min: 8, max: 12)),
             LayoutBuilder(
               builder: (context, constraints) {
                 final maxCardWidth = constraints.maxWidth;
@@ -1286,7 +1342,8 @@ class _FeedPostCardState extends State<FeedPostCard> {
 
                 return Center(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius:
+                        BorderRadius.circular(scale.rs(15, min: 12, max: 15)),
                     child: SizedBox(
                       width: imageWidth,
                       height: imageWidth * 1.2,
@@ -1309,7 +1366,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
               },
             ),
           ],
-          const SizedBox(height: 10),
+          SizedBox(height: scale.rs(10, min: 8, max: 10)),
           GestureDetector(
             onTap: _handleToggleLike,
             child: Row(
@@ -1319,9 +1376,9 @@ class _FeedPostCardState extends State<FeedPostCard> {
                   _displayIsLiked ? Icons.favorite : Icons.favorite_border,
                   color:
                       _displayIsLiked ? const Color(0xFF4489D7) : Colors.grey,
-                  size: 32,
+                  size: scale.rs(32, min: 26, max: 32),
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: scale.rs(6, min: 4, max: 6)),
                 Text(
                   _displayLikeCount.toString(),
                   style: TextStyle(
@@ -1354,15 +1411,18 @@ class _FeedHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
+          padding: EdgeInsets.symmetric(
+            vertical: scale.rs(20, min: 14, max: 20),
+          ),
           child: Center(
             child: Image.asset(
               'assets/images/logo.png',
-              width: 65,
-              height: 88,
+              width: scale.rs(65, min: 52, max: 65),
+              height: scale.rs(88, min: 70, max: 88),
             ),
           ),
         ),
@@ -1370,26 +1430,30 @@ class _FeedHeader extends StatelessWidget {
         Material(
           color: Colors.white,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: EdgeInsets.symmetric(
+              horizontal: scale.rs(16, min: 12, max: 16),
+              vertical: scale.rs(10, min: 8, max: 10),
+            ),
             child: Row(
               children: [
                 Expanded(
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(18),
+                    borderRadius:
+                        BorderRadius.circular(scale.rs(18, min: 14, max: 18)),
                     onTap: onComposerTap,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 4,
-                        horizontal: 2,
+                      padding: EdgeInsets.symmetric(
+                        vertical: scale.rs(4, min: 2, max: 4),
+                        horizontal: scale.rs(2, min: 1, max: 2),
                       ),
                       child: Row(
                         children: [
                           _AuthorAvatar(
                             name: 'คุณ',
                             avatarUrl: composerAvatarUrl,
-                            radius: 20,
+                            radius: scale.rs(20, min: 16, max: 20),
                           ),
-                          const SizedBox(width: 15),
+                          SizedBox(width: scale.rs(15, min: 10, max: 15)),
                           Expanded(
                             child: Text(
                               isLoadingComposer
@@ -1397,7 +1461,7 @@ class _FeedHeader extends StatelessWidget {
                                   : 'คุณกำลังคิดอะไรอยู่.....',
                               style: TextStyle(
                                 color: Colors.grey.shade400,
-                                fontSize: 16,
+                                fontSize: scale.rf(16, min: 14, max: 16),
                               ),
                             ),
                           ),
@@ -1406,16 +1470,17 @@ class _FeedHeader extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: scale.rs(6, min: 4, max: 6)),
                 InkWell(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius:
+                      BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
                   onTap: onImageTap,
                   child: Padding(
-                    padding: const EdgeInsets.all(6),
+                    padding: EdgeInsets.all(scale.rs(6, min: 4, max: 6)),
                     child: Image.asset(
                       'assets/images/Picture.png',
-                      width: 40,
-                      height: 35,
+                      width: scale.rs(40, min: 32, max: 40),
+                      height: scale.rs(35, min: 28, max: 35),
                       fit: BoxFit.contain,
                       color: Colors.grey,
                     ),
@@ -1438,25 +1503,34 @@ class _FeedEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Column(
       children: [
-        Icon(Icons.forum_outlined, size: 44, color: Colors.grey.shade400),
-        const SizedBox(height: 12),
-        const Text(
+        Icon(
+          Icons.forum_outlined,
+          size: scale.rs(44, min: 34, max: 44),
+          color: Colors.grey.shade400,
+        ),
+        SizedBox(height: scale.rs(12, min: 8, max: 12)),
+        Text(
           'ยังไม่มีโพสต์ในชุมชน',
           style: TextStyle(
-            fontSize: 18,
+            fontSize: scale.rf(18, min: 15.5, max: 18),
             fontWeight: FontWeight.bold,
             color: Colors.grey,
           ),
         ),
-        const SizedBox(height: 8),
-        const Text(
+        SizedBox(height: scale.rs(8, min: 6, max: 8)),
+        Text(
           'เริ่มโพสต์แรกเพื่อให้ feed นี้เริ่มใช้งานได้จริง',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.grey, height: 1.5),
+          style: TextStyle(
+            color: Colors.grey,
+            height: 1.5,
+            fontSize: scale.rf(14, min: 12, max: 14),
+          ),
         ),
-        const SizedBox(height: 18),
+        SizedBox(height: scale.rs(18, min: 12, max: 18)),
         OutlinedButton(
           onPressed: onCreatePost,
           style: OutlinedButton.styleFrom(
@@ -1486,30 +1560,37 @@ class _FeedMessageState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(scale.rs(24, min: 16, max: 24)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
+            Icon(icon,
+                size: scale.rs(48, min: 38, max: 48),
+                color: Colors.grey.shade400),
+            SizedBox(height: scale.rs(12, min: 8, max: 12)),
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 18,
+              style: TextStyle(
+                fontSize: scale.rf(18, min: 15.5, max: 18),
                 fontWeight: FontWeight.bold,
                 color: Colors.grey,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: scale.rs(8, min: 6, max: 8)),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.grey, height: 1.5),
+              style: TextStyle(
+                color: Colors.grey,
+                height: 1.5,
+                fontSize: scale.rf(14, min: 12, max: 14),
+              ),
             ),
             if (actionLabel != null && onAction != null) ...[
-              const SizedBox(height: 18),
+              SizedBox(height: scale.rs(18, min: 12, max: 18)),
               OutlinedButton(
                 onPressed: () => onAction?.call(),
                 child: Text(actionLabel!),
@@ -1537,29 +1618,35 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scale = context.responsive;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+      padding: EdgeInsets.fromLTRB(
+        scale.rs(24, min: 16, max: 24),
+        scale.rs(20, min: 14, max: 20),
+        scale.rs(24, min: 16, max: 24),
+        scale.rs(20, min: 14, max: 20),
+      ),
       child: Column(
         children: [
           _AuthorAvatar(
             name: authorName,
             avatarUrl: authorAvatarUrl,
-            radius: 50,
+            radius: scale.rs(50, min: 40, max: 50),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: scale.rs(10, min: 8, max: 10)),
           Text(
             authorName,
-            style: const TextStyle(
-              fontSize: 24,
+            style: TextStyle(
+              fontSize: scale.rf(24, min: 20, max: 24),
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: scale.rs(8, min: 6, max: 8)),
           Text(
             '$postCount โพสต์ • $totalLikes ถูกใจ',
             style: TextStyle(
               color: Colors.grey.shade500,
-              fontSize: 13,
+              fontSize: scale.rf(13, min: 11.5, max: 13),
             ),
           ),
         ],

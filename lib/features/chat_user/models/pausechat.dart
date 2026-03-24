@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:get/get.dart';
 
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
@@ -172,6 +173,7 @@ class _PauseChatPageState extends State<PauseChatPage>
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
+              final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
               final rippleOrbit = (constraints.maxWidth * 0.92).clamp(
                 240.0,
                 350.0,
@@ -180,14 +182,18 @@ class _PauseChatPageState extends State<PauseChatPage>
               final innerAvatar = (outerAvatar * 0.81).clamp(120.0, 170.0);
 
               return SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 24),
+                padding: EdgeInsets.only(
+                  bottom: scale.rs(24, min: 16, max: 24),
+                ),
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: Column(
                     children: [
-                      const SizedBox(height: 15),
+                      SizedBox(height: scale.rs(15, min: 10, max: 15)),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: scale.rs(10, min: 8, max: 10),
+                        ),
                         child: Row(
                           children: [
                             IconButton(
@@ -195,17 +201,17 @@ class _PauseChatPageState extends State<PauseChatPage>
                               constraints: const BoxConstraints(),
                               icon: Image.asset(
                                 'assets/images/back.png',
-                                width: 25,
-                                height: 25,
+                                width: scale.rs(25, min: 20, max: 25),
+                                height: scale.rs(25, min: 20, max: 25),
                               ),
                               onPressed: _goHome,
                             ),
-                            const Expanded(
+                            Expanded(
                               child: Text(
                                 'มีคนกำลังรอแชทกับคุณ',
                                 style: TextStyle(
-                                  color: Color(0xFF4489D7),
-                                  fontSize: 22,
+                                  color: const Color(0xFF4489D7),
+                                  fontSize: scale.rf(22, min: 18, max: 22),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -213,17 +219,17 @@ class _PauseChatPageState extends State<PauseChatPage>
                           ],
                         ),
                       ),
-                      const SizedBox(height: 48),
+                      SizedBox(height: scale.rs(48, min: 32, max: 48)),
                       Text(
                         _isNameLoading ? '...' : _displayName,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFF4489D7),
-                          fontSize: 22,
+                          color: const Color(0xFF4489D7),
+                          fontSize: scale.rf(22, min: 18, max: 22),
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 30),
+                      SizedBox(height: scale.rs(30, min: 20, max: 30)),
                       Center(
                         child: SizedBox(
                           width: rippleOrbit,
@@ -272,9 +278,9 @@ class _PauseChatPageState extends State<PauseChatPage>
                                         fit: BoxFit.cover,
                                         errorBuilder:
                                             (context, error, stackTrace) =>
-                                                const Icon(
+                                                Icon(
                                           Icons.forum_rounded,
-                                          size: 82,
+                                          size: scale.rs(82, min: 66, max: 82),
                                           color: _primaryBlue,
                                         ),
                                       ),
@@ -301,6 +307,7 @@ class _PauseChatPageState extends State<PauseChatPage>
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
+        final scale = context.responsive;
         final screenWidth = MediaQuery.sizeOf(context).width;
         final baseSize = screenWidth < 360 ? 150.0 : 210.0;
         final spreadSize = screenWidth < 360 ? 100.0 : 140.0;
@@ -317,7 +324,7 @@ class _PauseChatPageState extends State<PauseChatPage>
             color: const Color(0xFFF3BDBD).withValues(alpha: opacity),
             border: Border.all(
               color: Colors.white.withValues(alpha: opacity * 0.8),
-              width: 1.5,
+              width: scale.rs(1.5, min: 1.1, max: 1.5),
             ),
           ),
         );
