@@ -10,6 +10,7 @@ import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 
 // ==========================================
 // 💡 1. HomeController
@@ -22,7 +23,6 @@ class HomeController extends GetxController {
   final ImagePicker _picker = ImagePicker();
   final RxString selectedVideoPath = ''.obs;
 
-  // 💡 2. เปลี่ยน clipList เป็น RxList (.obs) เพื่อให้ UI อัปเดตอัตโนมัติเวลาลงคลิปใหม่
   final RxList<Map<String, dynamic>> clipList = <Map<String, dynamic>>[
     {
       "title": "Jellyfish",
@@ -54,41 +54,30 @@ class HomeController extends GetxController {
     },
   ].obs;
 
-  // 💡 Panel กรอกประจำเดือน (แสดงครั้งเดียวเมื่อเข้า Home)
   bool hasShownPeriodPanel = false;
   final TextEditingController periodRangeController = TextEditingController();
 
-  // 💡 3. เพิ่มฟังก์ชัน addNewClip เพื่อให้หน้า Post เรียกใช้งาน (เส้นแดงในหน้า post.dart จะหายไป)
   void addNewClip(String videoPath, String caption) {
     clipList.insert(0, {
       "title": "seal",
       "subtitle": "Just now",
-      // ใช้ path วิดีโอจริงเป็น thumbnail (ดึงเฟรมแรกจากไฟล์)
       "imagePath": videoPath,
       "videoPath": videoPath,
       "caption": caption,
     });
   }
 
-  // 💡 4. แก้ไข pickMedia ให้เด้งไปหน้า Post
   Future<void> pickMedia() async {
     try {
-      // โพสต์จากหน้า Home รองรับเฉพาะวิดีโอ
       final XFile? file = await _picker.pickVideo(source: ImageSource.gallery);
 
       if (file != null) {
         selectedVideoPath.value = file.path;
-
-        print("เลือกไฟล์สำเร็จ! ไปหน้าโพสต์...");
-
-        // เปิดหน้า Post แบบ BottomSheet ให้ UI เหมือนกันทุกจุด
         showPostSheet(
           mediaFile: file,
           isVideo: true,
           mode: PostComposerMode.homeVideoOnly,
         );
-      } else {
-        print("ผู้ใช้ยกเลิกการเลือก");
       }
     } catch (e) {
       print("เกิดข้อผิดพลาดในการดึงไฟล์: $e");
@@ -159,102 +148,234 @@ class HomePage extends StatelessWidget {
       : Get.put(HomeController());
 
   void _showPeriodPanel() {
+    // สร้างตัวแปรเก็บวันที่ไว้ในฟังก์ชัน
+    DateTime? selectedStart;
+    DateTime? selectedEnd;
+
     Get.bottomSheet(
-      ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        child: Container(
-          color: Colors.white,
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 16),
-                      width: 45,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
+      // 💡 ใช้ StatefulBuilder เพื่อให้ปุ่มเปลี่ยนข้อความได้เวลาเลือกวันเสร็จ
+      StatefulBuilder(
+        builder: (BuildContext context, StateSetter setStateSheet) {
+          return Container(
+            padding: const EdgeInsets.only(
+              left: 24,
+              right: 24,
+              bottom: 30,
+              top: 10,
+            ),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // --- ขีดสีเทาด้านบน ---
+                Container(
+                  width: 50,
+                  height: 5,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  const Text(
-                    'คุณยังไม่ได้ใส่ประจำเดือน- คุณต้องการที่จะใส่ไหม',
-                    style: TextStyle(
-                      color: Color(0xFF8E8E8E),
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
+                ),
+
+                // --- ข้อความหัวข้อ ---
+                const Text(
+                  'คุณยังไม่ได้ใส่ประจำเดือนนะ คุณต้องการที่จะใส่ไหม',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Color(0xFF8E8E8E),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(height: 12),
-                  Container(
-                    height: 50,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3F3F3),
-                      borderRadius: BorderRadius.circular(25),
+                ),
+                const SizedBox(height: 25),
+
+                // --- ส่วนเลือกวันที่ ---
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // 💡 ปุ่มเลือกวันเริ่ม
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedStart ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            // อัปเดต UI บน Panel
+                            setStateSheet(() => selectedStart = picked);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F5F5), // สีเทาอ่อนแบบในรูป
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            selectedStart != null
+                                ? DateFormat('dd/MM/yy').format(selectedStart!)
+                                : 'วันที่เริ่ม',
+                            style: TextStyle(
+                              color: selectedStart != null
+                                  ? const Color(0xFF6A6A6A)
+                                  : const Color(0xFFB0B0B0),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                    child: TextField(
-                      textAlignVertical: TextAlignVertical.center,
-                      controller: controller.periodRangeController,
-                      readOnly: true,
-                      style: const TextStyle(
-                        color: Color(0xFF6A6A6A),
-                        fontSize: 18,
-                      ),
-                      decoration: InputDecoration(
-                        border: InputBorder.none,
-                        isDense: true,
-                        hintText: 'dd/mm/yy-dd/mm/yy',
-                        hintStyle: TextStyle(
-                          color: Color(0xFFB0B0B0),
-                          fontSize: 18,
-                        ),
-                        suffixIcon: Image.asset(
-                          "assets/images/calendar.png",
-                          width: 10,
-                          height: 10,
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Get.back(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF20C2FF),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                      child: const Text(
-                        'บันทึก',
+
+                    // เครื่องหมายลบตรงกลาง
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 15),
+                      child: Text(
+                        "-",
                         style: TextStyle(
-                          fontSize: 16,
+                          color: Color(0xFF5CC0FF), // สีฟ้าตามดีไซน์
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
+
+                    // 💡 ปุ่มเลือกวันจบ
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate:
+                                selectedEnd ?? selectedStart ?? DateTime.now(),
+                            firstDate:
+                                selectedStart ??
+                                DateTime(2000), // วันจบต้องไม่ก่อนวันเริ่ม
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            // อัปเดต UI บน Panel
+                            setStateSheet(() => selectedEnd = picked);
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF5F5F5),
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            selectedEnd != null
+                                ? DateFormat('dd/MM/yy').format(selectedEnd!)
+                                : 'วันที่สิ้นสุด',
+                            style: TextStyle(
+                              color: selectedEnd != null
+                                  ? const Color(0xFF6A6A6A)
+                                  : const Color(0xFFB0B0B0),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 25),
+
+                // --- ปุ่มบันทึก ---
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      if (selectedStart != null && selectedEnd != null) {
+                        // เซฟเข้า Controller
+                        final String start = DateFormat(
+                          'dd/MM/yy',
+                        ).format(selectedStart!);
+                        final String end = DateFormat(
+                          'dd/MM/yy',
+                        ).format(selectedEnd!);
+                        controller.periodRangeController.text = '$start - $end';
+                        Get.back(); // ปิด Panel
+                      } else {
+                        // แจ้งเตือนถ้ายังเลือกไม่ครบ
+                        Get.snackbar(
+                          "แจ้งเตือน",
+                          "กรุณาเลือกทั้งวันเริ่มต้นและวันสิ้นสุด",
+                          backgroundColor: const Color(0xFF5CC0FF),
+                          colorText: Colors.white,
+                        );
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(
+                        0xFF5CC0FF,
+                      ), // สีฟ้าตามดีไซน์
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text(
+                      'บันทึก',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent, // ให้ Container โชว์ขอบมนได้
+    );
+  }
+
+  // 💡 วิดเจ็ตปุ่มสำหรับเลือกวันที่
+  Widget _buildDateButton({
+    required BuildContext context,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF3F3F3),
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: const Color(0xFFE0E0E0)),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: label.contains('/')
+                  ? const Color(0xFF4489D7)
+                  : const Color(0xFFB0B0B0),
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
       ),
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
     );
   }
 
@@ -295,9 +416,9 @@ class HomePage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 5),
-              Text(
-                'สวัสดี,$name',
-                style: const TextStyle(
+              const Text(
+                'สวัสดี, $name',
+                style: TextStyle(
                   color: Color(0xFF4489D7),
                   fontSize: 24,
                   fontWeight: FontWeight.w900,
@@ -312,10 +433,10 @@ class HomePage extends StatelessWidget {
                   controller: controller.pageController,
                   onPageChanged: (index) =>
                       controller.currentBannerIndex.value = index,
-                  children: [
-                    const DailyMissionBanner(),
-                    const ClownFishBanner(),
-                    const LoveJobBanner(),
+                  children: const [
+                    DailyMissionBanner(),
+                    ClownFishBanner(),
+                    LoveJobBanner(),
                   ],
                 ),
               ),
@@ -347,10 +468,9 @@ class HomePage extends StatelessWidget {
               const HomeSectionHeader(title: 'คลิปสั้น'),
               const SizedBox(height: 15),
 
-              // --- 💡 ส่วนแสดงคลิปสั้น ---
+              // --- ส่วนแสดงคลิปสั้น ---
               SizedBox(
                 height: 160,
-                // 💡 5. ใช้ Obx ครอบ ListView เพื่อให้เวลาเพิ่มคลิปใหม่ UI จะรีเฟรชเอง
                 child: Obx(
                   () => ListView.separated(
                     scrollDirection: Axis.horizontal,
@@ -363,8 +483,7 @@ class HomePage extends StatelessWidget {
                       if (index == 0) {
                         return GestureDetector(
                           onTap: () {
-                            controller
-                                .pickMedia(); // เรียกฟังก์ชันเปิดแกลเลอรี่
+                            controller.pickMedia();
                           },
                           child: Container(
                             width: 110,
@@ -424,7 +543,7 @@ class HomePage extends StatelessWidget {
               const HomeSectionHeader(title: 'บทความจิตวิทยา'),
               const SizedBox(height: 15),
 
-              // --- 💡 ส่วนแสดงบทความ ---
+              // --- ส่วนแสดงบทความ ---
               SizedBox(
                 height: 210,
                 child: ListView.separated(
