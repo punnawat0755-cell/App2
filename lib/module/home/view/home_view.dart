@@ -11,6 +11,7 @@ import 'package:flutter_application_1/module/user_Profile/widget/app_profile_ava
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // 💡 นำเข้า SharedPreferences
 
 // ==========================================
 // 💡 1. HomeController
@@ -57,6 +58,32 @@ class HomeController extends GetxController {
   bool hasShownPeriodPanel = false;
   final TextEditingController periodRangeController = TextEditingController();
 
+  // 💡 ฟังก์ชันเช็คว่าควรโชว์ Popup ไหม (เช็คว่าครบ 4 ชม. หรือยัง)
+  Future<bool> shouldShowPeriodPanel() async {
+    final prefs = await SharedPreferences.getInstance();
+    final String? nextShowTimeStr = prefs.getString('next_period_prompt_time');
+
+    if (nextShowTimeStr != null) {
+      final DateTime nextShowTime = DateTime.parse(nextShowTimeStr);
+      if (DateTime.now().isBefore(nextShowTime)) {
+        return false; // ยังไม่ถึงเวลา 4 ชม. ไม่ต้องโชว์
+      }
+    }
+    return true; // ถึงเวลาแล้ว ให้โชว์ได้
+  }
+
+  // 💡 ฟังก์ชันแอบตั้งเวลาไปอีก 4 ชม. (ทำงานเงียบๆ เบื้องหลัง)
+  Future<void> setNextPromptIn4Hours() async {
+    final prefs = await SharedPreferences.getInstance();
+    final DateTime nextTime = DateTime.now().add(
+      const Duration(hours: 4),
+    ); // 💡 เปลี่ยน hours: 4 ตรงนี้ถ้าอยากเทสเวลาอื่น
+    await prefs.setString(
+      'next_period_prompt_time',
+      nextTime.toIso8601String(),
+    );
+  }
+
   void addNewClip(String videoPath, String caption) {
     clipList.insert(0, {
       "title": "seal",
@@ -70,7 +97,6 @@ class HomeController extends GetxController {
   Future<void> pickMedia() async {
     try {
       final XFile? file = await _picker.pickVideo(source: ImageSource.gallery);
-
       if (file != null) {
         selectedVideoPath.value = file.path;
         showPostSheet(
@@ -90,7 +116,7 @@ class HomeController extends GetxController {
       "subtitle": '1 Month Ago',
       "imagePath": 'assets/images/52Hz.png',
       "detailImage": 'assets/images/article1.png',
-      "content": "เคยถูกใช้เป็นภาพสะท้อนความเหงา... (เนื้อหายาว)",
+      "content": "เคยถูกใช้เป็นภาพสะท้อนความเหงา...",
     },
     {
       "title": 'อยู่คนเดียวก็มีความ\nสุขดีนะ',
@@ -148,12 +174,11 @@ class HomePage extends StatelessWidget {
       : Get.put(HomeController());
 
   void _showPeriodPanel() {
-    // สร้างตัวแปรเก็บวันที่ไว้ในฟังก์ชัน
     DateTime? selectedStart;
     DateTime? selectedEnd;
+    bool isSaved = false; // ตัวแปรเช็คว่าผู้ใช้กดปุ่มบันทึกหรือยัง
 
     Get.bottomSheet(
-      // 💡 ใช้ StatefulBuilder เพื่อให้ปุ่มเปลี่ยนข้อความได้เวลาเลือกวันเสร็จ
       StatefulBuilder(
         builder: (BuildContext context, StateSetter setStateSheet) {
           return Container(
@@ -208,14 +233,13 @@ class HomePage extends StatelessWidget {
                             lastDate: DateTime(2100),
                           );
                           if (picked != null) {
-                            // อัปเดต UI บน Panel
                             setStateSheet(() => selectedStart = picked);
                           }
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF5F5F5), // สีเทาอ่อนแบบในรูป
+                            color: const Color(0xFFF5F5F5), // สีเทาอ่อน
                             borderRadius: BorderRadius.circular(25),
                           ),
                           alignment: Alignment.center,
@@ -241,7 +265,7 @@ class HomePage extends StatelessWidget {
                       child: Text(
                         "-",
                         style: TextStyle(
-                          color: Color(0xFF5CC0FF), // สีฟ้าตามดีไซน์
+                          color: Color(0xFF5CC0FF), // สีฟ้า
                           fontSize: 28,
                           fontWeight: FontWeight.bold,
                         ),
@@ -262,7 +286,6 @@ class HomePage extends StatelessWidget {
                             lastDate: DateTime(2100),
                           );
                           if (picked != null) {
-                            // อัปเดต UI บน Panel
                             setStateSheet(() => selectedEnd = picked);
                           }
                         },
@@ -306,9 +329,11 @@ class HomePage extends StatelessWidget {
                           'dd/MM/yy',
                         ).format(selectedEnd!);
                         controller.periodRangeController.text = '$start - $end';
+
+                        isSaved =
+                            true; // 💡 กำหนดสถานะว่าบันทึกแล้ว จะได้ไม่ไปรันตอน whenComplete
                         Get.back(); // ปิด Panel
                       } else {
-                        // แจ้งเตือนถ้ายังเลือกไม่ครบ
                         Get.snackbar(
                           "แจ้งเตือน",
                           "กรุณาเลือกทั้งวันเริ่มต้นและวันสิ้นสุด",
@@ -344,50 +369,33 @@ class HomePage extends StatelessWidget {
       ),
       isScrollControlled: true,
       backgroundColor: Colors.transparent, // ให้ Container โชว์ขอบมนได้
-    );
-  }
-
-  // 💡 วิดเจ็ตปุ่มสำหรับเลือกวันที่
-  Widget _buildDateButton({
-    required BuildContext context,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF3F3F3),
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: const Color(0xFFE0E0E0)),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            label,
-            style: TextStyle(
-              color: label.contains('/')
-                  ? const Color(0xFF4489D7)
-                  : const Color(0xFFB0B0B0),
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ),
-    );
+    ).whenComplete(() {
+      // 💡 โค้ดส่วนนี้จะทำงานเมื่อ Popup หายไป
+      if (!isSaved) {
+        // ถ้าผู้ใช้ปัดทิ้ง โดยยังไม่ได้กดบันทึก ให้ตั้งเวลา 4 ชม. อัตโนมัติ
+        controller.setNextPromptIn4Hours();
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     const name = 'Seal';
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+
+    // 💡 เช็คเวลาก่อนโชว์ Popup
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!controller.hasShownPeriodPanel) {
-        controller.hasShownPeriodPanel = true;
-        _showPeriodPanel();
+        bool shouldShow = await controller.shouldShowPeriodPanel();
+        if (shouldShow) {
+          controller.hasShownPeriodPanel = true;
+          _showPeriodPanel();
+        } else {
+          // ถ้ายังไม่ถึงเวลา ก็ตั้ง flag เป็น true ไว้เลยจะได้ไม่เช็คซ้ำในการเรนเดอร์ครั้งนี้
+          controller.hasShownPeriodPanel = true;
+        }
       }
     });
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(

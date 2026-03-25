@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/module/feed/view/feed_view.dart';
-// 💡 Import HomeController เพื่อส่งข้อมูลคลิปสั้นกลับไป
 import 'package:flutter_application_1/module/home/view/home_view.dart';
 import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart';
 import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
@@ -161,7 +160,9 @@ class PostPage extends StatelessWidget {
     if (mediaFile != null) {
       final path = mediaFile!.path.toLowerCase();
       final looksLikeVideo =
-          path.endsWith('.mp4') || path.endsWith('.mov') || path.endsWith('.avi');
+          path.endsWith('.mp4') ||
+          path.endsWith('.mov') ||
+          path.endsWith('.avi');
 
       final allowVideo = mode == PostComposerMode.homeVideoOnly;
       final allowImage = mode == PostComposerMode.feedTextImageOnly;
@@ -342,11 +343,14 @@ class PostPage extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(16),
                                   child: controller.isVideoMode.value
                                       ? _VideoPreview(
-                                          videoPath:
-                                              controller.selectedImagePath.value,
+                                          videoPath: controller
+                                              .selectedImagePath
+                                              .value,
                                         )
                                       : Image.file(
-                                          File(controller.selectedImagePath.value),
+                                          File(
+                                            controller.selectedImagePath.value,
+                                          ),
                                           width: 250,
                                           height: 300,
                                           fit: BoxFit.cover,
@@ -413,7 +417,7 @@ class PostPage extends StatelessWidget {
                         children: [
                           Obx(
                             () => Text(
-                              "${controller.charCount.value}/120", // อัปเดตให้ตรงกับ maxLength
+                              "${controller.charCount.value}/150", // อัปเดตให้ตรงกับ maxLength
                               style: const TextStyle(
                                 color: Color(0xffC3C3C3),
                                 fontSize: 13,
@@ -495,9 +499,7 @@ class _VideoPreviewState extends State<_VideoPreview> {
         width: 250,
         height: 300,
         color: Colors.grey[200],
-        child: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        child: const Center(child: CircularProgressIndicator()),
       );
     }
 

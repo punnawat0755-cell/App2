@@ -14,6 +14,7 @@ import 'package:flutter_application_1/module/profile/view/profile_view.dart';
 import 'package:flutter_application_1/module/setting/view/edit_view.dart';
 import 'package:flutter_application_1/module/setting/view/favorites_view.dart';
 import 'package:flutter_application_1/module/setting/view/setting_view.dart';
+import 'package:flutter_application_1/module/test/view/test_view.dart';
 import 'package:get/get.dart';
 
 class BottomNavController extends GetxController {
@@ -25,10 +26,11 @@ class BottomNavController extends GetxController {
     // SplashScreenpage(),
     // Signup(),
     // LoginPagetwo(),
+    QuizScreen(),
     HomePage(),
     Encouragement(),
     FavoritesPage(),
-    // FeedPage(),
+    FeedPage(),
     // ChatSelectionPage(),
     // PetPage(),
     ProfilePage(),

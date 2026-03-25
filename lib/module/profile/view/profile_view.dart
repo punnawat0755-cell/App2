@@ -662,7 +662,7 @@ class ProfilePage extends StatelessWidget {
                   Obx(
                     () => Text(
                       controller.isFemale
-                          ? "รอบเดือนและอาการ"
+                          ? "สุขภาพของคุณ"
                           : "บันทึกอาการ", // 💡 เปลี่ยนข้อความตามเพศ
                       style: GoogleFonts.mitr(
                         textStyle: const TextStyle(
