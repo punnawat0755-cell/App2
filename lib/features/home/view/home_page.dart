@@ -245,10 +245,8 @@ class _HomePageState extends State<HomePage> {
       final moderationResult = await _postModerationService.moderateVideo(
         userId: supabase.auth.currentUser?.id ?? '',
         caption: caption,
-        transcript: '',
-        frameNotes: <String>[
-          if (file.name.trim().isNotEmpty) file.name.trim(),
-        ],
+        transcript: caption.trim(),
+        frameNotes: _buildFrameNotes(caption),
         frameUrls: const <String>[],
       );
       if (!mounted) {
@@ -412,6 +410,21 @@ class _HomePageState extends State<HomePage> {
       return fileName;
     }
     return fileName.substring(0, lastDotIndex);
+  }
+
+  List<String> _buildFrameNotes(String caption) {
+    final normalizedCaption = caption.trim();
+    if (normalizedCaption.isNotEmpty) {
+      return <String>[
+        'คลิปวิดีโอที่ผู้ใช้ต้องการโพสต์',
+        'คำอธิบายจากผู้ใช้: $normalizedCaption',
+      ];
+    }
+
+    return const <String>[
+      'คลิปวิดีโอที่ผู้ใช้ต้องการโพสต์ในแอป',
+      'กรุณาตรวจสอบความเหมาะสมของเนื้อหาจากเฟรมในคลิปนี้',
+    ];
   }
 
   Widget _buildAddClipCard() {

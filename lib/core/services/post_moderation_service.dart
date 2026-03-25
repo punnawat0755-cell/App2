@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter_application_1/core/config/app_env.dart';
 import 'package:flutter_application_1/core/services/moderation_result.dart';
 import 'package:http/http.dart' as http;
 
@@ -9,17 +10,28 @@ class PostModerationService {
 
   static final PostModerationService instance = PostModerationService._();
 
-  static const String _webhookUrl = String.fromEnvironment(
-    'N8N_MODERATION_WEBHOOK',
-    defaultValue: 'https://n8n.tgstack.dev/webhook/HowAreYou',
-  );
-  static const String _token = String.fromEnvironment(
-    'N8N_MODERATION_TOKEN',
-    defaultValue: 'CHANGE_ME_TOKEN',
-  );
+  static const String _defaultWebhookUrl =
+      'https://n8n.tgstack.dev/webhook/HowAreYou';
+  static const String _defaultToken = 'howareyou_moderation_2026_secret';
   static const Duration _timeout = Duration(seconds: 8);
 
   final http.Client _httpClient = http.Client();
+
+  String get _webhookUrl => AppEnv.string(
+        'N8N_MODERATION_WEBHOOK',
+        defaultValue: _defaultWebhookUrl,
+        compileTimeValue: const bool.hasEnvironment('N8N_MODERATION_WEBHOOK')
+            ? const String.fromEnvironment('N8N_MODERATION_WEBHOOK')
+            : null,
+      );
+
+  String get _token => AppEnv.string(
+        'N8N_MODERATION_TOKEN',
+        defaultValue: _defaultToken,
+        compileTimeValue: const bool.hasEnvironment('N8N_MODERATION_TOKEN')
+            ? const String.fromEnvironment('N8N_MODERATION_TOKEN')
+            : null,
+      );
 
   Future<ModerationResult> moderateImage({
     required String userId,

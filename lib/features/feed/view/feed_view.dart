@@ -14,7 +14,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FeedPage extends StatefulWidget {
-  const FeedPage({super.key});
+  const FeedPage({
+    super.key,
+    this.focusPostId,
+  });
+
+  final String? focusPostId;
 
   @override
   State<FeedPage> createState() => _FeedPageState();
@@ -25,15 +30,28 @@ class _FeedPageState extends State<FeedPage> {
 
   final FeedRepository _repository = FeedRepository();
   final User? _currentUser = supabase.auth.currentUser;
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _postItemKeys = <String, GlobalKey>{};
 
   String _composerName = 'คุณ';
   String _composerAvatarUrl = ProfileAvatarCatalog.defaultAvatar;
   bool _isLoadingComposer = true;
+  String? _pendingFocusPostId;
+  bool _isFocusingPost = false;
+  bool _hasShownMissingPostMessage = false;
 
   @override
   void initState() {
     super.initState();
+    final focusPostId = widget.focusPostId?.trim() ?? '';
+    _pendingFocusPostId = focusPostId.isEmpty ? null : focusPostId;
     _loadComposerIdentity();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadComposerIdentity() async {
@@ -155,9 +173,91 @@ class _FeedPageState extends State<FeedPage> {
     );
   }
 
+  GlobalKey _keyForPost(String postId) {
+    return _postItemKeys.putIfAbsent(postId, GlobalKey.new);
+  }
+
+  void _focusPostIfNeeded(List<FeedPost> posts) {
+    final targetPostId = _pendingFocusPostId;
+    if (targetPostId == null || _isFocusingPost) {
+      return;
+    }
+
+    final targetIndex = posts.indexWhere((post) => post.id == targetPostId);
+    if (targetIndex == -1) {
+      if (!_hasShownMissingPostMessage) {
+        _hasShownMissingPostMessage = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _showSnackBar('ไม่พบโพสต์นี้ในฟีด', isError: true);
+        });
+      }
+      _pendingFocusPostId = null;
+      return;
+    }
+
+    _isFocusingPost = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (!mounted || !_scrollController.hasClients) return;
+
+        final targetKey = _keyForPost(targetPostId);
+        const maxAttempts = 8;
+
+        for (var attempt = 0; attempt < maxAttempts; attempt++) {
+          if (!mounted || !_scrollController.hasClients) {
+            return;
+          }
+
+          final targetContext = targetKey.currentContext;
+          if (targetContext != null && targetContext.mounted) {
+            await Scrollable.ensureVisible(
+              targetContext,
+              duration: const Duration(milliseconds: 380),
+              curve: Curves.easeOutCubic,
+              alignment: 0.08,
+            );
+            return;
+          }
+
+          final maxOffset = _scrollController.position.maxScrollExtent;
+          if (maxOffset <= 0) {
+            await Future<void>.delayed(const Duration(milliseconds: 100));
+            continue;
+          }
+
+          final targetRatio = (targetIndex + 1) / (posts.length + 1);
+          final ratioOffset = maxOffset * targetRatio;
+          final probeOffset = (ratioOffset + (attempt * 120.0)).clamp(
+            0.0,
+            maxOffset,
+          );
+
+          await _scrollController.animateTo(
+            probeOffset,
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOut,
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 70));
+        }
+
+        if (mounted) {
+          _showSnackBar('เลื่อนไปโพสต์นี้ไม่สำเร็จ ลองแตะอีกครั้ง',
+              isError: true);
+        }
+      } finally {
+        _pendingFocusPostId = null;
+        _isFocusingPost = false;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = _currentUser;
+    final openedFromFavorites =
+        (widget.focusPostId?.trim().isNotEmpty ?? false);
+
     if (currentUser == null) {
       return const Scaffold(
         body: Center(child: Text('กรุณาเข้าสู่ระบบเพื่อใช้งาน feed')),
@@ -165,6 +265,24 @@ class _FeedPageState extends State<FeedPage> {
     }
 
     return Scaffold(
+      appBar: openedFromFavorites
+          ? AppBar(
+              backgroundColor: Colors.white,
+              elevation: 0,
+              scrolledUnderElevation: 0,
+              leading: IconButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              ),
+              title: const Text(
+                'กลับไปรายการโปรด',
+                style: TextStyle(
+                  color: Color(0xFF4489D7),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          : null,
       backgroundColor: Colors.white,
       body: SafeArea(
         child: LayoutBuilder(
@@ -235,10 +353,12 @@ class _FeedPageState extends State<FeedPage> {
                         final likedPostIds =
                             likeSnapshot.data ?? const <String>{};
                         final posts = postSnapshot.data ?? const <FeedPost>[];
+                        _focusPostIfNeeded(posts);
 
                         return RefreshIndicator(
                           onRefresh: _refreshFeed,
                           child: ListView.separated(
+                            controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: EdgeInsets.only(
                               bottom: scale.rs(120, min: 90, max: 120),
@@ -270,17 +390,20 @@ class _FeedPageState extends State<FeedPage> {
                               final post = posts[index - 1];
                               final isLiked = likedPostIds.contains(post.id);
 
-                              return FeedPostCard(
-                                key: ValueKey(post.id),
-                                post: post,
-                                isLiked: isLiked,
-                                onAuthorTap: () => _openAuthorProfile(post),
-                                onToggleLike: _repository.supportsLikeActions
-                                    ? () => _toggleLike(post, isLiked)
-                                    : null,
-                                onDelete: post.authorId == currentUser.id
-                                    ? () => _deletePost(post)
-                                    : null,
+                              return KeyedSubtree(
+                                key: _keyForPost(post.id),
+                                child: FeedPostCard(
+                                  key: ValueKey(post.id),
+                                  post: post,
+                                  isLiked: isLiked,
+                                  onAuthorTap: () => _openAuthorProfile(post),
+                                  onToggleLike: _repository.supportsLikeActions
+                                      ? () => _toggleLike(post, isLiked)
+                                      : null,
+                                  onDelete: post.authorId == currentUser.id
+                                      ? () => _deletePost(post)
+                                      : null,
+                                ),
                               );
                             },
                           ),
@@ -675,6 +798,30 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
     });
   }
 
+  List<String> _buildImageNotes({
+    required String caption,
+    required bool hasSelectedImage,
+  }) {
+    final normalizedCaption = caption.trim();
+    if (!hasSelectedImage) {
+      return const <String>[
+        'โพสต์ข้อความในฟีดโดยไม่มีรูปภาพแนบ',
+      ];
+    }
+
+    if (normalizedCaption.isNotEmpty) {
+      return <String>[
+        'รูปภาพประกอบโพสต์ในฟีด',
+        'คำอธิบายจากผู้ใช้: $normalizedCaption',
+      ];
+    }
+
+    return const <String>[
+      'รูปภาพที่ผู้ใช้ต้องการโพสต์ในฟีด',
+      'กรุณาตรวจสอบความเหมาะสมของภาพก่อนเผยแพร่',
+    ];
+  }
+
   Future<void> _submit() async {
     final content = _controller.text.trim();
     final hasSelectedImage =
@@ -690,10 +837,10 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
         userId: supabase.auth.currentUser?.id ?? '',
         caption: content,
         imageUrls: const <String>[],
-        imageNotes: <String>[
-          if ((_selectedImageName ?? '').trim().isNotEmpty)
-            (_selectedImageName ?? '').trim(),
-        ],
+        imageNotes: _buildImageNotes(
+          caption: content,
+          hasSelectedImage: hasSelectedImage,
+        ),
       );
       if (!mounted) return;
       if (moderationResult.allowed != true) {
