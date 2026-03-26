@@ -298,7 +298,7 @@ class QuizController extends GetxController {
 
         Get.to(() => HomePage());
 
-        isProcessing.value = false;
+       isProcessing.value = false;
       }
     });
   }
