@@ -28,99 +28,137 @@ class RoleQuizPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scale = context.responsive;
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final imageWidth = (screenWidth - 80).clamp(180.0, 260.0);
-    final optionHorizontalMargin = screenWidth < 360 ? 16.0 : 40.0;
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 24.0,
-              vertical: 40.0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Text(
-                  "คุณเห็นอะไรในภาพนี้\nเป็นอย่างแรก",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: scale.rf(26, min: 22, max: 26),
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF4489D7),
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: 25),
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.1),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: Image.asset(
-                      'assets/images/quiz.png',
-                      width: imageWidth,
-                      height: imageWidth * 1.17,
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Text(
-                    "ขอบคุณข้อมูลจาก : lovecampus honghongworld",
-                    style: TextStyle(
-                      fontSize: scale.rf(8, min: 7.5, max: 8.5),
-                      color: Color(0xFF4489D7),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Align(
-                  alignment: Alignment.centerLeft,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final isCompact = constraints.maxWidth < 360;
+            final isShort = constraints.maxHeight < 760;
+
+            final horizontalPadding = scale.rs(
+              isCompact ? 16 : 22,
+              min: 14,
+              max: 28,
+            );
+            final verticalPadding = scale.rs(
+              isShort ? 20 : 34,
+              min: 16,
+              max: 40,
+            );
+            final contentWidth =
+                (constraints.maxWidth - (horizontalPadding * 2))
+                    .clamp(180.0, 520.0)
+                    .toDouble();
+            final imageWidth = (contentWidth * (isCompact ? 0.76 : 0.64))
+                .clamp(150.0, 250.0)
+                .toDouble();
+            final optionHorizontalMargin = scale.rs(
+              isCompact ? 4 : 18,
+              min: 2,
+              max: 28,
+            );
+            final optionVerticalMargin = scale.rs(7, min: 5, max: 9);
+            final imageRadius = scale.rs(18, min: 14, max: 22);
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: SingleChildScrollView(
                   child: Padding(
-                    padding: const EdgeInsets.only(left: 16.0),
-                    child: Text(
-                      "โปรดเลือกคำตอบของคุณ",
-                      style: TextStyle(
-                        fontSize: scale.rf(16, min: 14, max: 16.5),
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF4489D7),
-                      ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: verticalPadding,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          "คุณเห็นอะไรในภาพนี้\nเป็นอย่างแรก",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: scale.rf(26, min: 21, max: 26),
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF4489D7),
+                            height: 1.3,
+                          ),
+                        ),
+                        SizedBox(height: scale.rs(isShort ? 16 : 24)),
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(imageRadius),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.1),
+                                blurRadius: scale.rs(10, min: 8, max: 12),
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(imageRadius),
+                            child: Image.asset(
+                              'assets/images/quiz.png',
+                              width: imageWidth,
+                              height: imageWidth * 1.17,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: scale.rs(6, min: 4, max: 8)),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            "ขอบคุณข้อมูลจาก : lovecampus honghongworld",
+                            textAlign: TextAlign.right,
+                            style: TextStyle(
+                              fontSize: scale.rf(8, min: 7.2, max: 8.5),
+                              color: const Color(0xFF4489D7),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: scale.rs(isShort ? 14 : 20)),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              left: scale.rs(10, min: 6, max: 16),
+                            ),
+                            child: Text(
+                              "โปรดเลือกคำตอบของคุณ",
+                              style: TextStyle(
+                                fontSize: scale.rf(16, min: 14, max: 16.5),
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFF4489D7),
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(height: scale.rs(12, min: 10, max: 16)),
+                        ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _options.length,
+                          itemBuilder: (context, index) {
+                            return _buildOptionButton(
+                              context,
+                              index,
+                              _options[index],
+                              const Color(0xFF4489D7),
+                              horizontalMargin: optionHorizontalMargin,
+                              verticalMargin: optionVerticalMargin,
+                              scale: scale,
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _options.length,
-                  itemBuilder: (context, index) {
-                    return _buildOptionButton(
-                      context,
-                      index,
-                      _options[index],
-                      const Color(0xFF4489D7),
-                      horizontalMargin: optionHorizontalMargin,
-                    );
-                  },
-                ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -128,7 +166,9 @@ class RoleQuizPage extends StatelessWidget {
 
   Widget _buildOptionButton(
       BuildContext context, int index, String title, Color textColor,
-      {required double horizontalMargin}) {
+      {required double horizontalMargin,
+      required double verticalMargin,
+      required ResponsiveScale scale}) {
     return Obx(() {
       final isSelected = _controller.selectedIndex.value == index;
 
@@ -144,23 +184,28 @@ class RoleQuizPage extends StatelessWidget {
         },
         child: Container(
           margin: EdgeInsets.symmetric(
-            vertical: 8,
+            vertical: verticalMargin,
             horizontal: horizontalMargin,
           ),
-          padding: const EdgeInsets.symmetric(vertical: 16.0),
+          padding: EdgeInsets.symmetric(
+            vertical: scale.rs(13.5, min: 11, max: 16),
+            horizontal: scale.rs(14, min: 10, max: 20),
+          ),
           decoration: BoxDecoration(
             color:
                 isSelected ? const Color(0xFF9CE2FE) : const Color(0xFFD6F0FF),
-            borderRadius: BorderRadius.circular(30),
+            borderRadius: BorderRadius.circular(
+              scale.rs(28, min: 22, max: 32),
+            ),
             border: Border.all(
               color: const Color(0xFF86A8D6),
-              width: 1.5,
+              width: scale.rs(1.3, min: 1, max: 1.8),
             ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.05),
                 offset: const Offset(0, 3),
-                blurRadius: 5,
+                blurRadius: scale.rs(5, min: 4, max: 6),
               ),
             ],
           ),
@@ -168,7 +213,7 @@ class RoleQuizPage extends StatelessWidget {
             child: Text(
               title,
               style: TextStyle(
-                fontSize: 18,
+                fontSize: scale.rf(17, min: 14.5, max: 18),
                 fontWeight: FontWeight.bold,
                 color: textColor,
               ),

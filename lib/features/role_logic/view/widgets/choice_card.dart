@@ -33,17 +33,34 @@ class ChoiceCard extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final cardWidth = width ?? constraints.maxWidth;
-          final imageWidth = (cardWidth * 0.78).clamp(110.0, 200.0);
-          final imageHeight = (imageWidth * 0.75).clamp(90.0, 150.0);
+          final isNarrowCard = cardWidth < 190;
+          final topPadding = pageScale.rs(
+            isNarrowCard ? 14 : 18,
+            min: 12,
+            max: 22,
+          );
+          final bottomPadding = pageScale.rs(
+            isNarrowCard ? 10 : 14,
+            min: 8,
+            max: 16,
+          );
+          final radius = pageScale.rs(24, min: 18, max: 26);
+          final imageWidth = (cardWidth * (isNarrowCard ? 0.62 : 0.68))
+              .clamp(96.0, 176.0)
+              .toDouble();
+          final imageHeight = (imageWidth * 0.72).clamp(72.0, 132.0).toDouble();
 
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: width,
             height: height,
-            padding: const EdgeInsets.only(top: 20, bottom: 15),
+            padding: EdgeInsets.only(
+              top: topPadding,
+              bottom: bottomPadding,
+            ),
             decoration: BoxDecoration(
               color: bgColor,
-              borderRadius: BorderRadius.circular(25),
+              borderRadius: BorderRadius.circular(radius),
               border: Border.all(
                 color:
                     isSelected ? const Color(0xFF4A7DCA) : Colors.transparent,
@@ -70,16 +87,30 @@ class ChoiceCard extends StatelessWidget {
                       id == 'listener'
                           ? Icons.volunteer_activism
                           : Icons.self_improvement,
-                      size: 90,
+                      size: pageScale.rs(
+                        isNarrowCard ? 72 : 82,
+                        min: 58,
+                        max: 88,
+                      ),
                       color: Colors.white.withValues(alpha: 0.85),
                     );
                   },
                 ),
-                const SizedBox(height: 15),
+                SizedBox(
+                  height: pageScale.rs(
+                    isNarrowCard ? 10 : 14,
+                    min: 8,
+                    max: 16,
+                  ),
+                ),
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: pageScale.rf(18, min: 16, max: 18.5),
+                    fontSize: pageScale.rf(
+                      isNarrowCard ? 16.5 : 18,
+                      min: 14.5,
+                      max: 18.5,
+                    ),
                     fontWeight: FontWeight.bold,
                     color: textColor,
                   ),

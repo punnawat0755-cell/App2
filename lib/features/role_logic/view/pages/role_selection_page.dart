@@ -101,15 +101,41 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
             builder: (context, constraints) {
               final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
               final isCompact = constraints.maxWidth < 390;
-              final horizontalPadding = isCompact ? 16.0 : 24.0;
+              final isShort = constraints.maxHeight < 760;
+              final horizontalPadding = scale.rs(
+                isCompact ? 14 : 22,
+                min: 12,
+                max: 28,
+              );
+              final verticalPadding = scale.rs(
+                isShort ? 24 : 36,
+                min: 18,
+                max: 44,
+              );
+              final sectionGap = scale.rs(
+                isShort ? 18 : 24,
+                min: 14,
+                max: 28,
+              );
+              final titleToCardsGap = scale.rs(
+                isShort ? 32 : 44,
+                min: 24,
+                max: 48,
+              );
+              final cardsGap = scale.rs(
+                isCompact ? 12 : 16,
+                min: 10,
+                max: 20,
+              );
+              final rowCardGap = scale.rs(16, min: 12, max: 22);
 
               return Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 560),
+                  constraints: const BoxConstraints(maxWidth: 520),
                   child: SingleChildScrollView(
                     padding: EdgeInsets.symmetric(
                       horizontal: horizontalPadding,
-                      vertical: 40,
+                      vertical: verticalPadding,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
@@ -124,7 +150,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                             height: 1.3,
                           ),
                         ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: sectionGap),
                         Text(
                           'ถ้าเลือกพร้อมรับฟัง ระบบจะพาไปทำแบบทดสอบก่อน\nจากนั้นค่อยบันทึก current_mode และพาไปทำ Daily Mood ต่อ',
                           textAlign: TextAlign.center,
@@ -135,7 +161,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                             height: 1.6,
                           ),
                         ),
-                        const SizedBox(height: 48),
+                        SizedBox(height: titleToCardsGap),
                         Text(
                           'กรุณาเลือกคำตอบของคุณ',
                           textAlign: TextAlign.center,
@@ -145,7 +171,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                             color: const Color(0xFF4489D7),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        SizedBox(height: cardsGap),
                         if (isCompact) ...[
                           ChoiceCard(
                             id: 'listener',
@@ -156,7 +182,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                             isSelected: _selectedMode == 'listener',
                             onTap: _openListenerQuiz,
                           ),
-                          const SizedBox(height: 14),
+                          SizedBox(height: cardsGap),
                           ChoiceCard(
                             id: 'seeker',
                             title: 'ยังไม่พร้อม',
@@ -181,7 +207,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                                   onTap: _openListenerQuiz,
                                 ),
                               ),
-                              const SizedBox(width: 20),
+                              SizedBox(width: rowCardGap),
                               Expanded(
                                 child: ChoiceCard(
                                   id: 'seeker',
@@ -195,17 +221,21 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                               ),
                             ],
                           ),
-                        const SizedBox(height: 28),
+                        SizedBox(height: scale.rs(isShort ? 20 : 28)),
                         if (_isSaving)
-                          const Padding(
-                            padding: EdgeInsets.only(bottom: 18),
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: scale.rs(14, min: 10, max: 18),
+                            ),
                             child: Column(
                               children: [
-                                CircularProgressIndicator(),
-                                SizedBox(height: 10),
+                                const CircularProgressIndicator(),
+                                SizedBox(height: scale.rs(8, min: 6, max: 10)),
                                 Text(
                                   'กำลังบันทึกบทบาทของวันนี้...',
                                   style: TextStyle(
+                                    fontSize:
+                                        scale.rf(13, min: 11.5, max: 13.8),
                                     color: Color(0xFF4489D7),
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -213,7 +243,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                               ],
                             ),
                           ),
-                        const SizedBox(height: 24),
+                        SizedBox(height: scale.rs(isShort ? 16 : 24)),
                         Text(
                           '"ผู้รับฟัง" คือผู้ที่พร้อมเป็นพื้นที่ปลอดภัยให้ใครสักคน\n'
                           'รับฟังอย่างไม่ตัดสิน อยู่ข้างเขา และช่วยประคองใจผ่านการแชท\n'
@@ -221,7 +251,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: scale.rf(12, min: 10.8, max: 12.5),
-                            height: 1.8,
+                            height: 1.7,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFF639CDD),
                           ),
