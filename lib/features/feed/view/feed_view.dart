@@ -6,7 +6,9 @@ import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/core/services/post_moderation_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
+import 'package:flutter_application_1/features/feed/model/feed_comment.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
+import 'package:flutter_application_1/features/feed/service/feed_delete_service.dart';
 import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
 import 'package:flutter_application_1/features/feed/view/feed_photo_capture_page.dart';
 import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
@@ -138,10 +140,13 @@ class _FeedPageState extends State<FeedPage> {
     try {
       await _repository.deletePost(post.id);
       if (!mounted) return;
-      _showSnackBar('ลบโพสต์เรียบร้อย');
+      _showSnackBar('????????????????');
+    } on FeedPostUnavailableException {
+      if (!mounted) return;
+      _showSnackBar('???????????????????????????????????', isError: true);
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar('ลบโพสต์ไม่สำเร็จ: $error', isError: true);
+      _showSnackBar('????????????????: $error', isError: true);
     }
   }
 
@@ -464,16 +469,16 @@ class FeedProfilePage extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('ลบโพสต์นี้?'),
-        content: const Text('โพสต์นี้จะถูกลบออกจากชุมชนทันที'),
+        title: const Text('???????????'),
+        content: const Text('???????????????????????????????'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('ยกเลิก'),
+            child: const Text('??????'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('ลบ'),
+            child: const Text('??'),
           ),
         ],
       ),
@@ -485,13 +490,21 @@ class FeedProfilePage extends StatelessWidget {
       await repository.deletePost(post.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ลบโพสต์เรียบร้อย')),
+        const SnackBar(content: Text('????????????????')),
+      );
+    } on FeedPostUnavailableException {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('???????????????????????????????????'),
+          backgroundColor: Colors.red,
+        ),
       );
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('ลบโพสต์ไม่สำเร็จ: $error'),
+          content: Text('????????????????: $error'),
           backgroundColor: Colors.red,
         ),
       );
@@ -1404,6 +1417,38 @@ class _FeedPostCardState extends State<FeedPostCard> {
   late int _displayLikeCount;
   bool _isUpdatingLike = false;
 
+  String _formatRelativeTime(DateTime createdAt) {
+    final now = DateTime.now();
+    final difference = now.difference(createdAt);
+
+    if (difference.inSeconds < 60) {
+      return 'เมื่อสักครู่';
+    }
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} นาทีที่แล้ว';
+    }
+    if (difference.inHours < 24) {
+      return '${difference.inHours} ชั่วโมงที่แล้ว';
+    }
+    if (difference.inDays < 7) {
+      return '${difference.inDays} วันที่แล้ว';
+    }
+
+    final day = createdAt.day.toString().padLeft(2, '0');
+    final month = createdAt.month.toString().padLeft(2, '0');
+    final year = createdAt.year + 543;
+    return '$day/$month/$year';
+  }
+
+  void _handleCommentTap() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CommentSheet(post: widget.post),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1482,13 +1527,26 @@ class _FeedPostCardState extends State<FeedPostCard> {
               Expanded(
                 child: GestureDetector(
                   onTap: widget.onAuthorTap,
-                  child: Text(
-                    widget.post.authorName,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: scale.rf(16, min: 14, max: 16),
-                      color: Colors.grey,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.post.authorName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: scale.rf(16, min: 14, max: 16),
+                          color: Colors.grey,
+                        ),
+                      ),
+                      SizedBox(height: scale.rs(2, min: 2, max: 2)),
+                      Text(
+                        _formatRelativeTime(widget.post.createdAt),
+                        style: TextStyle(
+                          fontSize: scale.rf(12, min: 11, max: 12),
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1551,29 +1609,74 @@ class _FeedPostCardState extends State<FeedPostCard> {
               },
             ),
           ],
-          SizedBox(height: scale.rs(10, min: 8, max: 10)),
-          GestureDetector(
-            onTap: _handleToggleLike,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _displayIsLiked ? Icons.favorite : Icons.favorite_border,
-                  color:
-                      _displayIsLiked ? const Color(0xFF4489D7) : Colors.grey,
-                  size: scale.rs(32, min: 26, max: 32),
-                ),
-                SizedBox(width: scale.rs(6, min: 4, max: 6)),
-                Text(
-                  _displayLikeCount.toString(),
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontWeight:
-                        _displayIsLiked ? FontWeight.bold : FontWeight.normal,
+          SizedBox(height: scale.rs(12, min: 8, max: 12)),
+          Row(
+            children: [
+              InkWell(
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                onTap: _handleToggleLike,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: scale.rs(4, min: 2, max: 4),
+                    vertical: scale.rs(4, min: 2, max: 4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _displayIsLiked
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: _displayIsLiked
+                            ? const Color(0xFF4489D7)
+                            : Colors.grey,
+                        size: scale.rs(28, min: 24, max: 28),
+                      ),
+                      SizedBox(width: scale.rs(6, min: 4, max: 6)),
+                      Text(
+                        _displayLikeCount.toString(),
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontWeight: _displayIsLiked
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              SizedBox(width: scale.rs(14, min: 10, max: 14)),
+              InkWell(
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                onTap: _handleCommentTap,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: scale.rs(4, min: 2, max: 4),
+                    vertical: scale.rs(4, min: 2, max: 4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.mode_comment_outlined,
+                        color: Colors.grey,
+                        size: scale.rs(26, min: 22, max: 26),
+                      ),
+                      SizedBox(width: scale.rs(6, min: 4, max: 6)),
+                      Text(
+                        widget.post.commentCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1677,6 +1780,438 @@ class _FeedHeader extends StatelessWidget {
         ),
         Divider(thickness: 1, color: Colors.grey.shade200),
       ],
+    );
+  }
+}
+
+class _CommentSheet extends StatefulWidget {
+  const _CommentSheet({required this.post});
+
+  final FeedPost post;
+
+  @override
+  State<_CommentSheet> createState() => _CommentSheetState();
+}
+
+class _CommentSheetState extends State<_CommentSheet> {
+  final FeedRepository _repository = FeedRepository();
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  bool _isSubmitting = false;
+
+  String _formatCommentTime(DateTime createdAt) {
+    final now = DateTime.now();
+    final difference = now.difference(createdAt);
+
+    if (difference.inSeconds < 60) {
+      return 'เมื่อสักครู่';
+    }
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} นาทีที่แล้ว';
+    }
+    if (difference.inHours < 24) {
+      return '${difference.inHours} ชั่วโมงที่แล้ว';
+    }
+    if (difference.inDays < 7) {
+      return '${difference.inDays} วันที่แล้ว';
+    }
+
+    final day = createdAt.day.toString().padLeft(2, '0');
+    final month = createdAt.month.toString().padLeft(2, '0');
+    final year = createdAt.year + 543;
+    return '$day/$month/$year';
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitComment() async {
+    final comment = _controller.text.trim();
+    if (comment.isEmpty || _isSubmitting) {
+      return;
+    }
+
+    setState(() => _isSubmitting = true);
+    try {
+      await _repository.createComment(
+        postId: widget.post.id,
+        content: comment,
+      );
+      if (!mounted) return;
+      _controller.clear();
+      _focusNode.requestFocus();
+      setState(() {});
+    } on ContentModerationBlockedException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.reason.toLowerCase().contains('moderation-blocked')
+                ? 'ไม่สามารถส่งความคิดเห็นนี้ได้ เนื่องจากระบบตรวจพบเนื้อหาที่ไม่เหมาะสม'
+                : error.reason,
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } on AuthException catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ส่งความคิดเห็นไม่สำเร็จ: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = context.responsive;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final canSubmit = _controller.text.trim().isNotEmpty && !_isSubmitting;
+
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: FractionallySizedBox(
+        heightFactor: 0.78,
+        child: ClipRRect(
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(scale.rs(22, min: 18, max: 22)),
+          ),
+          child: Material(
+            color: Colors.white,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Container(
+                    width: scale.rs(44, min: 36, max: 44),
+                    height: scale.rs(5, min: 4, max: 5),
+                    margin: EdgeInsets.only(
+                      top: scale.rs(12, min: 10, max: 12),
+                      bottom: scale.rs(14, min: 10, max: 14),
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(16, min: 12, max: 16),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(
+                          'ความคิดเห็น',
+                          style: TextStyle(
+                            fontSize: scale.rf(18, min: 16, max: 18),
+                            fontWeight: FontWeight.w700,
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        const Spacer(),
+                        StreamBuilder<List<FeedComment>>(
+                          stream:
+                              _repository.watchCommentsByPost(widget.post.id),
+                          builder: (context, snapshot) {
+                            final count = snapshot.data?.length ??
+                                widget.post.commentCount;
+                            return Text(
+                              '$count รายการ',
+                              style: TextStyle(
+                                fontSize: scale.rf(13, min: 12, max: 13),
+                                color: Colors.grey.shade500,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: scale.rs(14, min: 10, max: 14)),
+                  Divider(height: 1, color: Colors.grey.shade200),
+                  Expanded(
+                    child: _CommentLiveSection(
+                      repository: _repository,
+                      post: widget.post,
+                      formatTime: _formatCommentTime,
+                    ),
+                  ),
+                  Divider(height: 1, color: Colors.grey.shade200),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      scale.rs(16, min: 12, max: 16),
+                      scale.rs(12, min: 10, max: 12),
+                      scale.rs(16, min: 12, max: 16),
+                      scale.rs(12, min: 10, max: 12),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            focusNode: _focusNode,
+                            minLines: 1,
+                            maxLines: 4,
+                            onChanged: (_) => setState(() {}),
+                            textInputAction: TextInputAction.send,
+                            onSubmitted:
+                                canSubmit ? (_) => _submitComment() : null,
+                            decoration: InputDecoration(
+                              hintText: 'เขียนความคิดเห็น...',
+                              filled: true,
+                              fillColor: const Color(0xFFF7F9FC),
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: scale.rs(14, min: 12, max: 14),
+                                vertical: scale.rs(12, min: 10, max: 12),
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(
+                                  scale.rs(18, min: 14, max: 18),
+                                ),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: scale.rs(10, min: 8, max: 10)),
+                        FilledButton(
+                          onPressed: canSubmit ? _submitComment : null,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF4489D7),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: scale.rs(16, min: 14, max: 16),
+                              vertical: scale.rs(14, min: 12, max: 14),
+                            ),
+                          ),
+                          child: _isSubmitting
+                              ? SizedBox(
+                                  width: scale.rs(16, min: 14, max: 16),
+                                  height: scale.rs(16, min: 14, max: 16),
+                                  child: const CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white),
+                                  ),
+                                )
+                              : const Text('ส่ง'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CommentLiveSection extends StatelessWidget {
+  const _CommentLiveSection({
+    required this.repository,
+    required this.post,
+    required this.formatTime,
+  });
+
+  final FeedRepository repository;
+  final FeedPost post;
+  final String Function(DateTime createdAt) formatTime;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = context.responsive;
+    return StreamBuilder<List<FeedComment>>(
+      stream: repository.watchCommentsByPost(post.id),
+      builder: (context, snapshot) {
+        final comments = snapshot.data ?? const <FeedComment>[];
+
+        return ListView(
+          padding: EdgeInsets.fromLTRB(
+            scale.rs(16, min: 12, max: 16),
+            scale.rs(16, min: 12, max: 16),
+            scale.rs(16, min: 12, max: 16),
+            scale.rs(12, min: 8, max: 12),
+          ),
+          children: [
+            Container(
+              padding: EdgeInsets.all(scale.rs(14, min: 12, max: 14)),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F9FC),
+                borderRadius: BorderRadius.circular(
+                  scale.rs(16, min: 12, max: 16),
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _AuthorAvatar(
+                    name: post.authorName,
+                    avatarUrl: post.authorAvatarUrl,
+                    radius: scale.rs(18, min: 16, max: 18),
+                  ),
+                  SizedBox(width: scale.rs(10, min: 8, max: 10)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.authorName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: scale.rf(14, min: 13, max: 14),
+                            color: Colors.grey.shade800,
+                          ),
+                        ),
+                        if (post.content.trim().isNotEmpty) ...[
+                          SizedBox(height: scale.rs(6, min: 4, max: 6)),
+                          Text(
+                            post.content,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: scale.rs(20, min: 16, max: 20)),
+            if (snapshot.hasError)
+              SizedBox(
+                height: scale.rs(220, min: 180, max: 220),
+                child: _FeedMessageState(
+                  icon: Icons.cloud_off_rounded,
+                  title: 'โหลดคอมเมนต์ไม่สำเร็จ',
+                  subtitle: '${snapshot.error}',
+                ),
+              )
+            else if (!snapshot.hasData)
+              Padding(
+                padding: EdgeInsets.only(top: scale.rs(20, min: 16, max: 20)),
+                child: const Center(child: CircularProgressIndicator()),
+              )
+            else if (comments.isEmpty)
+              SizedBox(
+                height: scale.rs(260, min: 220, max: 260),
+                child: _FeedMessageState(
+                  icon: Icons.mode_comment_outlined,
+                  title: 'ยังไม่มีคอมเมนต์',
+                  subtitle: 'เริ่มบทสนทนาแรกใต้โพสต์นี้ได้เลย',
+                ),
+              )
+            else
+              ...comments.map(
+                (comment) => Padding(
+                  padding: EdgeInsets.only(
+                    bottom: scale.rs(12, min: 10, max: 12),
+                  ),
+                  child: _CommentCard(
+                    comment: comment,
+                    timeText: formatTime(comment.createdAt),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _CommentCard extends StatelessWidget {
+  const _CommentCard({
+    required this.comment,
+    required this.timeText,
+  });
+
+  final FeedComment comment;
+  final String timeText;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = context.responsive;
+    return Container(
+      padding: EdgeInsets.all(scale.rs(12, min: 10, max: 12)),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(scale.rs(14, min: 12, max: 14)),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _AuthorAvatar(
+            name: comment.authorName,
+            avatarUrl: comment.authorAvatarUrl,
+            radius: scale.rs(17, min: 15, max: 17),
+          ),
+          SizedBox(width: scale.rs(10, min: 8, max: 10)),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        comment.authorName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: scale.rf(13.5, min: 12.5, max: 13.5),
+                          color: Colors.grey.shade800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      timeText,
+                      style: TextStyle(
+                        fontSize: scale.rf(11.5, min: 11, max: 11.5),
+                        color: Colors.grey.shade500,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: scale.rs(6, min: 4, max: 6)),
+                Text(
+                  comment.content,
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

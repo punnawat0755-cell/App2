@@ -14,6 +14,7 @@ import 'package:flutter_application_1/features/home/model/home_article.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
 import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
+import 'package:flutter_application_1/features/home/service/video_upload_prepare_service.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/home/view/play_video_page.dart';
 import 'package:flutter_application_1/features/home/view/video_preview_controller_factory.dart';
@@ -42,6 +43,8 @@ class _HomePageState extends State<HomePage> {
   final HomeVideoRepository _homeVideoRepository = HomeVideoRepository();
   final HomeVideoPrefetchService _homeVideoPrefetchService =
       HomeVideoPrefetchService.instance;
+  final VideoUploadPrepareService _videoUploadPrepareService =
+      VideoUploadPrepareService.instance;
   final PostModerationService _postModerationService =
       PostModerationService.instance;
   final ImagePicker _imagePicker = ImagePicker();
@@ -235,7 +238,7 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      final videoBytes = await file.readAsBytes();
+      final originalVideoBytes = await file.readAsBytes();
       if (!mounted) {
         return;
       }
@@ -262,9 +265,15 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
+      final preparedUpload = await _videoUploadPrepareService.prepareForUpload(
+        filePath: file.path,
+        fileName: file.name,
+        fallbackBytes: originalVideoBytes,
+      );
+
       await _homeVideoRepository.createVideoClip(
-        videoBytes: videoBytes,
-        videoFileName: file.name,
+        videoBytes: preparedUpload.bytes,
+        videoFileName: preparedUpload.fileName,
         caption: caption,
       );
 
@@ -315,6 +324,16 @@ class _HomePageState extends State<HomePage> {
           content: Text(
             'อัปโหลดคลิปไม่ได้ เพราะ Supabase Storage ยังไม่เปิดสิทธิ์ให้ผู้ใช้เพิ่มไฟล์',
           ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } on VideoUploadPrepareException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.message),
           backgroundColor: Colors.red,
         ),
       );

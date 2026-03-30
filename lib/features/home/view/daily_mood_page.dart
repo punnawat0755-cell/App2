@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -228,6 +229,14 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     await Get.find<ProfileController>().loadMonthData();
   }
 
+  Future<void> _refreshCoinsIfNeeded() async {
+    final coinService =
+        Get.isRegistered<CoinService>()
+            ? Get.find<CoinService>()
+            : Get.put(CoinService(), permanent: true);
+    await coinService.loadCoins();
+  }
+
   // ---------- Supabase ----------
   Future<void> _syncFromSupabaseToday() async {
     if (!_isLoggedIn) return;
@@ -338,6 +347,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     // 2) Save to local cache
     await _saveLocalToday(option, markEditUsed: canEditNow);
     await _refreshProfileCalendarIfNeeded();
+    await _refreshCoinsIfNeeded();
 
     final message = canEditNow
         ? 'แก้ไขคำตอบสำเร็จ: ${option.label} (${option.score}/100)'

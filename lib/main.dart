@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_env.dart';
+import 'core/services/coin_service.dart';
 import 'firebase_options.dart';
 import 'core/services/notification_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
@@ -52,6 +53,8 @@ Future<void> main() async {
     url: supabaseUrl,
     anonKey: supabaseAnonKey,
   );
+
+  Get.put(CoinService(), permanent: true);
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 

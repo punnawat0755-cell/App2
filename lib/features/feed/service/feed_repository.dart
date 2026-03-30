@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
+import 'package:flutter_application_1/features/feed/model/feed_comment.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
+import 'package:flutter_application_1/features/feed/service/feed_delete_service.dart';
 import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
+import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FeedComposerIdentity {
@@ -25,6 +29,7 @@ class FeedRepository {
   static const _postsTable = 'posts';
   static const _postMediaTable = 'post_media';
   static const _postLikesTable = 'post_reactions';
+  static const _postCommentsTable = 'post_comments';
   static const _profilesTable = 'profiles';
   static const _feedImageBucketConfig = String.fromEnvironment(
     'SUPABASE_FEED_IMAGE_BUCKET',
@@ -35,6 +40,9 @@ class FeedRepository {
   static const _likeReaction = 'like';
 
   final SupabaseClient _client;
+  late final FeedDeleteService _deleteService = FeedDeleteService(
+    client: _client,
+  );
   final ContentModerationService _moderationService =
       ContentModerationService.instance;
 
@@ -64,6 +72,57 @@ class FeedRepository {
               .where((id) => id.isNotEmpty)
               .toSet(),
         );
+  }
+
+  Stream<List<FeedComment>> watchCommentsByPost(String postId) {
+    if (postId.trim().isEmpty) {
+      return Stream<List<FeedComment>>.value(const <FeedComment>[]);
+    }
+
+    late final StreamController<List<FeedComment>> controller;
+    StreamSubscription<List<Map<String, dynamic>>>? commentsSubscription;
+
+    List<Map<String, dynamic>> latestRows = const [];
+    var hasLoadedComments = false;
+
+    Future<void> emitMappedComments() async {
+      if (!hasLoadedComments) {
+        return;
+      }
+
+      try {
+        controller.add(await _mapComments(latestRows));
+      } catch (error, stackTrace) {
+        controller.addError(error, stackTrace);
+      }
+    }
+
+    controller = StreamController<List<FeedComment>>(
+      onListen: () {
+        commentsSubscription = _client
+            .from(_postCommentsTable)
+            .stream(primaryKey: const ['id'])
+            .eq('post_id', postId)
+            .order('created_at', ascending: true)
+            .listen(
+              (rows) {
+                latestRows = rows
+                    .map<Map<String, dynamic>>(
+                      (row) => Map<String, dynamic>.from(row),
+                    )
+                    .toList();
+                hasLoadedComments = true;
+                unawaited(emitMappedComments());
+              },
+              onError: controller.addError,
+            );
+      },
+      onCancel: () async {
+        await commentsSubscription?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   Future<FeedComposerIdentity> getComposerIdentity() async {
@@ -142,8 +201,10 @@ class FeedRepository {
         content: safeText,
       );
       createdPostId = postId;
+      await _rewardPostCreated(postId);
 
       if (!hasImage) {
+        await _refreshCoins();
         return;
       }
 
@@ -163,6 +224,7 @@ class FeedRepository {
             ),
         fileSizeBytes: selectedImageBytes.lengthInBytes,
       );
+      await _refreshCoins();
     } catch (error) {
       if (uploadedImagePath != null) {
         await _deleteStorageObject(uploadedImagePath);
@@ -181,6 +243,7 @@ class FeedRepository {
       'user_id': user.id,
       'reaction': _likeReaction,
     }, onConflict: 'post_id,user_id');
+    await _refreshCoins();
   }
 
   Future<void> unlikePost(String postId) async {
@@ -191,58 +254,66 @@ class FeedRepository {
         .eq('post_id', postId)
         .eq('reaction', _likeReaction)
         .eq('user_id', user.id);
+    await _refreshCoins();
+  }
+
+  Future<void> _rewardPostCreated(String postId) async {
+    try {
+      await _client.rpc('reward_post_created', params: {
+        'p_post_id': postId,
+      });
+    } catch (_) {
+      // Reward RPC may be unavailable in some environments.
+    }
+  }
+
+  Future<void> createComment({
+    required String postId,
+    required String content,
+  }) async {
+    final identity = await getComposerIdentity();
+    final normalizedContent = content.trim();
+
+    if (postId.trim().isEmpty || normalizedContent.isEmpty) {
+      throw const PostgrestException(
+        message: 'กรุณากรอกความคิดเห็นก่อนส่ง',
+      );
+    }
+
+    final moderation = await _moderationService.moderateText(
+      source: 'feed_comment',
+      text: normalizedContent,
+      metadata: {
+        'userId': identity.userId,
+        'authorName': identity.authorName,
+        'postId': postId,
+      },
+    );
+
+    if (!moderation.allow) {
+      throw ContentModerationBlockedException(moderation.reason);
+    }
+
+    final safeText = moderation.safeText.trim().isNotEmpty
+        ? moderation.safeText.trim()
+        : normalizedContent;
+
+    await _client.from(_postCommentsTable).insert({
+      'post_id': postId,
+      'user_id': identity.userId,
+      'content_text': safeText,
+    });
+  }
+
+  Future<void> _refreshCoins() async {
+    final coinService = Get.isRegistered<CoinService>()
+        ? Get.find<CoinService>()
+        : Get.put(CoinService(), permanent: true);
+    await coinService.loadCoins();
   }
 
   Future<void> deletePost(String postId) async {
-    final user = _requireUser();
-    Map<String, dynamic>? ownedPost;
-    List<Map<String, dynamic>> postMediaRows = const [];
-
-    try {
-      ownedPost = await _client
-          .from(_postsTable)
-          .select('id')
-          .eq('id', postId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-    } catch (_) {
-      ownedPost = null;
-    }
-
-    if (ownedPost == null) {
-      return;
-    }
-
-    try {
-      final mediaRows = await _client
-          .from(_postMediaTable)
-          .select('storage_bucket, storage_path')
-          .eq('post_id', postId);
-      postMediaRows = mediaRows
-          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
-          .toList();
-    } catch (_) {
-      postMediaRows = const [];
-    }
-
-    await _client
-        .from(_postsTable)
-        .delete()
-        .eq('id', postId)
-        .eq('user_id', user.id);
-
-    final removablePaths = postMediaRows
-        .where(
-          (row) =>
-              _normalizeBucketName(row['storage_bucket']?.toString() ?? '') ==
-              _feedImageBucket,
-        )
-        .map((row) => row['storage_path']?.toString().trim() ?? '')
-        .where((path) => path.isNotEmpty)
-        .toList();
-    if (removablePaths.isNotEmpty) {
-      await _deleteStorageObjects(removablePaths);
-    }
+    await _deleteService.deletePostWithMedia(postId: postId);
   }
 
   Future<List<FeedPost>> _mapPosts(List<Map<String, dynamic>> rows) async {
@@ -262,6 +333,7 @@ class FeedRepository {
     final imageUrlsByPostId = <String, String>{};
     final postsWithVideoMedia = <String>{};
     final likeCountsByPostId = <String, int>{};
+    final commentCountsByPostId = <String, int>{};
 
     if (authorIds.isNotEmpty) {
       try {
@@ -319,19 +391,9 @@ class FeedRepository {
             continue;
           }
 
-          final publicUrl = map['public_url']?.toString().trim();
-          if (publicUrl != null && publicUrl.isNotEmpty) {
-            imageUrlsByPostId[postId] = publicUrl;
-            continue;
-          }
-
-          final storagePath = map['storage_path']?.toString().trim() ?? '';
-          final storageBucket = _normalizeBucketName(
-            map['storage_bucket']?.toString() ?? _feedImageBucket,
-          );
-          if (storagePath.isNotEmpty) {
-            imageUrlsByPostId[postId] =
-                _client.storage.from(storageBucket).getPublicUrl(storagePath);
+          final resolvedImageUrl = await _resolveFeedImageUrl(map);
+          if (resolvedImageUrl != null && resolvedImageUrl.isNotEmpty) {
+            imageUrlsByPostId[postId] = resolvedImageUrl;
           }
         }
       } catch (_) {
@@ -356,6 +418,25 @@ class FeedRepository {
       } catch (_) {
         // Keep feed visible even if like counts fail to load.
       }
+
+      try {
+        final commentRows = await _client
+            .from(_postCommentsTable)
+            .select('post_id')
+            .inFilter('post_id', postIds);
+
+        for (final row in commentRows) {
+          final map = Map<String, dynamic>.from(row);
+          final postId = map['post_id']?.toString() ?? '';
+          if (postId.isEmpty) {
+            continue;
+          }
+          commentCountsByPostId[postId] =
+              (commentCountsByPostId[postId] ?? 0) + 1;
+        }
+      } catch (_) {
+        // Keep feed visible even if comment counts fail to load.
+      }
     }
 
     final posts = rows.where((row) {
@@ -369,10 +450,92 @@ class FeedRepository {
       map['author_avatar_url'] = avatarsByUserId[userId];
       map['image_url'] = imageUrlsByPostId[postId];
       map['like_count'] = likeCountsByPostId[postId] ?? map['like_count'];
+      map['comment_count'] =
+          commentCountsByPostId[postId] ?? map['comment_count'];
       return FeedPost.fromMap(map);
     }).toList();
     posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return posts;
+  }
+
+  Future<List<FeedComment>> _mapComments(
+      List<Map<String, dynamic>> rows) async {
+    final authorIds = rows
+        .map((row) => row['user_id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    final namesByUserId = <String, String>{};
+    final avatarsByUserId = <String, String>{};
+
+    if (authorIds.isNotEmpty) {
+      try {
+        final profiles = await _client
+            .from(_profilesTable)
+            .select('id, username, avatarurl')
+            .inFilter('id', authorIds);
+
+        for (final row in profiles) {
+          final map = Map<String, dynamic>.from(row);
+          final id = map['id']?.toString() ?? '';
+          final username = map['username']?.toString().trim() ?? '';
+          if (id.isNotEmpty && username.isNotEmpty) {
+            namesByUserId[id] = username;
+          }
+          if (id.isNotEmpty) {
+            avatarsByUserId[id] = ProfileAvatarCatalog.normalize(
+              map['avatarurl']?.toString(),
+            );
+          }
+        }
+      } catch (_) {
+        // Keep fallback display names when profiles cannot be loaded.
+      }
+    }
+
+    final comments = rows.map((row) {
+      final map = Map<String, dynamic>.from(row);
+      final userId = map['user_id']?.toString() ?? '';
+      map['author_name'] = namesByUserId[userId];
+      map['author_avatar_url'] = avatarsByUserId[userId];
+      return FeedComment.fromMap(map);
+    }).toList();
+
+    comments.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return comments;
+  }
+
+  Future<String?> _resolveFeedImageUrl(Map<String, dynamic> row) async {
+    final storagePath = row['storage_path']?.toString().trim() ?? '';
+    final publicUrl = row['public_url']?.toString().trim();
+
+    if (storagePath.isEmpty) {
+      if (publicUrl == null || publicUrl.isEmpty) {
+        return null;
+      }
+      return publicUrl;
+    }
+
+    final storageBucket = _normalizeBucketName(
+      row['storage_bucket']?.toString() ?? _feedImageBucket,
+    );
+
+    try {
+      return await _client.storage
+          .from(storageBucket)
+          .createSignedUrl(storagePath, 60 * 60);
+    } catch (_) {
+      if (publicUrl != null && publicUrl.isNotEmpty) {
+        return publicUrl;
+      }
+
+      try {
+        return _client.storage.from(storageBucket).getPublicUrl(storagePath);
+      } catch (_) {
+        return null;
+      }
+    }
   }
 
   Stream<List<FeedPost>> _watchMappedPosts({String? authorId}) {
@@ -380,6 +543,7 @@ class FeedRepository {
     StreamSubscription<List<Map<String, dynamic>>>? postsSubscription;
     StreamSubscription<List<Map<String, dynamic>>>? mediaSubscription;
     StreamSubscription<List<Map<String, dynamic>>>? likesSubscription;
+    StreamSubscription<List<Map<String, dynamic>>>? commentsSubscription;
 
     List<Map<String, dynamic>> latestPostRows = const [];
     var hasLoadedPosts = false;
@@ -442,11 +606,19 @@ class FeedRepository {
           (_) => unawaited(emitMappedPosts()),
           onError: (_, __) {},
         );
+
+        commentsSubscription = _client
+            .from(_postCommentsTable)
+            .stream(primaryKey: const ['id']).listen(
+          (_) => unawaited(emitMappedPosts()),
+          onError: (_, __) {},
+        );
       },
       onCancel: () async {
         await postsSubscription?.cancel();
         await mediaSubscription?.cancel();
         await likesSubscription?.cancel();
+        await commentsSubscription?.cancel();
       },
     );
 
@@ -556,14 +728,6 @@ class FeedRepository {
   Future<void> _deleteStorageObject(String storagePath) async {
     try {
       await _client.storage.from(_feedImageBucket).remove([storagePath]);
-    } catch (_) {
-      // Ignore cleanup failures to avoid masking the main action result.
-    }
-  }
-
-  Future<void> _deleteStorageObjects(List<String> storagePaths) async {
-    try {
-      await _client.storage.from(_feedImageBucket).remove(storagePaths);
     } catch (_) {
       // Ignore cleanup failures to avoid masking the main action result.
     }

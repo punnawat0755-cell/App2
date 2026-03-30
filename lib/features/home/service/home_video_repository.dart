@@ -189,7 +189,7 @@ class HomeVideoRepository {
         continue;
       }
 
-      final videoUrl = _resolveMediaUrl(row);
+      final videoUrl = await _resolveMediaUrl(row);
       if (videoUrl.isEmpty) {
         continue;
       }
@@ -263,21 +263,28 @@ class HomeVideoRepository {
     return authorNamesById;
   }
 
-  String _resolveMediaUrl(Map<String, dynamic> row) {
+  Future<String> _resolveMediaUrl(Map<String, dynamic> row) async {
     final publicUrl = row['public_url']?.toString().trim();
-    if (publicUrl != null && publicUrl.isNotEmpty) {
-      return publicUrl;
-    }
-
     final storagePath = row['storage_path']?.toString().trim() ?? '';
     if (storagePath.isEmpty) {
-      return '';
+      return publicUrl ?? '';
     }
 
     final bucket = _normalizeBucketName(
       row['storage_bucket']?.toString() ?? _defaultBucket,
     );
-    return _client.storage.from(bucket).getPublicUrl(storagePath);
+
+    try {
+      return await _client.storage.from(bucket).createSignedUrl(
+            storagePath,
+            60 * 60,
+          );
+    } catch (_) {
+      if (publicUrl != null && publicUrl.isNotEmpty) {
+        return publicUrl;
+      }
+      return _client.storage.from(bucket).getPublicUrl(storagePath);
+    }
   }
 
   String? _toOptionalText(dynamic value) {

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/shop/view/shop_view.dart';
 import 'package:get/get.dart';
@@ -8,10 +9,11 @@ import 'package:get/get.dart';
 // 1. Class Pet (Logic Controller) - แก้ไขแล้ว
 // ==========================================
 class Pet extends GetxController {
+  late final CoinService _coinService;
   var ownedItems = <int>[].obs;
 
   // --- ตัวแปรทั่วไป ---
-  var coins = 833.obs;
+  RxInt get coins => _coinService.coins;
   var level = 1.obs;
   var energyPercent = 50.obs; // ค่าพลังงานเริ่มต้น
   var username = "Seal".obs;
@@ -21,6 +23,15 @@ class Pet extends GetxController {
   var remainingTime = "00:00:00".obs;
   var isTimerRunning = false.obs;
   Timer? _timer;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _coinService =
+        Get.isRegistered<CoinService>()
+            ? Get.find<CoinService>()
+            : Get.put(CoinService(), permanent: true);
+  }
 
   @override
   void onClose() {
@@ -76,10 +87,10 @@ class Pet extends GetxController {
   // -----------------------------------------------------------------------
   // ฟังก์ชัน 2: ปลาตัวกลาง (ใช้เหรียญ)
   // -----------------------------------------------------------------------
-  void feedWithCoin(int cost) {
-    if (coins.value >= cost) {
+  Future<void> feedWithCoin(int cost) async {
+    final didSpend = await _coinService.spendCoins(cost);
+    if (didSpend) {
       // หักเหรียญ
-      coins.value -= cost;
 
       energyPercent.value += 10;
 
@@ -107,6 +118,8 @@ class Pet extends GetxController {
       );
     }
   }
+
+  Future<bool> spendCoins(int cost) => _coinService.spendCoins(cost);
 
   // --- Logic การนับเวลา ---
   void _startTimer(int seconds) {
