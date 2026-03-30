@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:image_picker/image_picker.dart';
 
 import 'package:flutter_application_1/core/config/app_env.dart';
@@ -16,7 +17,7 @@ class MediaModerationService {
   static const String _defaultWebhookUrl =
       'https://n8n.tgstack.dev/webhook/HowAreYouMediaBinary';
   static const String _defaultToken = 'howareyou_moderation_2026_secret';
-  static const Duration _timeout = Duration(seconds: 25);
+  static const int _defaultTimeoutSeconds = 90;
 
   final http.Client _httpClient = http.Client();
 
@@ -35,6 +36,24 @@ class MediaModerationService {
             ? const String.fromEnvironment('N8N_MODERATION_TOKEN')
             : null,
       );
+
+  Duration get _timeout {
+    final rawTimeout = AppEnv.string(
+      'N8N_MEDIA_MODERATION_TIMEOUT_SECONDS',
+      defaultValue: '$_defaultTimeoutSeconds',
+      compileTimeValue:
+          const bool.hasEnvironment('N8N_MEDIA_MODERATION_TIMEOUT_SECONDS')
+              ? const String.fromEnvironment(
+                  'N8N_MEDIA_MODERATION_TIMEOUT_SECONDS',
+                )
+              : null,
+    );
+    final timeoutSeconds = int.tryParse(rawTimeout.trim());
+    if (timeoutSeconds == null || timeoutSeconds <= 0) {
+      return const Duration(seconds: _defaultTimeoutSeconds);
+    }
+    return Duration(seconds: timeoutSeconds);
+  }
 
   Future<ModerationResult> moderateImageBeforePost({
     required String userId,
@@ -76,6 +95,7 @@ class MediaModerationService {
     required XFile videoFile,
     String caption = '',
     String transcript = '',
+    String frameNotes = '',
   }) {
     final normalizedUserId = userId.trim();
     if (normalizedUserId.isEmpty) {
@@ -102,6 +122,7 @@ class MediaModerationService {
         userId: normalizedUserId,
         caption: caption,
         transcript: transcript,
+        frameNotes: frameNotes,
       ),
       unavailableSummary:
           'ระบบตรวจสอบวิดีโอไม่พร้อมใช้งาน จึงยังไม่อนุญาตให้โพสต์',
@@ -112,6 +133,7 @@ class MediaModerationService {
     required String userId,
     String caption = '',
     String transcript = '',
+    String frameNotes = '',
   }) {
     final fields = <String, String>{
       'token': _token,
@@ -126,6 +148,11 @@ class MediaModerationService {
     final normalizedTranscript = transcript.trim();
     if (normalizedTranscript.isNotEmpty) {
       fields['transcript'] = normalizedTranscript;
+    }
+
+    final normalizedFrameNotes = frameNotes.trim();
+    if (normalizedFrameNotes.isNotEmpty) {
+      fields['frame_notes'] = normalizedFrameNotes;
     }
 
     return fields;
@@ -145,12 +172,23 @@ class MediaModerationService {
     }
 
     final mimeType = _inferMimeType(mediaFile.name, mediaFile.path);
+    final mediaType = _toMediaType(mimeType);
     final request = http.MultipartRequest('POST', uri);
     request.fields.addAll(fields);
+    request.fields['media_mime_type'] = mimeType;
+
+    try {
+      final fileSize = await mediaFile.length();
+      request.fields['file_size_bytes'] = fileSize.toString();
+      debugPrint('media moderation file size=$fileSize bytes');
+    } catch (_) {
+      // Keep request compatible if file length cannot be resolved on platform.
+    }
 
     debugPrint('media moderation request url=${uri.toString()}');
     debugPrint('media moderation file path=${mediaFile.path}');
     debugPrint('media moderation mime type=$mimeType');
+    debugPrint('media moderation timeout=${_timeout.inSeconds}s');
 
     try {
       request.files.add(
@@ -158,6 +196,7 @@ class MediaModerationService {
           'media',
           mediaFile.path,
           filename: _normalizedFileName(mediaFile.name),
+          contentType: mediaType,
         ),
       );
     } catch (_) {
@@ -167,13 +206,13 @@ class MediaModerationService {
           'media',
           bytes,
           filename: _normalizedFileName(mediaFile.name),
+          contentType: mediaType,
         ),
       );
     }
 
     try {
-      final streamedResponse =
-          await _httpClient.send(request).timeout(_timeout);
+      final streamedResponse = await _httpClient.send(request).timeout(_timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
 
       debugPrint('media moderation response body=$responseBody');
@@ -245,7 +284,8 @@ class MediaModerationService {
         summary: 'ระบบตรวจสอบรูป/วิดีโอใช้เวลานานเกินกำหนด กรุณาลองใหม่',
         reasonCode: 'timeout',
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('media moderation exception=$error');
       return ModerationResult.blocked(
         summary: unavailableSummary,
         reasonCode: 'exception',
@@ -318,5 +358,16 @@ class MediaModerationService {
     if (source.endsWith('.mkv')) return 'video/x-matroska';
 
     return 'application/octet-stream';
+  }
+
+  http_parser.MediaType _toMediaType(String mimeType) {
+    final normalized = mimeType.trim().toLowerCase();
+    final parts = normalized.split('/');
+    if (parts.length == 2 &&
+        parts[0].isNotEmpty &&
+        parts[1].isNotEmpty) {
+      return http_parser.MediaType(parts[0], parts[1]);
+    }
+    return http_parser.MediaType('application', 'octet-stream');
   }
 }

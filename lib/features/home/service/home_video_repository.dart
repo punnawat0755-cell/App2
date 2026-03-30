@@ -13,6 +13,7 @@ class HomeVideoRepository {
   static const _profilesTable = 'profiles';
   static const _approvePostRpc = 'approve_post';
   static const _videoMediaType = 'video';
+  static const _signedVideoUrlTtlSeconds = 60 * 60 * 24;
   static const _defaultBucketConfig = String.fromEnvironment(
     'SUPABASE_FEED_IMAGE_BUCKET',
     defaultValue: 'app_media',
@@ -93,6 +94,7 @@ class HomeVideoRepository {
   Future<void> createVideoClip({
     required Uint8List videoBytes,
     required String videoFileName,
+    String? videoFilePath,
     required String caption,
   }) async {
     final user = _requireUser();
@@ -107,7 +109,10 @@ class HomeVideoRepository {
       );
       createdPostId = postId;
 
-      final extension = _resolveVideoExtension(videoFileName);
+      final extension = _resolveVideoExtension(
+        videoFileName,
+        filePath: videoFilePath,
+      );
       final fileName = _resolveStorageFileName(videoFileName, extension);
       final storagePath = 'posts/${user.id}/$postId/$fileName';
 
@@ -195,7 +200,7 @@ class HomeVideoRepository {
         continue;
       }
 
-      final videoUrl = _resolveMediaUrl(row);
+      final videoUrl = await _resolveMediaUrl(row);
       if (videoUrl.isEmpty) {
         continue;
       }
@@ -269,21 +274,36 @@ class HomeVideoRepository {
     return authorNamesById;
   }
 
-  String _resolveMediaUrl(Map<String, dynamic> row) {
-    final publicUrl = row['public_url']?.toString().trim();
-    if (publicUrl != null && publicUrl.isNotEmpty) {
-      return publicUrl;
-    }
-
+  Future<String> _resolveMediaUrl(Map<String, dynamic> row) async {
+    final publicUrl = row['public_url']?.toString().trim() ?? '';
     final storagePath = row['storage_path']?.toString().trim() ?? '';
-    if (storagePath.isEmpty) {
-      return '';
-    }
-
     final bucket = _normalizeBucketName(
       row['storage_bucket']?.toString() ?? _defaultBucket,
     );
-    return _client.storage.from(bucket).getPublicUrl(storagePath);
+
+    if (storagePath.isNotEmpty) {
+      try {
+        final signedUrl = await _client.storage
+            .from(bucket)
+            .createSignedUrl(storagePath, _signedVideoUrlTtlSeconds);
+        final normalizedSignedUrl = signedUrl.trim();
+        if (normalizedSignedUrl.isNotEmpty) {
+          return normalizedSignedUrl;
+        }
+      } catch (_) {
+        // Fall back to public URL when signing is unavailable.
+      }
+    }
+
+    if (publicUrl.isNotEmpty) {
+      return publicUrl;
+    }
+
+    if (storagePath.isNotEmpty) {
+      return _client.storage.from(bucket).getPublicUrl(storagePath);
+    }
+
+    return '';
   }
 
   String? _toOptionalText(dynamic value) {
@@ -467,20 +487,28 @@ class HomeVideoRepository {
     return false;
   }
 
-  String _resolveVideoExtension(String fileName) {
-    final trimmed = fileName.trim();
-    final dotIndex = trimmed.lastIndexOf('.');
-    if (dotIndex == -1 || dotIndex == trimmed.length - 1) {
-      return 'mp4';
+  String _resolveVideoExtension(String fileName, {String? filePath}) {
+    String extensionFrom(String source) {
+      final trimmed = source.trim();
+      final dotIndex = trimmed.lastIndexOf('.');
+      if (dotIndex == -1 || dotIndex == trimmed.length - 1) {
+        return '';
+      }
+      return trimmed.substring(dotIndex + 1).toLowerCase();
     }
 
-    final extension = trimmed.substring(dotIndex + 1).toLowerCase();
+    var extension = extensionFrom(fileName);
+    if (extension.isEmpty && filePath != null && filePath.trim().isNotEmpty) {
+      extension = extensionFrom(filePath);
+    }
+
     switch (extension) {
       case 'mp4':
       case 'mov':
       case 'm4v':
       case 'avi':
       case 'webm':
+      case 'mkv':
         return extension;
       default:
         return 'mp4';
@@ -510,6 +538,8 @@ class HomeVideoRepository {
         return 'video/x-msvideo';
       case 'webm':
         return 'video/webm';
+      case 'mkv':
+        return 'video/x-matroska';
       case 'm4v':
       case 'mp4':
       default:

@@ -32,6 +32,7 @@ class FeedRepository {
     defaultValue: 'app_media',
   );
   static const _imageMediaType = 'image';
+  static const _videoMediaType = 'video';
   static const _likeReaction = 'like';
   static const _signedImageUrlTtlSeconds = 60 * 60 * 24 * 7;
 
@@ -264,6 +265,7 @@ class FeedRepository {
     final namesByUserId = <String, String>{};
     final avatarsByUserId = <String, String>{};
     final imageUrlsByPostId = <String, String>{};
+    final videoPostIds = <String>{};
     final likeCountsByPostId = <String, int>{};
 
     if (authorIds.isNotEmpty) {
@@ -309,6 +311,10 @@ class FeedRepository {
           }
 
           final mediaType = map['media_type']?.toString() ?? '';
+          if (mediaType == _videoMediaType) {
+            videoPostIds.add(postId);
+            continue;
+          }
           if (mediaType != _imageMediaType) {
             continue;
           }
@@ -352,7 +358,12 @@ class FeedRepository {
 
     final posts = rows.where((row) {
       final postId = row['id']?.toString() ?? '';
-      return postId.isNotEmpty;
+      if (postId.isEmpty) {
+        return false;
+      }
+
+      // Keep video clips exclusive to Home by hiding video-backed posts in Feed.
+      return !videoPostIds.contains(postId);
     }).map((row) {
       final map = Map<String, dynamic>.from(row);
       final postId = map['id']?.toString() ?? '';

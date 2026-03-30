@@ -37,7 +37,7 @@ class _HomePageState extends State<HomePage> {
 
   int _currentBannerIndex = 0;
   late final PageController _pageController;
-  late final Stream<List<HomeVideoClip>> _videoClipsStream;
+  late Stream<List<HomeVideoClip>> _videoClipsStream;
   Timer? _timer;
   final HomeVideoRepository _homeVideoRepository = HomeVideoRepository();
   final HomeVideoPrefetchService _homeVideoPrefetchService =
@@ -249,7 +249,14 @@ class _HomePageState extends State<HomePage> {
         userId: currentUserId,
         videoFile: file,
         caption: caption,
-        transcript: caption.trim(),
+        transcript: _buildModerationTranscript(
+          caption: caption,
+          fileName: file.name,
+        ),
+        frameNotes: _buildModerationFrameNotes(
+          caption: caption,
+          fileName: file.name,
+        ),
       );
       if (!mounted) {
         return;
@@ -267,12 +274,17 @@ class _HomePageState extends State<HomePage> {
       await _homeVideoRepository.createVideoClip(
         videoBytes: videoBytes,
         videoFileName: file.name,
+        videoFilePath: file.path,
         caption: caption,
       );
 
       if (!mounted) {
         return;
       }
+      setState(() {
+        // Force a fresh fetch so the new clip appears even when realtime events lag.
+        _videoClipsStream = _homeVideoRepository.watchVideoClips();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('โพสต์เรียบร้อยแล้ว!')),
       );
@@ -424,6 +436,42 @@ class _HomePageState extends State<HomePage> {
       return fileName;
     }
     return fileName.substring(0, lastDotIndex);
+  }
+
+  String _buildModerationTranscript({
+    required String caption,
+    required String fileName,
+  }) {
+    final normalizedCaption = caption.trim();
+    if (normalizedCaption.isNotEmpty) {
+      return normalizedCaption;
+    }
+
+    final fallbackName = _fileNameWithoutExtension(fileName).trim();
+    if (fallbackName.isNotEmpty) {
+      return '(no transcript) clip title: $fallbackName';
+    }
+
+    return '(no transcript)';
+  }
+
+  String _buildModerationFrameNotes({
+    required String caption,
+    required String fileName,
+  }) {
+    final notes = <String>[
+      'user_uploaded_video',
+      'filename: ${fileName.trim().isEmpty ? 'unknown' : fileName.trim()}',
+    ];
+
+    final normalizedCaption = caption.trim();
+    if (normalizedCaption.isNotEmpty) {
+      notes.add('caption: $normalizedCaption');
+    } else {
+      notes.add('caption: (none)');
+    }
+
+    return notes.join('\n');
   }
 
   Widget _buildAddClipCard() {
