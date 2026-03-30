@@ -11,10 +11,8 @@ class ContentModerationService {
 
   static final ContentModerationService instance = ContentModerationService._();
 
-  static const String _n8nModerationWebhook = String.fromEnvironment(
-    'N8N_MODERATION_WEBHOOK',
-    defaultValue: 'https://n8n.tgstack.dev/webhook/HowAreYou',
-  );
+  static const String _n8nModerationWebhook =
+      'https://n8n.tgstack.dev/webhook/HowAreYou';
   static const bool _moderationFailOpen = bool.fromEnvironment(
     'N8N_MODERATION_FAIL_OPEN',
     defaultValue: true,

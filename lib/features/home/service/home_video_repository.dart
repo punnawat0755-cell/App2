@@ -11,6 +11,7 @@ class HomeVideoRepository {
   static const _postsTable = 'posts';
   static const _postMediaTable = 'post_media';
   static const _profilesTable = 'profiles';
+  static const _approvePostRpc = 'approve_post';
   static const _videoMediaType = 'video';
   static const _defaultBucketConfig = String.fromEnvironment(
     'SUPABASE_FEED_IMAGE_BUCKET',
@@ -148,6 +149,11 @@ class HomeVideoRepository {
         'file_size_bytes': videoBytes.lengthInBytes,
         'order_no': 0,
       });
+
+      await _approvePost(
+        postId: postId,
+        userId: user.id,
+      );
     } catch (error) {
       if (uploadedVideoPath != null) {
         await _deleteStorageObject(uploadedVideoPath);
@@ -375,6 +381,92 @@ class HomeVideoRepository {
     }
   }
 
+  Future<void> _approvePost({
+    required String postId,
+    required String userId,
+  }) async {
+    if (await _tryApprovePostViaRpc(postId: postId)) {
+      return;
+    }
+    if (await _trySetPostVisibleWithUpdate(postId: postId, userId: userId)) {
+      return;
+    }
+    throw HomeVideoApprovePostFailedException(postId: postId);
+  }
+
+  Future<bool> _tryApprovePostViaRpc({required String postId}) async {
+    final candidateParams = <Map<String, dynamic>>[
+      {'post_id': postId},
+      {'p_post_id': postId},
+      {'_post_id': postId},
+    ];
+
+    for (final params in candidateParams) {
+      try {
+        await _client.rpc(_approvePostRpc, params: params);
+        return true;
+      } catch (_) {
+        // Try next known function signature.
+      }
+    }
+
+    return false;
+  }
+
+  Future<bool> _trySetPostVisibleWithUpdate({
+    required String postId,
+    required String userId,
+  }) async {
+    final candidatePayloads = <Map<String, dynamic>>[
+      {
+        'is_visible': true,
+        'moderation_status': 'approved',
+        'status': 'active',
+      },
+      {
+        'is_visible': true,
+        'moderation_status': 'approved',
+      },
+      {
+        'is_visible': true,
+        'status': 'active',
+      },
+      {
+        'is_visible': true,
+      },
+      {
+        'moderation_status': 'approved',
+        'status': 'active',
+      },
+      {
+        'moderation_status': 'approved',
+      },
+      {
+        'status': 'active',
+      },
+    ];
+
+    for (final payload in candidatePayloads) {
+      try {
+        final updated = await _client
+            .from(_postsTable)
+            .update(payload)
+            .eq('id', postId)
+            .eq('user_id', userId)
+            .select('id')
+            .maybeSingle();
+
+        if (updated != null) {
+          return true;
+        }
+      } catch (_) {
+        // Try next payload for schema compatibility.
+      }
+    }
+
+    return false;
+  }
+
   String _resolveVideoExtension(String fileName) {
     final trimmed = fileName.trim();
     final dotIndex = trimmed.lastIndexOf('.');
@@ -476,4 +568,15 @@ class HomeVideoUploadUnauthorizedException implements Exception {
   @override
   String toString() =>
       'HomeVideoUploadUnauthorizedException(bucketName: $bucketName, storagePath: $storagePath)';
+}
+
+class HomeVideoApprovePostFailedException implements Exception {
+  const HomeVideoApprovePostFailedException({
+    required this.postId,
+  });
+
+  final String postId;
+
+  @override
+  String toString() => 'HomeVideoApprovePostFailedException(postId: $postId)';
 }

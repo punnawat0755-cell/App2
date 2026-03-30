@@ -26,13 +26,14 @@ class FeedRepository {
   static const _postMediaTable = 'post_media';
   static const _postLikesTable = 'post_reactions';
   static const _profilesTable = 'profiles';
+  static const _approvePostRpc = 'approve_post';
   static const _feedImageBucketConfig = String.fromEnvironment(
     'SUPABASE_FEED_IMAGE_BUCKET',
     defaultValue: 'app_media',
   );
   static const _imageMediaType = 'image';
-  static const _videoMediaType = 'video';
   static const _likeReaction = 'like';
+  static const _signedImageUrlTtlSeconds = 60 * 60 * 24 * 7;
 
   final SupabaseClient _client;
   final ContentModerationService _moderationService =
@@ -143,31 +144,34 @@ class FeedRepository {
       );
       createdPostId = postId;
 
-      if (!hasImage) {
-        return;
+      if (hasImage) {
+        final storagePath = await _uploadPostImage(
+          postId: postId,
+          userId: identity.userId,
+          imageBytes: selectedImageBytes,
+          imageFileName: imageFileName,
+        );
+        uploadedImagePath = storagePath;
+
+        await _insertPostMedia(
+          postId: postId,
+          storagePath: storagePath,
+          publicUrl: _client.storage.from(_feedImageBucket).getPublicUrl(
+                storagePath,
+              ),
+          fileSizeBytes: selectedImageBytes.lengthInBytes,
+        );
       }
 
-      final storagePath = await _uploadPostImage(
+      await _approvePost(
         postId: postId,
         userId: identity.userId,
-        imageBytes: selectedImageBytes,
-        imageFileName: imageFileName,
-      );
-      uploadedImagePath = storagePath;
-
-      await _insertPostMedia(
-        postId: postId,
-        storagePath: storagePath,
-        publicUrl: _client.storage.from(_feedImageBucket).getPublicUrl(
-              storagePath,
-            ),
-        fileSizeBytes: selectedImageBytes.lengthInBytes,
       );
     } catch (error) {
       if (uploadedImagePath != null) {
         await _deleteStorageObject(uploadedImagePath);
       }
-      if (createdPostId != null && hasImage) {
+      if (createdPostId != null) {
         await _deletePostRow(postId: createdPostId, userId: identity.userId);
       }
       rethrow;
@@ -260,7 +264,6 @@ class FeedRepository {
     final namesByUserId = <String, String>{};
     final avatarsByUserId = <String, String>{};
     final imageUrlsByPostId = <String, String>{};
-    final postsWithVideoMedia = <String>{};
     final likeCountsByPostId = <String, int>{};
 
     if (authorIds.isNotEmpty) {
@@ -302,26 +305,11 @@ class FeedRepository {
           final map = Map<String, dynamic>.from(row);
           final postId = map['post_id']?.toString() ?? '';
           if (postId.isEmpty || imageUrlsByPostId.containsKey(postId)) {
-            if (postId.isNotEmpty &&
-                map['media_type']?.toString() == _videoMediaType) {
-              postsWithVideoMedia.add(postId);
-            }
             continue;
           }
 
           final mediaType = map['media_type']?.toString() ?? '';
-          if (mediaType == _videoMediaType) {
-            postsWithVideoMedia.add(postId);
-            continue;
-          }
-
           if (mediaType != _imageMediaType) {
-            continue;
-          }
-
-          final publicUrl = map['public_url']?.toString().trim();
-          if (publicUrl != null && publicUrl.isNotEmpty) {
-            imageUrlsByPostId[postId] = publicUrl;
             continue;
           }
 
@@ -329,9 +317,13 @@ class FeedRepository {
           final storageBucket = _normalizeBucketName(
             map['storage_bucket']?.toString() ?? _feedImageBucket,
           );
-          if (storagePath.isNotEmpty) {
-            imageUrlsByPostId[postId] =
-                _client.storage.from(storageBucket).getPublicUrl(storagePath);
+          final resolvedImageUrl = await _resolveReadableImageUrl(
+            storageBucket: storageBucket,
+            storagePath: storagePath,
+            publicUrl: map['public_url']?.toString(),
+          );
+          if (resolvedImageUrl != null && resolvedImageUrl.isNotEmpty) {
+            imageUrlsByPostId[postId] = resolvedImageUrl;
           }
         }
       } catch (_) {
@@ -360,7 +352,7 @@ class FeedRepository {
 
     final posts = rows.where((row) {
       final postId = row['id']?.toString() ?? '';
-      return postId.isNotEmpty && !postsWithVideoMedia.contains(postId);
+      return postId.isNotEmpty;
     }).map((row) {
       final map = Map<String, dynamic>.from(row);
       final postId = map['id']?.toString() ?? '';
@@ -584,6 +576,197 @@ class FeedRepository {
     }
   }
 
+  Future<void> _approvePost({
+    required String postId,
+    required String userId,
+  }) async {
+    if (await _tryApprovePostViaRpc(postId: postId)) {
+      return;
+    }
+    if (await _trySetPostVisibleWithUpdate(postId: postId, userId: userId)) {
+      return;
+    }
+    throw ApprovePostFailedException(postId: postId);
+  }
+
+  Future<bool> _tryApprovePostViaRpc({required String postId}) async {
+    final candidateParams = <Map<String, dynamic>>[
+      {'post_id': postId},
+      {'p_post_id': postId},
+      {'_post_id': postId},
+    ];
+
+    for (final params in candidateParams) {
+      try {
+        await _client.rpc(_approvePostRpc, params: params);
+        return true;
+      } catch (_) {
+        // Try next known function signature.
+      }
+    }
+
+    return false;
+  }
+
+  Future<bool> _trySetPostVisibleWithUpdate({
+    required String postId,
+    required String userId,
+  }) async {
+    final candidatePayloads = <Map<String, dynamic>>[
+      {
+        'is_visible': true,
+        'moderation_status': 'approved',
+        'status': 'active',
+      },
+      {
+        'is_visible': true,
+        'moderation_status': 'approved',
+      },
+      {
+        'is_visible': true,
+        'status': 'active',
+      },
+      {
+        'is_visible': true,
+      },
+      {
+        'moderation_status': 'approved',
+        'status': 'active',
+      },
+      {
+        'moderation_status': 'approved',
+      },
+      {
+        'status': 'active',
+      },
+    ];
+
+    for (final payload in candidatePayloads) {
+      try {
+        final updated = await _client
+            .from(_postsTable)
+            .update(payload)
+            .eq('id', postId)
+            .eq('user_id', userId)
+            .select('id')
+            .maybeSingle();
+
+        if (updated != null) {
+          return true;
+        }
+      } catch (_) {
+        // Try next payload for schema compatibility.
+      }
+    }
+
+    return false;
+  }
+
+  Future<String?> _resolveReadableImageUrl({
+    required String storageBucket,
+    required String storagePath,
+    String? publicUrl,
+  }) async {
+    final normalizedPublicUrl = publicUrl?.trim() ?? '';
+    final candidateRefs = <_StorageRef>[];
+    final candidateKeys = <String>{};
+
+    void addCandidateRef(_StorageRef? ref) {
+      if (ref == null || ref.path.isEmpty || ref.bucket.isEmpty) {
+        return;
+      }
+      final key = '${ref.bucket}|${ref.path}';
+      if (!candidateKeys.add(key)) {
+        return;
+      }
+      candidateRefs.add(ref);
+    }
+
+    if (storagePath.isNotEmpty) {
+      addCandidateRef(
+        _StorageRef(
+          bucket: storageBucket,
+          path: storagePath,
+        ),
+      );
+    }
+
+    if (normalizedPublicUrl.isNotEmpty) {
+      addCandidateRef(_extractStorageRefFromUrl(normalizedPublicUrl));
+    }
+
+    for (final ref in candidateRefs) {
+      try {
+        final signedUrl = await _client.storage
+            .from(ref.bucket)
+            .createSignedUrl(ref.path, _signedImageUrlTtlSeconds);
+        final normalizedSignedUrl = signedUrl.trim();
+        if (normalizedSignedUrl.isNotEmpty) {
+          return normalizedSignedUrl;
+        }
+      } catch (_) {
+        // Fall through to public URL fallback.
+      }
+    }
+
+    if (normalizedPublicUrl.isNotEmpty) {
+      return normalizedPublicUrl;
+    }
+
+    if (candidateRefs.isNotEmpty) {
+      final firstRef = candidateRefs.first;
+      return _client.storage.from(firstRef.bucket).getPublicUrl(firstRef.path);
+    }
+
+    return null;
+  }
+
+  _StorageRef? _extractStorageRefFromUrl(String rawUrl) {
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) {
+      return null;
+    }
+
+    final segments = uri.pathSegments;
+    if (segments.isEmpty) {
+      return null;
+    }
+
+    const markers = <String>{
+      'public',
+      'authenticated',
+      'sign',
+      'render',
+    };
+    var markerIndex = -1;
+    for (var i = 0; i < segments.length; i++) {
+      if (markers.contains(segments[i])) {
+        markerIndex = i;
+        break;
+      }
+    }
+
+    if (markerIndex == -1 || markerIndex + 2 >= segments.length) {
+      return null;
+    }
+
+    final bucket = _normalizeBucketName(segments[markerIndex + 1]);
+    final pathSegments = segments.sublist(markerIndex + 2);
+    if (pathSegments.isEmpty) {
+      return null;
+    }
+
+    final decodedPath = pathSegments.map(Uri.decodeComponent).join('/');
+    if (decodedPath.trim().isEmpty) {
+      return null;
+    }
+
+    return _StorageRef(
+      bucket: bucket,
+      path: decodedPath,
+    );
+  }
+
   String _resolveImageExtension(String? imageFileName) {
     final fileName = imageFileName?.trim() ?? '';
     final dotIndex = fileName.lastIndexOf('.');
@@ -663,4 +846,23 @@ class FeedImageBucketNotFoundException implements Exception {
   @override
   String toString() =>
       'FeedImageBucketNotFoundException(bucketName: $bucketName)';
+}
+
+class ApprovePostFailedException implements Exception {
+  const ApprovePostFailedException({required this.postId});
+
+  final String postId;
+
+  @override
+  String toString() => 'ApprovePostFailedException(postId: $postId)';
+}
+
+class _StorageRef {
+  const _StorageRef({
+    required this.bucket,
+    required this.path,
+  });
+
+  final String bucket;
+  final String path;
 }

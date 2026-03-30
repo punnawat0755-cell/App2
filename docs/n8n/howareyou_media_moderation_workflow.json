@@ -1,0 +1,283 @@
+{
+  "name": "HowAreYou Media Moderation (Binary Vision)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "HowAreYouMediaBinary",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryData": true
+        }
+      },
+      "id": "node_webhook",
+      "name": "Webhook (multipart media)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -1180,
+        260
+      ],
+      "webhookId": "howareyou-media-binary"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item;\nconst incomingJson = { ...(item.json ?? {}) };\nconst media = item.binary?.media;\n\nif (!media) {\n  return [{\n    json: {\n      ok: false,\n      status: 400,\n      action: 'media_moderate',\n      allowed: false,\n      safe_to_post: false,\n      needs_review: false,\n      reason_codes: ['missing-media-binary'],\n      summary: 'ไม่พบไฟล์ media ใน multipart/form-data'\n    }\n  }];\n}\n\nreturn [{\n  json: incomingJson,\n  binary: {\n    media\n  }\n}];"
+      },
+      "id": "node_validate_binary",
+      "name": "Validate Binary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -930,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.item;\nconst incomingJson = { ...(item.json ?? {}) };\nconst media = item.binary?.media;\nconst mimeType = String(media?.mimeType ?? media?.fileType ?? '').toLowerCase();\nconst fileName = String(media?.fileName ?? '').toLowerCase();\n\nlet mediaType = 'unknown';\nif (mimeType.startsWith('image/') || /\\.(png|jpe?g|webp|gif|heic|heif)$/i.test(fileName)) {\n  mediaType = 'image';\n} else if (mimeType.startsWith('video/') || /\\.(mp4|mov|m4v|avi|webm|mkv)$/i.test(fileName)) {\n  mediaType = 'video';\n}\n\nconst moderationPrompt = `You are a safety moderator for user-generated media.\nAnalyze the attached media binary directly (image or video).\nIf media_type is video, also use transcript text when provided.\n\nReturn ONLY valid JSON with this schema:\n{\n  \"allowed\": boolean,\n  \"safe_to_post\": boolean,\n  \"needs_review\": boolean,\n  \"reason_codes\": string[],\n  \"summary\": string\n}\n\nRules:\n- Block explicit sexual content, nudity, minors in sexual context, graphic violence, self-harm promotion, hate symbols, illegal activity promotion.\n- If uncertain, set needs_review=true and allowed=false.\n- If safe, use reason_codes=[\"safe\"] and summary in Thai.`;\n\nreturn [{\n  json: {\n    ...incomingJson,\n    media_type: mediaType,\n    mime_type: mimeType,\n    file_name: media?.fileName ?? '',\n    moderation_prompt: moderationPrompt\n  },\n  binary: {\n    media\n  }\n}];"
+      },
+      "id": "node_detect_type",
+      "name": "Detect Type (image/video)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -680,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "dataType": "string",
+        "value1": "={{$json.media_type}}",
+        "rules": [
+          {
+            "operation": "equal",
+            "value2": "image"
+          },
+          {
+            "operation": "equal",
+            "value2": "video"
+          }
+        ],
+        "fallbackOutput": 2
+      },
+      "id": "node_switch",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -420,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "model": "gpt-4.1-mini",
+        "messages": {
+          "messageValues": [
+            {
+              "content": "={{$json.moderation_prompt}}"
+            }
+          ]
+        },
+        "inputType": "binary",
+        "binaryPropertyName": "media",
+        "options": {
+          "responseFormat": "json_object",
+          "automaticallyPassthroughBinaryImages": true
+        }
+      },
+      "id": "node_ai_moderate",
+      "name": "Image + Video Moderate",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        -140,
+        180
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "YOUR_OPENAI_CREDENTIAL_ID",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "if (($json.media_type ?? '').toString().toLowerCase() !== 'image') {\n  return [];\n}\n\nconst toBool = (value, fallback = false) => {\n  if (typeof value === 'boolean') return value;\n  if (typeof value === 'number') return value !== 0;\n  if (typeof value === 'string') {\n    const v = value.trim().toLowerCase();\n    if (['true', '1', 'yes'].includes(v)) return true;\n    if (['false', '0', 'no'].includes(v)) return false;\n  }\n  return fallback;\n};\n\nconst toStringArray = (value, fallback = ['safe']) => {\n  if (!Array.isArray(value)) return fallback;\n  const arr = value.map((v) => String(v ?? '').trim()).filter((v) => v.length > 0);\n  return arr.length > 0 ? arr : fallback;\n};\n\nconst pickRaw = () => {\n  const candidates = [\n    $json?.choices?.[0]?.message?.content,\n    $json?.message?.content,\n    $json?.content,\n    $json?.text,\n    $json?.output,\n    $json?.response,\n    $json\n  ];\n  for (const value of candidates) {\n    if (value !== undefined && value !== null && value !== '') {\n      return value;\n    }\n  }\n  return null;\n};\n\nconst parseObject = (raw) => {\n  if (!raw) return {};\n  if (typeof raw === 'object') return raw;\n  const text = String(raw).trim();\n  if (!text) return {};\n  try {\n    return JSON.parse(text);\n  } catch {\n    const start = text.indexOf('{');\n    const end = text.lastIndexOf('}');\n    if (start >= 0 && end > start) {\n      try {\n        return JSON.parse(text.slice(start, end + 1));\n      } catch {}\n    }\n  }\n  return {};\n};\n\nconst parsed = parseObject(pickRaw());\nconst allowed = toBool(parsed.allowed, false);\nconst safeToPost = toBool(parsed.safe_to_post ?? parsed.safeToPost, allowed);\nconst needsReview = toBool(parsed.needs_review ?? parsed.needsReview, !allowed);\nconst reasonCodes = toStringArray(parsed.reason_codes ?? parsed.reasonCodes, allowed ? ['safe'] : ['blocked']);\nconst summary = String(parsed.summary ?? (allowed ? 'สามารถโพสต์ได้' : 'ไม่อนุญาตให้โพสต์')).trim() || (allowed ? 'สามารถโพสต์ได้' : 'ไม่อนุญาตให้โพสต์');\n\nreturn [{\n  json: {\n    ok: true,\n    status: 200,\n    action: 'image_moderate',\n    allowed,\n    safe_to_post: safeToPost,\n    needs_review: needsReview,\n    reason_codes: reasonCodes,\n    summary\n  }\n}];"
+      },
+      "id": "node_parse_image",
+      "name": "Parse Image JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        90
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "if (($json.media_type ?? '').toString().toLowerCase() !== 'video') {\n  return [];\n}\n\nconst toBool = (value, fallback = false) => {\n  if (typeof value === 'boolean') return value;\n  if (typeof value === 'number') return value !== 0;\n  if (typeof value === 'string') {\n    const v = value.trim().toLowerCase();\n    if (['true', '1', 'yes'].includes(v)) return true;\n    if (['false', '0', 'no'].includes(v)) return false;\n  }\n  return fallback;\n};\n\nconst toStringArray = (value, fallback = ['safe']) => {\n  if (!Array.isArray(value)) return fallback;\n  const arr = value.map((v) => String(v ?? '').trim()).filter((v) => v.length > 0);\n  return arr.length > 0 ? arr : fallback;\n};\n\nconst pickRaw = () => {\n  const candidates = [\n    $json?.choices?.[0]?.message?.content,\n    $json?.message?.content,\n    $json?.content,\n    $json?.text,\n    $json?.output,\n    $json?.response,\n    $json\n  ];\n  for (const value of candidates) {\n    if (value !== undefined && value !== null && value !== '') {\n      return value;\n    }\n  }\n  return null;\n};\n\nconst parseObject = (raw) => {\n  if (!raw) return {};\n  if (typeof raw === 'object') return raw;\n  const text = String(raw).trim();\n  if (!text) return {};\n  try {\n    return JSON.parse(text);\n  } catch {\n    const start = text.indexOf('{');\n    const end = text.lastIndexOf('}');\n    if (start >= 0 && end > start) {\n      try {\n        return JSON.parse(text.slice(start, end + 1));\n      } catch {}\n    }\n  }\n  return {};\n};\n\nconst parsed = parseObject(pickRaw());\nconst allowed = toBool(parsed.allowed, false);\nconst safeToPost = toBool(parsed.safe_to_post ?? parsed.safeToPost, allowed);\nconst needsReview = toBool(parsed.needs_review ?? parsed.needsReview, !allowed);\nconst reasonCodes = toStringArray(parsed.reason_codes ?? parsed.reasonCodes, allowed ? ['safe'] : ['blocked']);\nconst summary = String(parsed.summary ?? (allowed ? 'สามารถโพสต์ได้' : 'ไม่อนุญาตให้โพสต์')).trim() || (allowed ? 'สามารถโพสต์ได้' : 'ไม่อนุญาตให้โพสต์');\n\nreturn [{\n  json: {\n    ok: true,\n    status: 200,\n    action: 'video_moderate',\n    allowed,\n    safe_to_post: safeToPost,\n    needs_review: needsReview,\n    reason_codes: reasonCodes,\n    summary\n  }\n}];"
+      },
+      "id": "node_parse_video",
+      "name": "Parse Video JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        120,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ok: false,\n    status: 415,\n    action: 'media_moderate',\n    allowed: false,\n    safe_to_post: false,\n    needs_review: false,\n    reason_codes: ['unsupported-media-type'],\n    summary: 'รองรับเฉพาะไฟล์ image หรือ video'\n  }\n}];"
+      },
+      "id": "node_unsupported",
+      "name": "Unsupported Media Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -150,
+        430
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}",
+        "options": {
+          "responseCode": "={{$json.status || 200}}"
+        }
+      },
+      "id": "node_respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        390,
+        260
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook (multipart media)": {
+      "main": [
+        [
+          {
+            "node": "Validate Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Binary": {
+      "main": [
+        [
+          {
+            "node": "Detect Type (image/video)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Type (image/video)": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Image + Video Moderate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Image + Video Moderate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unsupported Media Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Image + Video Moderate": {
+      "main": [
+        [
+          {
+            "node": "Parse Image JSON",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse Video JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Image JSON": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Video JSON": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unsupported Media Type": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "id": "howareyou-media-moderation-binary"
+}

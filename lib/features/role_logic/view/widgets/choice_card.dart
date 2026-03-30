@@ -28,36 +28,47 @@ class ChoiceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pageScale = context.responsive;
+
     return GestureDetector(
       onTap: onTap,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final cardWidth = width ?? constraints.maxWidth;
           final isNarrowCard = cardWidth < 190;
-          final topPadding = pageScale.rs(
-            isNarrowCard ? 14 : 18,
-            min: 12,
-            max: 22,
-          );
-          final bottomPadding = pageScale.rs(
-            isNarrowCard ? 10 : 14,
-            min: 8,
-            max: 16,
-          );
+
+          final resolvedHeight = height ??
+              pageScale.rs(isNarrowCard ? 200 : 228, min: 184, max: 246);
+
+          final topPadding =
+              pageScale.rs(isNarrowCard ? 12 : 16, min: 10, max: 20);
+          final bottomPadding =
+              pageScale.rs(isNarrowCard ? 10 : 12, min: 8, max: 16);
           final radius = pageScale.rs(24, min: 18, max: 26);
-          final imageWidth = (cardWidth * (isNarrowCard ? 0.62 : 0.68))
-              .clamp(96.0, 176.0)
+
+          final titleFontSize = pageScale.rf(
+            isNarrowCard ? 16.5 : 18,
+            min: 14.5,
+            max: 18.5,
+          );
+          final labelGap = pageScale.rs(isNarrowCard ? 8 : 12, min: 6, max: 14);
+
+          final contentHeight = (resolvedHeight - topPadding - bottomPadding)
+              .clamp(120.0, 320.0)
               .toDouble();
-          final imageHeight = (imageWidth * 0.72).clamp(72.0, 132.0).toDouble();
+          final maxImageHeight =
+              (contentHeight - (titleFontSize * 1.35) - labelGap)
+                  .clamp(86.0, 220.0)
+                  .toDouble();
+          final desiredImageHeight = (contentHeight * 0.58).toDouble();
+          final imageHeight =
+              desiredImageHeight.clamp(86.0, maxImageHeight).toDouble();
+          final imageWidth = (cardWidth * 0.76).clamp(110.0, 210.0).toDouble();
 
           return AnimatedContainer(
             duration: const Duration(milliseconds: 200),
             width: width,
-            height: height,
-            padding: EdgeInsets.only(
-              top: topPadding,
-              bottom: bottomPadding,
-            ),
+            height: resolvedHeight,
+            padding: EdgeInsets.only(top: topPadding, bottom: bottomPadding),
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: BorderRadius.circular(radius),
@@ -75,7 +86,8 @@ class ChoiceCard extends StatelessWidget {
               ],
             ),
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisSize: MainAxisSize.max,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset(
                   imagePath,
@@ -87,30 +99,16 @@ class ChoiceCard extends StatelessWidget {
                       id == 'listener'
                           ? Icons.volunteer_activism
                           : Icons.self_improvement,
-                      size: pageScale.rs(
-                        isNarrowCard ? 72 : 82,
-                        min: 58,
-                        max: 88,
-                      ),
+                      size: (imageHeight * 0.72).clamp(56.0, 108.0),
                       color: Colors.white.withValues(alpha: 0.85),
                     );
                   },
                 ),
-                SizedBox(
-                  height: pageScale.rs(
-                    isNarrowCard ? 10 : 14,
-                    min: 8,
-                    max: 16,
-                  ),
-                ),
+                SizedBox(height: labelGap),
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: pageScale.rf(
-                      isNarrowCard ? 16.5 : 18,
-                      min: 14.5,
-                      max: 18.5,
-                    ),
+                    fontSize: titleFontSize,
                     fontWeight: FontWeight.bold,
                     color: textColor,
                   ),

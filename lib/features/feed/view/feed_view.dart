@@ -4,7 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
-import 'package:flutter_application_1/core/services/post_moderation_service.dart';
+import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
+import 'package:flutter_application_1/core/services/media_moderation_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
 import 'package:flutter_application_1/features/feed/service/feed_repository.dart';
@@ -655,13 +656,30 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final ImagePicker _imagePicker = ImagePicker();
-  final PostModerationService _postModerationService =
-      PostModerationService.instance;
+  final MediaModerationService _mediaModerationService =
+      MediaModerationService.instance;
 
   bool _isSubmitting = false;
   bool _isPickingImage = false;
+  XFile? _selectedImageFile;
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
+  String? _composerErrorMessage;
+
+  void _showComposerError(String message) {
+    final normalized = message.trim();
+    if (!mounted || normalized.isEmpty) {
+      return;
+    }
+    setState(() => _composerErrorMessage = normalized);
+  }
+
+  void _clearComposerError() {
+    if (!mounted || _composerErrorMessage == null) {
+      return;
+    }
+    setState(() => _composerErrorMessage = null);
+  }
 
   String _messageForModerationReason(String reason) {
     final normalizedReason = reason.toLowerCase();
@@ -718,11 +736,15 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
     }
 
     FocusScope.of(context).unfocus();
-    setState(() => _isPickingImage = true);
+    setState(() {
+      _isPickingImage = true;
+      _composerErrorMessage = null;
+    });
 
     try {
       final XFile? image;
       if (source == ImageSource.camera && _usesInAppCameraPage) {
+        EntryFlowGuard.ignoreResumeFor(const Duration(minutes: 5));
         await _waitForModalToClose();
         if (!mounted) {
           return;
@@ -733,6 +755,7 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
           ),
         );
       } else {
+        EntryFlowGuard.ignoreResumeFor(const Duration(minutes: 5));
         image = await _imagePicker.pickImage(
           source: source,
           imageQuality: 88,
@@ -749,27 +772,18 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       if (!mounted) return;
 
       if (imageBytes.lengthInBytes > _maxImageBytes) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('รูปใหญ่เกินไป กรุณาเลือกรูปที่ไม่เกิน 8 MB'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showComposerError('รูปใหญ่เกินไป กรุณาเลือกรูปที่ไม่เกิน 8 MB');
         return;
       }
 
       setState(() {
+        _selectedImageFile = selectedImage;
         _selectedImageBytes = imageBytes;
         _selectedImageName = selectedImage.name;
+        _composerErrorMessage = null;
       });
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เลือกรูปไม่สำเร็จ: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showComposerError('เลือกรูปไม่สำเร็จ: $error');
     } finally {
       if (mounted) {
         setState(() => _isPickingImage = false);
@@ -793,33 +807,11 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
     }
 
     setState(() {
+      _selectedImageFile = null;
       _selectedImageBytes = null;
       _selectedImageName = null;
     });
-  }
-
-  List<String> _buildImageNotes({
-    required String caption,
-    required bool hasSelectedImage,
-  }) {
-    final normalizedCaption = caption.trim();
-    if (!hasSelectedImage) {
-      return const <String>[
-        'โพสต์ข้อความในฟีดโดยไม่มีรูปภาพแนบ',
-      ];
-    }
-
-    if (normalizedCaption.isNotEmpty) {
-      return <String>[
-        'รูปภาพประกอบโพสต์ในฟีด',
-        'คำอธิบายจากผู้ใช้: $normalizedCaption',
-      ];
-    }
-
-    return const <String>[
-      'รูปภาพที่ผู้ใช้ต้องการโพสต์ในฟีด',
-      'กรุณาตรวจสอบความเหมาะสมของภาพก่อนเผยแพร่',
-    ];
+    _clearComposerError();
   }
 
   Future<void> _submit() async {
@@ -830,28 +822,31 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _composerErrorMessage = null;
+    });
     try {
-      // PRE-POST MODERATION HOOK: block submission unless webhook allows it.
-      final moderationResult = await _postModerationService.moderateImage(
-        userId: supabase.auth.currentUser?.id ?? '',
-        caption: content,
-        imageUrls: const <String>[],
-        imageNotes: _buildImageNotes(
+      final currentUserId = supabase.auth.currentUser?.id ?? '';
+      if (hasSelectedImage) {
+        final selectedImageFile = _selectedImageFile;
+        if (selectedImageFile == null) {
+          _showComposerError('ไม่พบไฟล์รูปภาพสำหรับตรวจสอบ กรุณาเลือกใหม่');
+          return;
+        }
+
+        // PRE-POST MODERATION HOOK: send real image binary to webhook and fail-closed before creating the post.
+        final moderationResult =
+            await _mediaModerationService.moderateImageBeforePost(
+          userId: currentUserId,
+          imageFile: selectedImageFile,
           caption: content,
-          hasSelectedImage: hasSelectedImage,
-        ),
-      );
-      if (!mounted) return;
-      if (moderationResult.allowed != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(moderationResult.summary),
-            backgroundColor: Colors.red,
-          ),
         );
-        setState(() => _isSubmitting = false);
-        return;
+        if (!mounted) return;
+        if (moderationResult.allowed != true) {
+          _showComposerError(moderationResult.summary);
+          return;
+        }
       }
 
       await widget.repository.createPost(
@@ -863,43 +858,23 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       FocusScope.of(context).unfocus();
       Navigator.of(context).pop(true);
     } on ContentModerationBlockedException catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_messageForModerationReason(error.reason)),
-          backgroundColor: Colors.red,
-        ),
-      );
-      setState(() => _isSubmitting = false);
+      _showComposerError(_messageForModerationReason(error.reason));
     } on FeedImageBucketNotFoundException catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'ยังไม่พบ Supabase Storage bucket ชื่อ ${error.bucketName} กรุณาตรวจชื่อ bucket หรือสร้าง bucket นี้เป็น Public',
-          ),
-          backgroundColor: Colors.red,
-        ),
+      _showComposerError(
+        'ยังไม่พบ Supabase Storage bucket ชื่อ ${error.bucketName} กรุณาตรวจชื่อ bucket หรือสร้าง bucket นี้เป็น Public',
       );
-      setState(() => _isSubmitting = false);
+    } on ApprovePostFailedException catch (_) {
+      _showComposerError(
+        'โพสต์ถูกสร้างแล้ว แต่ระบบยืนยันการเผยแพร่ไม่สำเร็จ กรุณาลองโพสต์อีกครั้ง',
+      );
     } on AuthException catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.message),
-          backgroundColor: Colors.red,
-        ),
-      );
-      setState(() => _isSubmitting = false);
+      _showComposerError(error.message);
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('สร้างโพสต์ไม่สำเร็จ: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      setState(() => _isSubmitting = false);
+      _showComposerError('สร้างโพสต์ไม่สำเร็จ: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
     }
   }
 
@@ -979,6 +954,50 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                     ),
                   ),
                   Divider(height: 1, thickness: 1, color: Colors.grey[200]),
+                  if ((_composerErrorMessage ?? '').isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        scale.rs(12, min: 8, max: 12),
+                        scale.rs(10, min: 8, max: 10),
+                        scale.rs(12, min: 8, max: 12),
+                        scale.rs(4, min: 2, max: 4),
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: scale.rs(12, min: 10, max: 12),
+                          vertical: scale.rs(10, min: 8, max: 10),
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFEDEE),
+                          borderRadius: BorderRadius.circular(
+                            scale.rs(12, min: 10, max: 12),
+                          ),
+                          border: Border.all(color: const Color(0xFFF3B4B6)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.error_outline,
+                              size: scale.rs(18, min: 16, max: 18),
+                              color: const Color(0xFFD93844),
+                            ),
+                            SizedBox(width: scale.rs(8, min: 6, max: 8)),
+                            Expanded(
+                              child: Text(
+                                _composerErrorMessage!,
+                                style: TextStyle(
+                                  color: const Color(0xFFB4232D),
+                                  fontSize: scale.rf(13, min: 12, max: 13),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: scale.rs(10, min: 8, max: 10),
@@ -1535,15 +1554,46 @@ class _FeedPostCardState extends State<FeedPostCard> {
                       child: Image.network(
                         widget.post.imageUrl!,
                         fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: Colors.grey[200],
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.broken_image_outlined,
-                            color: Colors.grey,
-                            size: 32,
-                          ),
-                        ),
+                        errorBuilder: (context, error, stackTrace) {
+                          var message = 'โหลดรูปไม่สำเร็จ';
+                          if (error is NetworkImageLoadException) {
+                            if (error.statusCode == 401 ||
+                                error.statusCode == 403) {
+                              message = 'ไม่มีสิทธิ์ดูรูป';
+                            } else if (error.statusCode == 404) {
+                              message = 'ไม่พบไฟล์รูป';
+                            } else {
+                              message =
+                                  'โหลดรูปไม่สำเร็จ (${error.statusCode})';
+                            }
+                          }
+                          debugPrint(
+                            'Feed image load failed. url=${widget.post.imageUrl} error=$error',
+                          );
+                          return Container(
+                            color: Colors.grey[200],
+                            alignment: Alignment.center,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.broken_image_outlined,
+                                  color: Colors.grey,
+                                  size: 32,
+                                ),
+                                SizedBox(height: scale.rs(8, min: 6, max: 8)),
+                                Text(
+                                  message,
+                                  style: TextStyle(
+                                    color: Colors.grey.shade600,
+                                    fontSize: scale.rf(12, min: 10, max: 12),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ),

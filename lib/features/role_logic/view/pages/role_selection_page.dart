@@ -102,34 +102,51 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
               final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
               final isCompact = constraints.maxWidth < 390;
               final isShort = constraints.maxHeight < 760;
+
               final horizontalPadding = scale.rs(
-                isCompact ? 14 : 22,
+                isCompact ? 14 : 20,
                 min: 12,
-                max: 28,
+                max: 24,
               );
               final verticalPadding = scale.rs(
-                isShort ? 24 : 36,
-                min: 18,
-                max: 44,
+                isShort ? 10 : 16,
+                min: 8,
+                max: 22,
               );
-              final sectionGap = scale.rs(
-                isShort ? 18 : 24,
-                min: 14,
-                max: 28,
+              final topLeadGap = scale.rs(
+                isShort ? 14 : 28,
+                min: 10,
+                max: 34,
               );
-              final titleToCardsGap = scale.rs(
-                isShort ? 32 : 44,
-                min: 24,
+              final titleToHintGap = scale.rs(
+                isShort ? 26 : 40,
+                min: 20,
                 max: 48,
               );
-              final cardsGap = scale.rs(
-                isCompact ? 12 : 16,
+              final hintToCardsGap = scale.rs(
+                isShort ? 14 : 22,
                 min: 10,
-                max: 20,
+                max: 28,
+              );
+              final cardsGap = scale.rs(
+                isCompact ? 10 : 14,
+                min: 8,
+                max: 18,
               );
               final rowCardGap = scale.rs(16, min: 12, max: 22);
+              final cardsToDetailGap = scale.rs(
+                isShort ? 24 : 44,
+                min: 18,
+                max: 56,
+              );
+              final cardHeight = scale.rs(
+                isShort ? 214 : 244,
+                min: 196,
+                max: 256,
+              );
 
-              return Center(
+              return Align(
+                alignment: Alignment.topCenter,
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 520),
                   child: SingleChildScrollView(
@@ -140,57 +157,50 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
+                        SizedBox(height: topLeadGap),
                         Text(
-                          'วันนี้คุณพร้อมเป็น\nผู้รับฟังไหม',
+                          'วันนี้คุณต้องการที่จะเป็น\nผู้ให้คำปรึกษาไหม',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: scale.rf(26, min: 22, max: 26),
+                            fontSize: scale.rf(27, min: 22, max: 30),
                             fontWeight: FontWeight.bold,
+                            color: const Color(0xFF4489D7),
+                            height: 1.2,
+                          ),
+                        ),
+                        SizedBox(height: titleToHintGap),
+                        Text(
+                          'กรุณากดที่รูปเพื่อเลือกคำตอบของคุณ',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: scale.rf(13.6, min: 12, max: 15),
+                            fontWeight: FontWeight.w700,
                             color: const Color(0xFF4489D7),
                             height: 1.3,
                           ),
                         ),
-                        SizedBox(height: sectionGap),
-                        Text(
-                          'ถ้าเลือกพร้อมรับฟัง ระบบจะพาไปทำแบบทดสอบก่อน\nจากนั้นค่อยบันทึก current_mode และพาไปทำ Daily Mood ต่อ',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: scale.rf(14, min: 12.5, max: 14.5),
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF639CDD),
-                            height: 1.6,
-                          ),
-                        ),
-                        SizedBox(height: titleToCardsGap),
-                        Text(
-                          'กรุณาเลือกคำตอบของคุณ',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: scale.rf(14, min: 12.5, max: 14.5),
-                            fontWeight: FontWeight.bold,
-                            color: const Color(0xFF4489D7),
-                          ),
-                        ),
-                        SizedBox(height: cardsGap),
+                        SizedBox(height: hintToCardsGap),
                         if (isCompact) ...[
                           ChoiceCard(
                             id: 'listener',
-                            title: 'พร้อมรับฟัง',
+                            title: 'ต้องการ',
                             imagePath: 'assets/images/fine.png',
                             bgColor: _cardListenerColor,
                             textColor: const Color(0xFF4489D7),
                             isSelected: _selectedMode == 'listener',
                             onTap: _openListenerQuiz,
+                            height: cardHeight,
                           ),
                           SizedBox(height: cardsGap),
                           ChoiceCard(
                             id: 'seeker',
-                            title: 'ยังไม่พร้อม',
+                            title: 'ไม่ต้องการ',
                             imagePath: 'assets/images/sad.png',
                             bgColor: _cardSeekerColor,
                             textColor: const Color(0xFFC49A3E),
                             isSelected: _selectedMode == 'seeker',
                             onTap: () => _saveMode('seeker'),
+                            height: cardHeight,
                           ),
                         ] else
                           Row(
@@ -199,33 +209,35 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                               Expanded(
                                 child: ChoiceCard(
                                   id: 'listener',
-                                  title: 'พร้อมรับฟัง',
+                                  title: 'ต้องการ',
                                   imagePath: 'assets/images/fine.png',
                                   bgColor: _cardListenerColor,
                                   textColor: const Color(0xFF4489D7),
                                   isSelected: _selectedMode == 'listener',
                                   onTap: _openListenerQuiz,
+                                  height: cardHeight,
                                 ),
                               ),
                               SizedBox(width: rowCardGap),
                               Expanded(
                                 child: ChoiceCard(
                                   id: 'seeker',
-                                  title: 'ยังไม่พร้อม',
+                                  title: 'ไม่ต้องการ',
                                   imagePath: 'assets/images/sad.png',
                                   bgColor: _cardSeekerColor,
                                   textColor: const Color(0xFFC49A3E),
                                   isSelected: _selectedMode == 'seeker',
                                   onTap: () => _saveMode('seeker'),
+                                  height: cardHeight,
                                 ),
                               ),
                             ],
                           ),
-                        SizedBox(height: scale.rs(isShort ? 20 : 28)),
+                        SizedBox(height: cardsToDetailGap),
                         if (_isSaving)
                           Padding(
                             padding: EdgeInsets.only(
-                              bottom: scale.rs(14, min: 10, max: 18),
+                              bottom: scale.rs(10, min: 8, max: 14),
                             ),
                             child: Column(
                               children: [
@@ -234,25 +246,29 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                                 Text(
                                   'กำลังบันทึกบทบาทของวันนี้...',
                                   style: TextStyle(
-                                    fontSize:
-                                        scale.rf(13, min: 11.5, max: 13.8),
-                                    color: Color(0xFF4489D7),
+                                    fontSize: scale.rf(13, min: 11, max: 13.8),
+                                    color: const Color(0xFF4489D7),
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        SizedBox(height: scale.rs(isShort ? 16 : 24)),
+                        SizedBox(height: scale.rs(isShort ? 8 : 12)),
                         Text(
-                          '"ผู้รับฟัง" คือผู้ที่พร้อมเป็นพื้นที่ปลอดภัยให้ใครสักคน\n'
-                          'รับฟังอย่างไม่ตัดสิน อยู่ข้างเขา และช่วยประคองใจผ่านการแชท\n'
-                          'เมื่อกด "พร้อมรับฟัง" จะเข้าสู่แบบทดสอบก่อน ส่วนถ้ายังไม่พร้อม ระบบจะบันทึก role ของวันนี้ทันที',
+                          '"ผู้ให้คำปรึกษา" คือใคร? คือผู้ที่เป็น "พื้นที่ปลอดภัย"\n'
+                          'สำหรับใครสักคนที่กำลังต้องการคนรับฟัง\n'
+                          'ผู้ให้คำปรึกษาในแอปของเราพร้อมที่จะเปิดใจรับฟังปัญหา ความเครียด\n'
+                          'หรือความไม่สบายใจของผู้รับคำปรึกษาผ่านทางแชท\n'
+                          'โดยไม่มีการตัดสิน หน้าที่ของคุณคือการอยู่เคียงข้าง ให้กำลังใจ\n'
+                          'และชวนมองมุมกลับเพื่อให้เขารู้สึกดีขึ้น\n'
+                          'และเมื่อจบการให้คำปรึกษาในแต่ละครั้ง คุณจะได้รับ "คอยน์"\n'
+                          'เป็นการตอบแทนสำหรับความใส่ใจที่คุณมอบให้',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: scale.rf(12, min: 10.8, max: 12.5),
-                            height: 1.7,
-                            fontWeight: FontWeight.w600,
+                            fontSize: scale.rf(11.9, min: 10.4, max: 13.2),
+                            height: 1.5,
+                            fontWeight: FontWeight.w700,
                             color: const Color(0xFF639CDD),
                           ),
                         ),

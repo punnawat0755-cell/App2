@@ -8,7 +8,7 @@ import 'package:video_player/video_player.dart';
 
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
-import 'package:flutter_application_1/core/services/post_moderation_service.dart';
+import 'package:flutter_application_1/core/services/media_moderation_service.dart';
 import 'package:flutter_application_1/features/home/data/mock/home_articles_mock.dart';
 import 'package:flutter_application_1/features/home/model/home_article.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
@@ -42,8 +42,8 @@ class _HomePageState extends State<HomePage> {
   final HomeVideoRepository _homeVideoRepository = HomeVideoRepository();
   final HomeVideoPrefetchService _homeVideoPrefetchService =
       HomeVideoPrefetchService.instance;
-  final PostModerationService _postModerationService =
-      PostModerationService.instance;
+  final MediaModerationService _mediaModerationService =
+      MediaModerationService.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isNameLoading = true;
@@ -241,13 +241,15 @@ class _HomePageState extends State<HomePage> {
       }
 
       setState(() => _isUploadingClip = true);
-      // PRE-POST MODERATION HOOK: block submission unless webhook allows it.
-      final moderationResult = await _postModerationService.moderateVideo(
-        userId: supabase.auth.currentUser?.id ?? '',
+      final currentUserId = supabase.auth.currentUser?.id ?? '';
+
+      // PRE-POST MODERATION HOOK: send real video binary to webhook and fail-closed before creating the post.
+      final moderationResult =
+          await _mediaModerationService.moderateVideoBeforePost(
+        userId: currentUserId,
+        videoFile: file,
         caption: caption,
         transcript: caption.trim(),
-        frameNotes: _buildFrameNotes(caption),
-        frameUrls: const <String>[],
       );
       if (!mounted) {
         return;
@@ -314,6 +316,18 @@ class _HomePageState extends State<HomePage> {
         const SnackBar(
           content: Text(
             'อัปโหลดคลิปไม่ได้ เพราะ Supabase Storage ยังไม่เปิดสิทธิ์ให้ผู้ใช้เพิ่มไฟล์',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } on HomeVideoApprovePostFailedException catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'โพสต์วิดีโอถูกสร้างแล้ว แต่ระบบยืนยันการเผยแพร่ไม่สำเร็จ กรุณาลองใหม่',
           ),
           backgroundColor: Colors.red,
         ),
@@ -410,21 +424,6 @@ class _HomePageState extends State<HomePage> {
       return fileName;
     }
     return fileName.substring(0, lastDotIndex);
-  }
-
-  List<String> _buildFrameNotes(String caption) {
-    final normalizedCaption = caption.trim();
-    if (normalizedCaption.isNotEmpty) {
-      return <String>[
-        'คลิปวิดีโอที่ผู้ใช้ต้องการโพสต์',
-        'คำอธิบายจากผู้ใช้: $normalizedCaption',
-      ];
-    }
-
-    return const <String>[
-      'คลิปวิดีโอที่ผู้ใช้ต้องการโพสต์ในแอป',
-      'กรุณาตรวจสอบความเหมาะสมของเนื้อหาจากเฟรมในคลิปนี้',
-    ];
   }
 
   Widget _buildAddClipCard() {
