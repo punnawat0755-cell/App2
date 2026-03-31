@@ -8,13 +8,14 @@ import 'package:video_player/video_player.dart';
 
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
-import 'package:flutter_application_1/core/services/media_moderation_service.dart';
+import 'package:flutter_application_1/core/services/post_moderation_service.dart';
 import 'package:flutter_application_1/features/home/data/mock/home_articles_mock.dart';
 import 'package:flutter_application_1/features/home/model/home_article.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
-import 'package:flutter_application_1/features/home/service/daily_mood_streak_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
+import 'package:flutter_application_1/features/home/service/video_upload_prepare_service.dart';
+import 'package:flutter_application_1/features/home/service/daily_mission_streak_service.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/home/view/play_video_page.dart';
 import 'package:flutter_application_1/features/home/view/video_preview_controller_factory.dart';
@@ -34,23 +35,29 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const int _defaultMissionDays = 138;
+
   int _currentBannerIndex = 0;
   late final PageController _pageController;
-  late Stream<List<HomeVideoClip>> _videoClipsStream;
+  late final Stream<List<HomeVideoClip>> _videoClipsStream;
   Timer? _timer;
   final HomeVideoRepository _homeVideoRepository = HomeVideoRepository();
   final HomeVideoPrefetchService _homeVideoPrefetchService =
       HomeVideoPrefetchService.instance;
-  final MediaModerationService _mediaModerationService =
-      MediaModerationService.instance;
+  final VideoUploadPrepareService _videoUploadPrepareService =
+      VideoUploadPrepareService.instance;
+  final DailyMissionStreakService _dailyMissionStreakService =
+      DailyMissionStreakService();
+  final PostModerationService _postModerationService =
+      PostModerationService.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isNameLoading = true;
-  bool _isMissionStreakLoading = true;
+  bool _isMissionDaysLoading = true;
   bool _isUploadingClip = false;
   String _displayName = 'ผู้ใช้';
   String _lastWarmupSignature = '';
-  int _missionStreakDays = 0;
+  int _missionDays = _defaultMissionDays;
 
   final List<HomeArticle> _articleList = homeArticlesMock;
 
@@ -60,7 +67,7 @@ class _HomePageState extends State<HomePage> {
     _pageController = PageController(initialPage: 0);
     _videoClipsStream = _homeVideoRepository.watchVideoClips();
     _loadUsername();
-    _loadMissionStreakDays();
+    _loadMissionDays();
 
     _timer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (_currentBannerIndex < 2) {
@@ -132,15 +139,19 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _loadMissionStreakDays() async {
-    final days = await DailyMoodStreakService.fetchCurrentStreakDays();
+  Future<void> _loadMissionDays() async {
+    if (mounted) {
+      setState(() => _isMissionDaysLoading = true);
+    }
+
+    final streakDays = await _dailyMissionStreakService.getCurrentStreakDays();
     if (!mounted) {
       return;
     }
 
     setState(() {
-      _missionStreakDays = days;
-      _isMissionStreakLoading = false;
+      _missionDays = streakDays > 0 ? streakDays : 0;
+      _isMissionDaysLoading = false;
     });
   }
 
@@ -232,7 +243,9 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      const suggestedCaption = '';
+      final suggestedCaption = source == ImageSource.camera
+          ? ''
+          : _fileNameWithoutExtension(file.name);
       final caption = await _promptClipCaption(
         initialValue: suggestedCaption,
         videoFileName: file.name,
@@ -247,27 +260,19 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      final videoBytes = await file.readAsBytes();
+      final originalVideoBytes = await file.readAsBytes();
       if (!mounted) {
         return;
       }
 
       setState(() => _isUploadingClip = true);
-      final currentUserId = supabase.auth.currentUser?.id ?? '';
-
-      // PRE-POST MODERATION HOOK: send real video binary to webhook and fail-closed before creating the post.
-      final moderationResult =
-          await _mediaModerationService.moderateVideoBeforePost(
-        userId: currentUserId,
-        videoFile: file,
+      // PRE-POST MODERATION HOOK: block submission unless webhook allows it.
+      final moderationResult = await _postModerationService.moderateVideo(
+        userId: supabase.auth.currentUser?.id ?? '',
         caption: caption,
-        transcript: _buildModerationTranscript(
-          caption: caption,
-        ),
-        frameNotes: _buildModerationFrameNotes(
-          caption: caption,
-          fileName: file.name,
-        ),
+        transcript: caption.trim(),
+        frameNotes: _buildFrameNotes(caption),
+        frameUrls: const <String>[],
       );
       if (!mounted) {
         return;
@@ -282,20 +287,21 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
+      final preparedUpload = await _videoUploadPrepareService.prepareForUpload(
+        filePath: file.path,
+        fileName: file.name,
+        fallbackBytes: originalVideoBytes,
+      );
+
       await _homeVideoRepository.createVideoClip(
-        videoBytes: videoBytes,
-        videoFileName: file.name,
-        videoFilePath: file.path,
+        videoBytes: preparedUpload.bytes,
+        videoFileName: preparedUpload.fileName,
         caption: caption,
       );
 
       if (!mounted) {
         return;
       }
-      setState(() {
-        // Force a fresh fetch so the new clip appears even when realtime events lag.
-        _videoClipsStream = _homeVideoRepository.watchVideoClips();
-      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('โพสต์เรียบร้อยแล้ว!')),
       );
@@ -343,15 +349,13 @@ class _HomePageState extends State<HomePage> {
           backgroundColor: Colors.red,
         ),
       );
-    } on HomeVideoApprovePostFailedException catch (_) {
+    } on VideoUploadPrepareException catch (error) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'โพสต์วิดีโอถูกสร้างแล้ว แต่ระบบยืนยันการเผยแพร่ไม่สำเร็จ กรุณาลองใหม่',
-          ),
+        SnackBar(
+          content: Text(error.message),
           backgroundColor: Colors.red,
         ),
       );
@@ -441,34 +445,27 @@ class _HomePageState extends State<HomePage> {
         defaultTargetPlatform == TargetPlatform.iOS;
   }
 
-  String _buildModerationTranscript({
-    required String caption,
-  }) {
-    final normalizedCaption = caption.trim();
-    if (normalizedCaption.isNotEmpty) {
-      return normalizedCaption;
+  String _fileNameWithoutExtension(String fileName) {
+    final lastDotIndex = fileName.lastIndexOf('.');
+    if (lastDotIndex <= 0) {
+      return fileName;
     }
-
-    return '(no transcript)';
+    return fileName.substring(0, lastDotIndex);
   }
 
-  String _buildModerationFrameNotes({
-    required String caption,
-    required String fileName,
-  }) {
-    final notes = <String>[
-      'user_uploaded_video',
-      'filename: ${fileName.trim().isEmpty ? 'unknown' : fileName.trim()}',
-    ];
-
+  List<String> _buildFrameNotes(String caption) {
     final normalizedCaption = caption.trim();
     if (normalizedCaption.isNotEmpty) {
-      notes.add('caption: $normalizedCaption');
-    } else {
-      notes.add('caption: (none)');
+      return <String>[
+        'คลิปวิดีโอที่ผู้ใช้ต้องการโพสต์',
+        'คำอธิบายจากผู้ใช้: $normalizedCaption',
+      ];
     }
 
-    return notes.join('\n');
+    return const <String>[
+      'คลิปวิดีโอที่ผู้ใช้ต้องการโพสต์ในแอป',
+      'กรุณาตรวจสอบความเหมาะสมของเนื้อหาจากเฟรมในคลิปนี้',
+    ];
   }
 
   Widget _buildAddClipCard() {
@@ -515,16 +512,12 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _openDailyMission() async {
     final message = await Get.to<String>(() => const DailyMoodPage());
-    if (!mounted) {
+    if (!mounted || message == null || message.isEmpty) {
       return;
     }
 
-    await _loadMissionStreakDays();
+    await _loadMissionDays();
     if (!mounted) {
-      return;
-    }
-
-    if (message == null || message.isEmpty) {
       return;
     }
 
@@ -625,9 +618,9 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             DailyMissionBanner(
                               onTap: _openDailyMission,
-                              dayCount: _isMissionStreakLoading
+                              dayCount: _isMissionDaysLoading
                                   ? '...'
-                                  : _missionStreakDays.toString(),
+                                  : _missionDays.toString(),
                             ),
                             ClownFishBanner(),
                             LoveJobBanner(),

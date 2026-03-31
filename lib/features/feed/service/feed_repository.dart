@@ -1,10 +1,14 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
+import 'package:flutter_application_1/features/feed/model/feed_comment.dart';
 import 'package:flutter_application_1/features/feed/model/feed_post.dart';
+import 'package:flutter_application_1/features/feed/service/feed_delete_service.dart';
 import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
+import 'package:get/get.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class FeedComposerIdentity {
@@ -25,8 +29,8 @@ class FeedRepository {
   static const _postsTable = 'posts';
   static const _postMediaTable = 'post_media';
   static const _postLikesTable = 'post_reactions';
+  static const _postCommentsTable = 'post_comments';
   static const _profilesTable = 'profiles';
-  static const _approvePostRpc = 'approve_post';
   static const _feedImageBucketConfig = String.fromEnvironment(
     'SUPABASE_FEED_IMAGE_BUCKET',
     defaultValue: 'app_media',
@@ -34,9 +38,11 @@ class FeedRepository {
   static const _imageMediaType = 'image';
   static const _videoMediaType = 'video';
   static const _likeReaction = 'like';
-  static const _signedImageUrlTtlSeconds = 60 * 60 * 24 * 7;
 
   final SupabaseClient _client;
+  late final FeedDeleteService _deleteService = FeedDeleteService(
+    client: _client,
+  );
   final ContentModerationService _moderationService =
       ContentModerationService.instance;
 
@@ -66,6 +72,57 @@ class FeedRepository {
               .where((id) => id.isNotEmpty)
               .toSet(),
         );
+  }
+
+  Stream<List<FeedComment>> watchCommentsByPost(String postId) {
+    if (postId.trim().isEmpty) {
+      return Stream<List<FeedComment>>.value(const <FeedComment>[]);
+    }
+
+    late final StreamController<List<FeedComment>> controller;
+    StreamSubscription<List<Map<String, dynamic>>>? commentsSubscription;
+
+    List<Map<String, dynamic>> latestRows = const [];
+    var hasLoadedComments = false;
+
+    Future<void> emitMappedComments() async {
+      if (!hasLoadedComments) {
+        return;
+      }
+
+      try {
+        controller.add(await _mapComments(latestRows));
+      } catch (error, stackTrace) {
+        controller.addError(error, stackTrace);
+      }
+    }
+
+    controller = StreamController<List<FeedComment>>(
+      onListen: () {
+        commentsSubscription = _client
+            .from(_postCommentsTable)
+            .stream(primaryKey: const ['id'])
+            .eq('post_id', postId)
+            .order('created_at', ascending: true)
+            .listen(
+              (rows) {
+                latestRows = rows
+                    .map<Map<String, dynamic>>(
+                      (row) => Map<String, dynamic>.from(row),
+                    )
+                    .toList();
+                hasLoadedComments = true;
+                unawaited(emitMappedComments());
+              },
+              onError: controller.addError,
+            );
+      },
+      onCancel: () async {
+        await commentsSubscription?.cancel();
+      },
+    );
+
+    return controller.stream;
   }
 
   Future<FeedComposerIdentity> getComposerIdentity() async {
@@ -144,35 +201,35 @@ class FeedRepository {
         content: safeText,
       );
       createdPostId = postId;
+      await _rewardPostCreated(postId);
 
-      if (hasImage) {
-        final storagePath = await _uploadPostImage(
-          postId: postId,
-          userId: identity.userId,
-          imageBytes: selectedImageBytes,
-          imageFileName: imageFileName,
-        );
-        uploadedImagePath = storagePath;
-
-        await _insertPostMedia(
-          postId: postId,
-          storagePath: storagePath,
-          publicUrl: _client.storage.from(_feedImageBucket).getPublicUrl(
-                storagePath,
-              ),
-          fileSizeBytes: selectedImageBytes.lengthInBytes,
-        );
+      if (!hasImage) {
+        await _refreshCoins();
+        return;
       }
 
-      await _approvePost(
+      final storagePath = await _uploadPostImage(
         postId: postId,
         userId: identity.userId,
+        imageBytes: selectedImageBytes,
+        imageFileName: imageFileName,
       );
+      uploadedImagePath = storagePath;
+
+      await _insertPostMedia(
+        postId: postId,
+        storagePath: storagePath,
+        publicUrl: _client.storage.from(_feedImageBucket).getPublicUrl(
+              storagePath,
+            ),
+        fileSizeBytes: selectedImageBytes.lengthInBytes,
+      );
+      await _refreshCoins();
     } catch (error) {
       if (uploadedImagePath != null) {
         await _deleteStorageObject(uploadedImagePath);
       }
-      if (createdPostId != null) {
+      if (createdPostId != null && hasImage) {
         await _deletePostRow(postId: createdPostId, userId: identity.userId);
       }
       rethrow;
@@ -186,6 +243,7 @@ class FeedRepository {
       'user_id': user.id,
       'reaction': _likeReaction,
     }, onConflict: 'post_id,user_id');
+    await _refreshCoins();
   }
 
   Future<void> unlikePost(String postId) async {
@@ -196,58 +254,66 @@ class FeedRepository {
         .eq('post_id', postId)
         .eq('reaction', _likeReaction)
         .eq('user_id', user.id);
+    await _refreshCoins();
+  }
+
+  Future<void> _rewardPostCreated(String postId) async {
+    try {
+      await _client.rpc('reward_post_created', params: {
+        'p_post_id': postId,
+      });
+    } catch (_) {
+      // Reward RPC may be unavailable in some environments.
+    }
+  }
+
+  Future<void> createComment({
+    required String postId,
+    required String content,
+  }) async {
+    final identity = await getComposerIdentity();
+    final normalizedContent = content.trim();
+
+    if (postId.trim().isEmpty || normalizedContent.isEmpty) {
+      throw const PostgrestException(
+        message: 'กรุณากรอกความคิดเห็นก่อนส่ง',
+      );
+    }
+
+    final moderation = await _moderationService.moderateText(
+      source: 'feed_comment',
+      text: normalizedContent,
+      metadata: {
+        'userId': identity.userId,
+        'authorName': identity.authorName,
+        'postId': postId,
+      },
+    );
+
+    if (!moderation.allow) {
+      throw ContentModerationBlockedException(moderation.reason);
+    }
+
+    final safeText = moderation.safeText.trim().isNotEmpty
+        ? moderation.safeText.trim()
+        : normalizedContent;
+
+    await _client.from(_postCommentsTable).insert({
+      'post_id': postId,
+      'user_id': identity.userId,
+      'content_text': safeText,
+    });
+  }
+
+  Future<void> _refreshCoins() async {
+    final coinService = Get.isRegistered<CoinService>()
+        ? Get.find<CoinService>()
+        : Get.put(CoinService(), permanent: true);
+    await coinService.loadCoins();
   }
 
   Future<void> deletePost(String postId) async {
-    final user = _requireUser();
-    Map<String, dynamic>? ownedPost;
-    List<Map<String, dynamic>> postMediaRows = const [];
-
-    try {
-      ownedPost = await _client
-          .from(_postsTable)
-          .select('id')
-          .eq('id', postId)
-          .eq('user_id', user.id)
-          .maybeSingle();
-    } catch (_) {
-      ownedPost = null;
-    }
-
-    if (ownedPost == null) {
-      return;
-    }
-
-    try {
-      final mediaRows = await _client
-          .from(_postMediaTable)
-          .select('storage_bucket, storage_path')
-          .eq('post_id', postId);
-      postMediaRows = mediaRows
-          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
-          .toList();
-    } catch (_) {
-      postMediaRows = const [];
-    }
-
-    await _client
-        .from(_postsTable)
-        .delete()
-        .eq('id', postId)
-        .eq('user_id', user.id);
-
-    final removablePaths = postMediaRows
-        .where(
-          (row) =>
-              _normalizeBucketName(row['storage_bucket']?.toString() ?? '') ==
-              _feedImageBucket,
-        )
-        .map((row) => row['storage_path']?.toString().trim() ?? '')
-        .where((path) => path.isNotEmpty)
-        .toList();
-    if (removablePaths.isNotEmpty) {
-      await _deleteStorageObjects(removablePaths);
-    }
+    await _deleteService.deletePostWithMedia(postId: postId);
   }
 
   Future<List<FeedPost>> _mapPosts(List<Map<String, dynamic>> rows) async {
@@ -265,8 +331,9 @@ class FeedRepository {
     final namesByUserId = <String, String>{};
     final avatarsByUserId = <String, String>{};
     final imageUrlsByPostId = <String, String>{};
-    final videoPostIds = <String>{};
+    final postsWithVideoMedia = <String>{};
     final likeCountsByPostId = <String, int>{};
+    final commentCountsByPostId = <String, int>{};
 
     if (authorIds.isNotEmpty) {
       try {
@@ -307,27 +374,24 @@ class FeedRepository {
           final map = Map<String, dynamic>.from(row);
           final postId = map['post_id']?.toString() ?? '';
           if (postId.isEmpty || imageUrlsByPostId.containsKey(postId)) {
+            if (postId.isNotEmpty &&
+                map['media_type']?.toString() == _videoMediaType) {
+              postsWithVideoMedia.add(postId);
+            }
             continue;
           }
 
           final mediaType = map['media_type']?.toString() ?? '';
           if (mediaType == _videoMediaType) {
-            videoPostIds.add(postId);
+            postsWithVideoMedia.add(postId);
             continue;
           }
+
           if (mediaType != _imageMediaType) {
             continue;
           }
 
-          final storagePath = map['storage_path']?.toString().trim() ?? '';
-          final storageBucket = _normalizeBucketName(
-            map['storage_bucket']?.toString() ?? _feedImageBucket,
-          );
-          final resolvedImageUrl = await _resolveReadableImageUrl(
-            storageBucket: storageBucket,
-            storagePath: storagePath,
-            publicUrl: map['public_url']?.toString(),
-          );
+          final resolvedImageUrl = await _resolveFeedImageUrl(map);
           if (resolvedImageUrl != null && resolvedImageUrl.isNotEmpty) {
             imageUrlsByPostId[postId] = resolvedImageUrl;
           }
@@ -354,16 +418,30 @@ class FeedRepository {
       } catch (_) {
         // Keep feed visible even if like counts fail to load.
       }
+
+      try {
+        final commentRows = await _client
+            .from(_postCommentsTable)
+            .select('post_id')
+            .inFilter('post_id', postIds);
+
+        for (final row in commentRows) {
+          final map = Map<String, dynamic>.from(row);
+          final postId = map['post_id']?.toString() ?? '';
+          if (postId.isEmpty) {
+            continue;
+          }
+          commentCountsByPostId[postId] =
+              (commentCountsByPostId[postId] ?? 0) + 1;
+        }
+      } catch (_) {
+        // Keep feed visible even if comment counts fail to load.
+      }
     }
 
     final posts = rows.where((row) {
       final postId = row['id']?.toString() ?? '';
-      if (postId.isEmpty) {
-        return false;
-      }
-
-      // Keep video clips exclusive to Home by hiding video-backed posts in Feed.
-      return !videoPostIds.contains(postId);
+      return postId.isNotEmpty && !postsWithVideoMedia.contains(postId);
     }).map((row) {
       final map = Map<String, dynamic>.from(row);
       final postId = map['id']?.toString() ?? '';
@@ -372,10 +450,92 @@ class FeedRepository {
       map['author_avatar_url'] = avatarsByUserId[userId];
       map['image_url'] = imageUrlsByPostId[postId];
       map['like_count'] = likeCountsByPostId[postId] ?? map['like_count'];
+      map['comment_count'] =
+          commentCountsByPostId[postId] ?? map['comment_count'];
       return FeedPost.fromMap(map);
     }).toList();
     posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return posts;
+  }
+
+  Future<List<FeedComment>> _mapComments(
+      List<Map<String, dynamic>> rows) async {
+    final authorIds = rows
+        .map((row) => row['user_id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet()
+        .toList();
+
+    final namesByUserId = <String, String>{};
+    final avatarsByUserId = <String, String>{};
+
+    if (authorIds.isNotEmpty) {
+      try {
+        final profiles = await _client
+            .from(_profilesTable)
+            .select('id, username, avatarurl')
+            .inFilter('id', authorIds);
+
+        for (final row in profiles) {
+          final map = Map<String, dynamic>.from(row);
+          final id = map['id']?.toString() ?? '';
+          final username = map['username']?.toString().trim() ?? '';
+          if (id.isNotEmpty && username.isNotEmpty) {
+            namesByUserId[id] = username;
+          }
+          if (id.isNotEmpty) {
+            avatarsByUserId[id] = ProfileAvatarCatalog.normalize(
+              map['avatarurl']?.toString(),
+            );
+          }
+        }
+      } catch (_) {
+        // Keep fallback display names when profiles cannot be loaded.
+      }
+    }
+
+    final comments = rows.map((row) {
+      final map = Map<String, dynamic>.from(row);
+      final userId = map['user_id']?.toString() ?? '';
+      map['author_name'] = namesByUserId[userId];
+      map['author_avatar_url'] = avatarsByUserId[userId];
+      return FeedComment.fromMap(map);
+    }).toList();
+
+    comments.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return comments;
+  }
+
+  Future<String?> _resolveFeedImageUrl(Map<String, dynamic> row) async {
+    final storagePath = row['storage_path']?.toString().trim() ?? '';
+    final publicUrl = row['public_url']?.toString().trim();
+
+    if (storagePath.isEmpty) {
+      if (publicUrl == null || publicUrl.isEmpty) {
+        return null;
+      }
+      return publicUrl;
+    }
+
+    final storageBucket = _normalizeBucketName(
+      row['storage_bucket']?.toString() ?? _feedImageBucket,
+    );
+
+    try {
+      return await _client.storage
+          .from(storageBucket)
+          .createSignedUrl(storagePath, 60 * 60);
+    } catch (_) {
+      if (publicUrl != null && publicUrl.isNotEmpty) {
+        return publicUrl;
+      }
+
+      try {
+        return _client.storage.from(storageBucket).getPublicUrl(storagePath);
+      } catch (_) {
+        return null;
+      }
+    }
   }
 
   Stream<List<FeedPost>> _watchMappedPosts({String? authorId}) {
@@ -383,6 +543,7 @@ class FeedRepository {
     StreamSubscription<List<Map<String, dynamic>>>? postsSubscription;
     StreamSubscription<List<Map<String, dynamic>>>? mediaSubscription;
     StreamSubscription<List<Map<String, dynamic>>>? likesSubscription;
+    StreamSubscription<List<Map<String, dynamic>>>? commentsSubscription;
 
     List<Map<String, dynamic>> latestPostRows = const [];
     var hasLoadedPosts = false;
@@ -445,11 +606,19 @@ class FeedRepository {
           (_) => unawaited(emitMappedPosts()),
           onError: (_, __) {},
         );
+
+        commentsSubscription = _client
+            .from(_postCommentsTable)
+            .stream(primaryKey: const ['id']).listen(
+          (_) => unawaited(emitMappedPosts()),
+          onError: (_, __) {},
+        );
       },
       onCancel: () async {
         await postsSubscription?.cancel();
         await mediaSubscription?.cancel();
         await likesSubscription?.cancel();
+        await commentsSubscription?.cancel();
       },
     );
 
@@ -564,14 +733,6 @@ class FeedRepository {
     }
   }
 
-  Future<void> _deleteStorageObjects(List<String> storagePaths) async {
-    try {
-      await _client.storage.from(_feedImageBucket).remove(storagePaths);
-    } catch (_) {
-      // Ignore cleanup failures to avoid masking the main action result.
-    }
-  }
-
   Future<void> _deletePostRow({
     required String postId,
     required String userId,
@@ -585,197 +746,6 @@ class FeedRepository {
     } catch (_) {
       // Ignore cleanup failures to avoid masking the main action result.
     }
-  }
-
-  Future<void> _approvePost({
-    required String postId,
-    required String userId,
-  }) async {
-    if (await _tryApprovePostViaRpc(postId: postId)) {
-      return;
-    }
-    if (await _trySetPostVisibleWithUpdate(postId: postId, userId: userId)) {
-      return;
-    }
-    throw ApprovePostFailedException(postId: postId);
-  }
-
-  Future<bool> _tryApprovePostViaRpc({required String postId}) async {
-    final candidateParams = <Map<String, dynamic>>[
-      {'post_id': postId},
-      {'p_post_id': postId},
-      {'_post_id': postId},
-    ];
-
-    for (final params in candidateParams) {
-      try {
-        await _client.rpc(_approvePostRpc, params: params);
-        return true;
-      } catch (_) {
-        // Try next known function signature.
-      }
-    }
-
-    return false;
-  }
-
-  Future<bool> _trySetPostVisibleWithUpdate({
-    required String postId,
-    required String userId,
-  }) async {
-    final candidatePayloads = <Map<String, dynamic>>[
-      {
-        'is_visible': true,
-        'moderation_status': 'approved',
-        'status': 'active',
-      },
-      {
-        'is_visible': true,
-        'moderation_status': 'approved',
-      },
-      {
-        'is_visible': true,
-        'status': 'active',
-      },
-      {
-        'is_visible': true,
-      },
-      {
-        'moderation_status': 'approved',
-        'status': 'active',
-      },
-      {
-        'moderation_status': 'approved',
-      },
-      {
-        'status': 'active',
-      },
-    ];
-
-    for (final payload in candidatePayloads) {
-      try {
-        final updated = await _client
-            .from(_postsTable)
-            .update(payload)
-            .eq('id', postId)
-            .eq('user_id', userId)
-            .select('id')
-            .maybeSingle();
-
-        if (updated != null) {
-          return true;
-        }
-      } catch (_) {
-        // Try next payload for schema compatibility.
-      }
-    }
-
-    return false;
-  }
-
-  Future<String?> _resolveReadableImageUrl({
-    required String storageBucket,
-    required String storagePath,
-    String? publicUrl,
-  }) async {
-    final normalizedPublicUrl = publicUrl?.trim() ?? '';
-    final candidateRefs = <_StorageRef>[];
-    final candidateKeys = <String>{};
-
-    void addCandidateRef(_StorageRef? ref) {
-      if (ref == null || ref.path.isEmpty || ref.bucket.isEmpty) {
-        return;
-      }
-      final key = '${ref.bucket}|${ref.path}';
-      if (!candidateKeys.add(key)) {
-        return;
-      }
-      candidateRefs.add(ref);
-    }
-
-    if (storagePath.isNotEmpty) {
-      addCandidateRef(
-        _StorageRef(
-          bucket: storageBucket,
-          path: storagePath,
-        ),
-      );
-    }
-
-    if (normalizedPublicUrl.isNotEmpty) {
-      addCandidateRef(_extractStorageRefFromUrl(normalizedPublicUrl));
-    }
-
-    for (final ref in candidateRefs) {
-      try {
-        final signedUrl = await _client.storage
-            .from(ref.bucket)
-            .createSignedUrl(ref.path, _signedImageUrlTtlSeconds);
-        final normalizedSignedUrl = signedUrl.trim();
-        if (normalizedSignedUrl.isNotEmpty) {
-          return normalizedSignedUrl;
-        }
-      } catch (_) {
-        // Fall through to public URL fallback.
-      }
-    }
-
-    if (normalizedPublicUrl.isNotEmpty) {
-      return normalizedPublicUrl;
-    }
-
-    if (candidateRefs.isNotEmpty) {
-      final firstRef = candidateRefs.first;
-      return _client.storage.from(firstRef.bucket).getPublicUrl(firstRef.path);
-    }
-
-    return null;
-  }
-
-  _StorageRef? _extractStorageRefFromUrl(String rawUrl) {
-    final uri = Uri.tryParse(rawUrl);
-    if (uri == null) {
-      return null;
-    }
-
-    final segments = uri.pathSegments;
-    if (segments.isEmpty) {
-      return null;
-    }
-
-    const markers = <String>{
-      'public',
-      'authenticated',
-      'sign',
-      'render',
-    };
-    var markerIndex = -1;
-    for (var i = 0; i < segments.length; i++) {
-      if (markers.contains(segments[i])) {
-        markerIndex = i;
-        break;
-      }
-    }
-
-    if (markerIndex == -1 || markerIndex + 2 >= segments.length) {
-      return null;
-    }
-
-    final bucket = _normalizeBucketName(segments[markerIndex + 1]);
-    final pathSegments = segments.sublist(markerIndex + 2);
-    if (pathSegments.isEmpty) {
-      return null;
-    }
-
-    final decodedPath = pathSegments.map(Uri.decodeComponent).join('/');
-    if (decodedPath.trim().isEmpty) {
-      return null;
-    }
-
-    return _StorageRef(
-      bucket: bucket,
-      path: decodedPath,
-    );
   }
 
   String _resolveImageExtension(String? imageFileName) {
@@ -857,23 +827,4 @@ class FeedImageBucketNotFoundException implements Exception {
   @override
   String toString() =>
       'FeedImageBucketNotFoundException(bucketName: $bucketName)';
-}
-
-class ApprovePostFailedException implements Exception {
-  const ApprovePostFailedException({required this.postId});
-
-  final String postId;
-
-  @override
-  String toString() => 'ApprovePostFailedException(postId: $postId)';
-}
-
-class _StorageRef {
-  const _StorageRef({
-    required this.bucket,
-    required this.path,
-  });
-
-  final String bucket;
-  final String path;
 }

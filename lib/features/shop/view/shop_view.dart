@@ -262,7 +262,7 @@ class ShopPage extends StatelessWidget {
             if (isOwned) {
               // --- [กรณี 1: ซื้อแล้ว] แสดงปุ่ม "ใช้เลย" ---
               return GestureDetector(
-                onTap: () {
+                onTap: () async {
                   Get.snackbar(
                     "สวมใส่สำเร็จ",
                     "เปลี่ยนไอเท็มเรียบร้อย!",
@@ -296,11 +296,11 @@ class ShopPage extends StatelessWidget {
             } else {
               // --- [กรณี 2: ยังไม่ซื้อ] แสดงราคาและกดซื้อได้ ---
               return GestureDetector(
-                onTap: () {
+                onTap: () async {
                   final price = item.price;
-                  if (controller.coins.value >= price) {
+                  final didSpend = await controller.spendCoins(price);
+                  if (didSpend) {
                     // เงินพอ: หักเงิน + เพิ่มเข้าของที่มี
-                    controller.coins.value -= price;
                     try {
                       controller.ownedItems.add(index);
                     } catch (e) {

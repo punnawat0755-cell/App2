@@ -11,9 +11,7 @@ class HomeVideoRepository {
   static const _postsTable = 'posts';
   static const _postMediaTable = 'post_media';
   static const _profilesTable = 'profiles';
-  static const _approvePostRpc = 'approve_post';
   static const _videoMediaType = 'video';
-  static const _signedVideoUrlTtlSeconds = 60 * 60 * 24;
   static const _defaultBucketConfig = String.fromEnvironment(
     'SUPABASE_FEED_IMAGE_BUCKET',
     defaultValue: 'app_media',
@@ -94,7 +92,6 @@ class HomeVideoRepository {
   Future<void> createVideoClip({
     required Uint8List videoBytes,
     required String videoFileName,
-    String? videoFilePath,
     required String caption,
   }) async {
     final user = _requireUser();
@@ -109,10 +106,7 @@ class HomeVideoRepository {
       );
       createdPostId = postId;
 
-      final extension = _resolveVideoExtension(
-        videoFileName,
-        filePath: videoFilePath,
-      );
+      final extension = _resolveVideoExtension(videoFileName);
       final fileName = _resolveStorageFileName(videoFileName, extension);
       final storagePath = 'posts/${user.id}/$postId/$fileName';
 
@@ -154,11 +148,6 @@ class HomeVideoRepository {
         'file_size_bytes': videoBytes.lengthInBytes,
         'order_no': 0,
       });
-
-      await _approvePost(
-        postId: postId,
-        userId: user.id,
-      );
     } catch (error) {
       if (uploadedVideoPath != null) {
         await _deleteStorageObject(uploadedVideoPath);
@@ -275,35 +264,27 @@ class HomeVideoRepository {
   }
 
   Future<String> _resolveMediaUrl(Map<String, dynamic> row) async {
-    final publicUrl = row['public_url']?.toString().trim() ?? '';
+    final publicUrl = row['public_url']?.toString().trim();
     final storagePath = row['storage_path']?.toString().trim() ?? '';
+    if (storagePath.isEmpty) {
+      return publicUrl ?? '';
+    }
+
     final bucket = _normalizeBucketName(
       row['storage_bucket']?.toString() ?? _defaultBucket,
     );
 
-    if (storagePath.isNotEmpty) {
-      try {
-        final signedUrl = await _client.storage
-            .from(bucket)
-            .createSignedUrl(storagePath, _signedVideoUrlTtlSeconds);
-        final normalizedSignedUrl = signedUrl.trim();
-        if (normalizedSignedUrl.isNotEmpty) {
-          return normalizedSignedUrl;
-        }
-      } catch (_) {
-        // Fall back to public URL when signing is unavailable.
+    try {
+      return await _client.storage.from(bucket).createSignedUrl(
+            storagePath,
+            60 * 60,
+          );
+    } catch (_) {
+      if (publicUrl != null && publicUrl.isNotEmpty) {
+        return publicUrl;
       }
-    }
-
-    if (publicUrl.isNotEmpty) {
-      return publicUrl;
-    }
-
-    if (storagePath.isNotEmpty) {
       return _client.storage.from(bucket).getPublicUrl(storagePath);
     }
-
-    return '';
   }
 
   String? _toOptionalText(dynamic value) {
@@ -401,114 +382,20 @@ class HomeVideoRepository {
     }
   }
 
-  Future<void> _approvePost({
-    required String postId,
-    required String userId,
-  }) async {
-    if (await _tryApprovePostViaRpc(postId: postId)) {
-      return;
-    }
-    if (await _trySetPostVisibleWithUpdate(postId: postId, userId: userId)) {
-      return;
-    }
-    throw HomeVideoApprovePostFailedException(postId: postId);
-  }
-
-  Future<bool> _tryApprovePostViaRpc({required String postId}) async {
-    final candidateParams = <Map<String, dynamic>>[
-      {'post_id': postId},
-      {'p_post_id': postId},
-      {'_post_id': postId},
-    ];
-
-    for (final params in candidateParams) {
-      try {
-        await _client.rpc(_approvePostRpc, params: params);
-        return true;
-      } catch (_) {
-        // Try next known function signature.
-      }
+  String _resolveVideoExtension(String fileName) {
+    final trimmed = fileName.trim();
+    final dotIndex = trimmed.lastIndexOf('.');
+    if (dotIndex == -1 || dotIndex == trimmed.length - 1) {
+      return 'mp4';
     }
 
-    return false;
-  }
-
-  Future<bool> _trySetPostVisibleWithUpdate({
-    required String postId,
-    required String userId,
-  }) async {
-    final candidatePayloads = <Map<String, dynamic>>[
-      {
-        'is_visible': true,
-        'moderation_status': 'approved',
-        'status': 'active',
-      },
-      {
-        'is_visible': true,
-        'moderation_status': 'approved',
-      },
-      {
-        'is_visible': true,
-        'status': 'active',
-      },
-      {
-        'is_visible': true,
-      },
-      {
-        'moderation_status': 'approved',
-        'status': 'active',
-      },
-      {
-        'moderation_status': 'approved',
-      },
-      {
-        'status': 'active',
-      },
-    ];
-
-    for (final payload in candidatePayloads) {
-      try {
-        final updated = await _client
-            .from(_postsTable)
-            .update(payload)
-            .eq('id', postId)
-            .eq('user_id', userId)
-            .select('id')
-            .maybeSingle();
-
-        if (updated != null) {
-          return true;
-        }
-      } catch (_) {
-        // Try next payload for schema compatibility.
-      }
-    }
-
-    return false;
-  }
-
-  String _resolveVideoExtension(String fileName, {String? filePath}) {
-    String extensionFrom(String source) {
-      final trimmed = source.trim();
-      final dotIndex = trimmed.lastIndexOf('.');
-      if (dotIndex == -1 || dotIndex == trimmed.length - 1) {
-        return '';
-      }
-      return trimmed.substring(dotIndex + 1).toLowerCase();
-    }
-
-    var extension = extensionFrom(fileName);
-    if (extension.isEmpty && filePath != null && filePath.trim().isNotEmpty) {
-      extension = extensionFrom(filePath);
-    }
-
+    final extension = trimmed.substring(dotIndex + 1).toLowerCase();
     switch (extension) {
       case 'mp4':
       case 'mov':
       case 'm4v':
       case 'avi':
       case 'webm':
-      case 'mkv':
         return extension;
       default:
         return 'mp4';
@@ -538,8 +425,6 @@ class HomeVideoRepository {
         return 'video/x-msvideo';
       case 'webm':
         return 'video/webm';
-      case 'mkv':
-        return 'video/x-matroska';
       case 'm4v':
       case 'mp4':
       default:
@@ -598,15 +483,4 @@ class HomeVideoUploadUnauthorizedException implements Exception {
   @override
   String toString() =>
       'HomeVideoUploadUnauthorizedException(bucketName: $bucketName, storagePath: $storagePath)';
-}
-
-class HomeVideoApprovePostFailedException implements Exception {
-  const HomeVideoApprovePostFailedException({
-    required this.postId,
-  });
-
-  final String postId;
-
-  @override
-  String toString() => 'HomeVideoApprovePostFailedException(postId: $postId)';
 }

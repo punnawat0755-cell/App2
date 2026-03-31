@@ -4,8 +4,9 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
-import 'package:flutter_application_1/features/home/service/daily_mood_streak_service.dart';
+import 'package:flutter_application_1/features/home/service/daily_mission_streak_service.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/setting/view/setting_page.dart';
 import 'package:get/get.dart';
@@ -20,6 +21,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class ProfileController extends GetxController {
   final supabase = Supabase.instance.client;
   late final http.Client _httpClient;
+  late final CoinService _coinService;
+  late final DailyMissionStreakService _dailyMissionStreakService;
   StreamSubscription<AuthState>? _authSubscription;
   String? _activeUserId;
 
@@ -42,7 +45,8 @@ class ProfileController extends GetxController {
   );
   static const Duration _predictionTimeout = Duration(seconds: 8);
 
-  var coins = 0.obs;
+  RxInt get coins => _coinService.coins;
+  final missionStreakDays = 0.obs;
   var today = DateTime.now().day.obs;
   var selectedMonth = DateTime.now().month.obs;
   var selectedYear = DateTime.now().year.obs;
@@ -87,6 +91,10 @@ class ProfileController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    _coinService = Get.isRegistered<CoinService>()
+        ? Get.find<CoinService>()
+        : Get.put(CoinService(), permanent: true);
+    _dailyMissionStreakService = DailyMissionStreakService();
     _httpClient = _buildHttpClient();
     _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
       final nextUserId = data.session?.user.id;
@@ -212,7 +220,6 @@ class ProfileController extends GetxController {
     final user = supabase.auth.currentUser;
     if (user == null) {
       _activeUserId = null;
-      coins.value = 0;
       isProfileReady.value = true;
       return;
     }
@@ -255,6 +262,7 @@ class ProfileController extends GetxController {
       isProfileReady.value = true;
     }
 
+    await _loadMissionStreakDays();
     await loadMonthData();
 
     if (showsStressMenu &&
@@ -268,13 +276,6 @@ class ProfileController extends GetxController {
       fetchLatestCycle();
       fetchMenstrualStats();
     }
-
-    await _loadDailyMoodStreak();
-  }
-
-  Future<void> _loadDailyMoodStreak() async {
-    final streakDays = await DailyMoodStreakService.fetchCurrentStreakDays();
-    coins.value = streakDays;
   }
 
   void _resetProfileState() {
@@ -288,7 +289,7 @@ class ProfileController extends GetxController {
 
     profileName.value = 'Seal';
     userGender.value = 'other';
-    coins.value = 0;
+    missionStreakDays.value = 0;
 
     predictionText.value = "";
     predictionConfidence.value = "";
@@ -317,6 +318,11 @@ class ProfileController extends GetxController {
   Future<void> refreshProfile() async {
     _resetProfileState();
     await _bootstrapProfile();
+  }
+
+  Future<void> _loadMissionStreakDays() async {
+    final streakDays = await _dailyMissionStreakService.getCurrentStreakDays();
+    missionStreakDays.value = streakDays > 0 ? streakDays : 0;
   }
 
   String _normalizeGender(String? raw) {
@@ -1708,7 +1714,7 @@ class ProfilePage extends StatelessWidget {
               ),
               SizedBox(width: scale.rs(1, min: 1, max: 2)),
               Obx(() => Text(
-                    "${controller.coins.value}",
+                    "${controller.missionStreakDays}",
                     style: TextStyle(
                       color: const Color(0xFF5D4037),
                       fontWeight: FontWeight.bold,

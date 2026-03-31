@@ -120,7 +120,10 @@ class _LoginPageState extends State<LoginPage> {
         await supabase.rpc('ensure_my_profile');
       } catch (_) {
         // fallback สร้าง profile ถ้าไม่มี
-        await supabase.from('profiles').upsert({'id': response.user!.id});
+        await supabase.from('profiles').upsert({
+          'id': response.user!.id,
+          'coins': 0,
+        });
       }
 
       try {
