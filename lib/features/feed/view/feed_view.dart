@@ -29,11 +29,14 @@ class FeedPage extends StatefulWidget {
 
 class _FeedPageState extends State<FeedPage> {
   static const _brandBlue = Color(0xFF4489D7);
+  static const _feedBackground = Color(0xFFF4FAFF);
 
   final FeedRepository _repository = FeedRepository();
   final User? _currentUser = supabase.auth.currentUser;
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _postItemKeys = <String, GlobalKey>{};
+  late final Stream<List<FeedPost>> _postsStream;
+  late final Stream<Set<String>> _likedPostIdsStream;
 
   String _composerName = 'คุณ';
   String _composerAvatarUrl = ProfileAvatarCatalog.defaultAvatar;
@@ -47,6 +50,10 @@ class _FeedPageState extends State<FeedPage> {
     super.initState();
     final focusPostId = widget.focusPostId?.trim() ?? '';
     _pendingFocusPostId = focusPostId.isEmpty ? null : focusPostId;
+    _postsStream = _repository.watchPosts();
+    _likedPostIdsStream = _currentUser == null
+        ? Stream<Set<String>>.value(const <String>{})
+        : _repository.watchLikedPostIds(_currentUser.id);
     _loadComposerIdentity();
   }
 
@@ -288,7 +295,7 @@ class _FeedPageState extends State<FeedPage> {
               ),
             )
           : null,
-      backgroundColor: Colors.white,
+      backgroundColor: _feedBackground,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -300,10 +307,11 @@ class _FeedPageState extends State<FeedPage> {
               child: SizedBox(
                 width: maxContentWidth,
                 child: StreamBuilder<List<FeedPost>>(
-                  stream: _repository.watchPosts(),
+                  stream: _postsStream,
                   builder: (context, postSnapshot) {
                     final feedHeader = _FeedHeader(
                       composerAvatarUrl: _composerAvatarUrl,
+                      composerName: _composerName,
                       isLoadingComposer: _isLoadingComposer,
                       onComposerTap: () => _openComposer(),
                       onImageTap: () =>
@@ -316,6 +324,8 @@ class _FeedPageState extends State<FeedPage> {
                         child: ListView(
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: EdgeInsets.only(
+                            left: scale.rs(16, min: 12, max: 16),
+                            right: scale.rs(16, min: 12, max: 16),
                             bottom: scale.rs(120, min: 90, max: 120),
                           ),
                           children: [
@@ -338,6 +348,9 @@ class _FeedPageState extends State<FeedPage> {
                     if (!postSnapshot.hasData) {
                       return ListView(
                         physics: const AlwaysScrollableScrollPhysics(),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: scale.rs(16, min: 12, max: 16),
+                        ),
                         children: [
                           feedHeader,
                           Padding(
@@ -353,7 +366,7 @@ class _FeedPageState extends State<FeedPage> {
                     }
 
                     return StreamBuilder<Set<String>>(
-                      stream: _repository.watchLikedPostIds(currentUser.id),
+                      stream: _likedPostIdsStream,
                       builder: (context, likeSnapshot) {
                         final likedPostIds =
                             likeSnapshot.data ?? const <String>{};
@@ -362,17 +375,16 @@ class _FeedPageState extends State<FeedPage> {
 
                         return RefreshIndicator(
                           onRefresh: _refreshFeed,
-                          child: ListView.separated(
+                          child: ListView.builder(
                             controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: EdgeInsets.only(
+                              left: scale.rs(16, min: 12, max: 16),
+                              right: scale.rs(16, min: 12, max: 16),
+                              top: scale.rs(8, min: 6, max: 8),
                               bottom: scale.rs(120, min: 90, max: 120),
                             ),
                             itemCount: posts.isEmpty ? 2 : posts.length + 1,
-                            separatorBuilder: (context, index) => Divider(
-                              thickness: 1,
-                              color: Colors.grey.shade200,
-                            ),
                             itemBuilder: (context, index) {
                               if (index == 0) {
                                 return feedHeader;
@@ -397,17 +409,23 @@ class _FeedPageState extends State<FeedPage> {
 
                               return KeyedSubtree(
                                 key: _keyForPost(post.id),
-                                child: FeedPostCard(
-                                  key: ValueKey(post.id),
-                                  post: post,
-                                  isLiked: isLiked,
-                                  onAuthorTap: () => _openAuthorProfile(post),
-                                  onToggleLike: _repository.supportsLikeActions
-                                      ? () => _toggleLike(post, isLiked)
-                                      : null,
-                                  onDelete: post.authorId == currentUser.id
-                                      ? () => _deletePost(post)
-                                      : null,
+                                child: Padding(
+                                  padding: EdgeInsets.only(
+                                    top: scale.rs(14, min: 10, max: 14),
+                                  ),
+                                  child: FeedPostCard(
+                                    key: ValueKey(post.id),
+                                    post: post,
+                                    isLiked: isLiked,
+                                    onAuthorTap: () => _openAuthorProfile(post),
+                                    onToggleLike:
+                                        _repository.supportsLikeActions
+                                            ? () => _toggleLike(post, isLiked)
+                                            : null,
+                                    onDelete: post.authorId == currentUser.id
+                                        ? () => _deletePost(post)
+                                        : null,
+                                  ),
                                 ),
                               );
                             },
@@ -1392,27 +1410,26 @@ class _FeedImageSourceTile extends StatelessWidget {
   }
 }
 
-class FeedPostCard extends StatefulWidget {
-  const FeedPostCard({
-    super.key,
+// ignore: unused_element
+class _LegacyFeedPostCard extends StatefulWidget {
+  const _LegacyFeedPostCard({
     required this.post,
     required this.isLiked,
     required this.onToggleLike,
     required this.onAuthorTap,
-    this.onDelete,
   });
 
   final FeedPost post;
   final bool isLiked;
   final Future<void> Function()? onToggleLike;
   final VoidCallback? onAuthorTap;
-  final VoidCallback? onDelete;
+  final VoidCallback? onDelete = null;
 
   @override
-  State<FeedPostCard> createState() => _FeedPostCardState();
+  State<_LegacyFeedPostCard> createState() => _LegacyFeedPostCardState();
 }
 
-class _FeedPostCardState extends State<FeedPostCard> {
+class _LegacyFeedPostCardState extends State<_LegacyFeedPostCard> {
   late bool _displayIsLiked;
   late int _displayLikeCount;
   bool _isUpdatingLike = false;
@@ -1457,7 +1474,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
   }
 
   @override
-  void didUpdateWidget(covariant FeedPostCard oldWidget) {
+  void didUpdateWidget(covariant _LegacyFeedPostCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.isLiked != oldWidget.isLiked) {
       _displayIsLiked = widget.isLiked;
@@ -1684,8 +1701,9 @@ class _FeedPostCardState extends State<FeedPostCard> {
   }
 }
 
-class _FeedHeader extends StatelessWidget {
-  const _FeedHeader({
+// ignore: unused_element
+class _LegacyFeedHeader extends StatelessWidget {
+  const _LegacyFeedHeader({
     required this.composerAvatarUrl,
     required this.isLoadingComposer,
     required this.onComposerTap,
@@ -1779,6 +1797,601 @@ class _FeedHeader extends StatelessWidget {
           ),
         ),
         Divider(thickness: 1, color: Colors.grey.shade200),
+      ],
+    );
+  }
+}
+
+class FeedPostCard extends StatefulWidget {
+  const FeedPostCard({
+    super.key,
+    required this.post,
+    required this.isLiked,
+    required this.onToggleLike,
+    required this.onAuthorTap,
+    this.onDelete,
+  });
+
+  final FeedPost post;
+  final bool isLiked;
+  final Future<void> Function()? onToggleLike;
+  final VoidCallback? onAuthorTap;
+  final VoidCallback? onDelete;
+
+  @override
+  State<FeedPostCard> createState() => _FeedPostCardState();
+}
+
+class _FeedPostCardState extends State<FeedPostCard> {
+  static const _accent = Color(0xFF4489D7);
+  static const _cardBorder = Color(0xFFDCEBFA);
+
+  late bool _displayIsLiked;
+  late int _displayLikeCount;
+  bool _isUpdatingLike = false;
+  bool _isSaved = false;
+
+  String _formatRelativeTime(DateTime createdAt) {
+    final now = DateTime.now();
+    final difference = now.difference(createdAt);
+
+    if (difference.inSeconds < 60) {
+      return 'เมื่อสักครู่';
+    }
+    if (difference.inMinutes < 60) {
+      return '${difference.inMinutes} นาที ago';
+    }
+    if (difference.inHours < 24) {
+      return '${difference.inHours} ชม. ago';
+    }
+    if (difference.inDays < 7) {
+      return '${difference.inDays} วัน ago';
+    }
+
+    final day = createdAt.day.toString().padLeft(2, '0');
+    final month = createdAt.month.toString().padLeft(2, '0');
+    final year = createdAt.year + 543;
+    return '$day/$month/$year';
+  }
+
+  void _handleCommentTap() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CommentSheet(post: widget.post),
+    );
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _displayIsLiked = widget.isLiked;
+    _displayLikeCount = widget.post.likeCount;
+  }
+
+  @override
+  void didUpdateWidget(covariant FeedPostCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLiked != oldWidget.isLiked) {
+      _displayIsLiked = widget.isLiked;
+    }
+    if (widget.post.likeCount != oldWidget.post.likeCount) {
+      _displayLikeCount = widget.post.likeCount;
+    }
+  }
+
+  Future<void> _handleToggleLike() async {
+    final onToggleLike = widget.onToggleLike;
+    if (onToggleLike == null || _isUpdatingLike) {
+      return;
+    }
+
+    final previousIsLiked = _displayIsLiked;
+    final previousLikeCount = _displayLikeCount;
+    final nextIsLiked = !previousIsLiked;
+    final nextLikeCount = nextIsLiked
+        ? previousLikeCount + 1
+        : (previousLikeCount > 0 ? previousLikeCount - 1 : 0);
+
+    setState(() {
+      _displayIsLiked = nextIsLiked;
+      _displayLikeCount = nextLikeCount;
+      _isUpdatingLike = true;
+    });
+
+    try {
+      await onToggleLike();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _displayIsLiked = previousIsLiked;
+        _displayLikeCount = previousLikeCount;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingLike = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = context.responsive;
+    final tags = _buildTags(widget.post.content);
+    final postBadge = _resolvePostBadge(widget.post.content);
+    final handle = _buildHandle(widget.post.authorName);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        scale.rs(16, min: 12, max: 16),
+        scale.rs(14, min: 10, max: 14),
+        scale.rs(16, min: 12, max: 16),
+        scale.rs(12, min: 10, max: 12),
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(scale.rs(22, min: 18, max: 22)),
+        border: Border.all(color: _cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: widget.onAuthorTap,
+                child: _AuthorAvatar(
+                  name: widget.post.authorName,
+                  avatarUrl: widget.post.authorAvatarUrl,
+                  radius: scale.rs(22, min: 18, max: 22),
+                ),
+              ),
+              SizedBox(width: scale.rs(10, min: 8, max: 10)),
+              Expanded(
+                child: GestureDetector(
+                  onTap: widget.onAuthorTap,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.post.authorName,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: scale.rf(16, min: 14, max: 16),
+                          color: const Color(0xFF2C5282),
+                        ),
+                      ),
+                      SizedBox(height: scale.rs(4, min: 2, max: 4)),
+                      Wrap(
+                        spacing: scale.rs(6, min: 4, max: 6),
+                        runSpacing: scale.rs(4, min: 4, max: 4),
+                        children: [
+                          Text(
+                            handle,
+                            style: TextStyle(
+                              fontSize: scale.rf(12.5, min: 11.5, max: 12.5),
+                              color: const Color(0xFF6A7489),
+                            ),
+                          ),
+                          Text(
+                            _formatRelativeTime(widget.post.createdAt),
+                            style: TextStyle(
+                              fontSize: scale.rf(12.5, min: 11.5, max: 12.5),
+                              color: const Color(0xFF6A7489),
+                            ),
+                          ),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: scale.rs(8, min: 6, max: 8),
+                              vertical: scale.rs(3, min: 2, max: 3),
+                            ),
+                            decoration: BoxDecoration(
+                              color: postBadge.backgroundColor,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Text(
+                              postBadge.label,
+                              style: TextStyle(
+                                fontSize: scale.rf(11, min: 10, max: 11),
+                                fontWeight: FontWeight.w700,
+                                color: postBadge.foregroundColor,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (widget.onDelete != null)
+                PopupMenuButton<String>(
+                  color: Colors.white,
+                  icon: const Icon(
+                    Icons.more_horiz,
+                    color: Color(0xFF97A0B5),
+                  ),
+                  onSelected: (value) {
+                    if (value == 'delete') widget.onDelete?.call();
+                  },
+                  itemBuilder: (context) => const [
+                    PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Text('ลบโพสต์'),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+          if (widget.post.content.trim().isNotEmpty) ...[
+            SizedBox(height: scale.rs(14, min: 10, max: 14)),
+            Text(
+              widget.post.content,
+              style: TextStyle(
+                color: const Color(0xFF42506A),
+                height: 1.6,
+                fontSize: scale.rf(14.5, min: 13, max: 14.5),
+              ),
+            ),
+          ],
+          if ((widget.post.imageUrl ?? '').isNotEmpty) ...[
+            SizedBox(height: scale.rs(14, min: 10, max: 14)),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final maxCardWidth = constraints.maxWidth;
+                final imageWidth = maxCardWidth.clamp(220.0, 420.0);
+
+                return Center(
+                  child: ClipRRect(
+                    borderRadius:
+                        BorderRadius.circular(scale.rs(18, min: 14, max: 18)),
+                    child: SizedBox(
+                      width: imageWidth,
+                      height: imageWidth * 0.78,
+                      child: Image.network(
+                        widget.post.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          color: const Color(0xFFF0F3F8),
+                          alignment: Alignment.center,
+                          child: const Icon(
+                            Icons.broken_image_outlined,
+                            color: Color(0xFF97A0B5),
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+          if (tags.isNotEmpty) ...[
+            SizedBox(height: scale.rs(14, min: 10, max: 14)),
+            Wrap(
+              spacing: scale.rs(8, min: 6, max: 8),
+              runSpacing: scale.rs(8, min: 6, max: 8),
+              children: tags
+                  .map(
+                    (tag) => Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: scale.rs(10, min: 8, max: 10),
+                        vertical: scale.rs(6, min: 4, max: 6),
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF7FF),
+                        borderRadius: BorderRadius.circular(
+                            scale.rs(10, min: 8, max: 10)),
+                      ),
+                      child: Text(
+                        tag,
+                        style: TextStyle(
+                          color: const Color(0xFF627089),
+                          fontSize: scale.rf(12, min: 11, max: 12),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+          SizedBox(height: scale.rs(16, min: 12, max: 16)),
+          Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+          SizedBox(height: scale.rs(12, min: 8, max: 12)),
+          Row(
+            children: [
+              InkWell(
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                onTap: _handleToggleLike,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: scale.rs(4, min: 2, max: 4),
+                    vertical: scale.rs(4, min: 2, max: 4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _displayIsLiked
+                            ? Icons.favorite
+                            : Icons.favorite_border_rounded,
+                        color:
+                            _displayIsLiked ? _accent : const Color(0xFF6A7489),
+                        size: scale.rs(24, min: 22, max: 24),
+                      ),
+                      SizedBox(width: scale.rs(6, min: 4, max: 6)),
+                      Text(
+                        _displayLikeCount.toString(),
+                        style: TextStyle(
+                          color: const Color(0xFF42506A),
+                          fontWeight: _displayIsLiked
+                              ? FontWeight.w700
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(width: scale.rs(18, min: 12, max: 18)),
+              InkWell(
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                onTap: _handleCommentTap,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: scale.rs(4, min: 2, max: 4),
+                    vertical: scale.rs(4, min: 2, max: 4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.mode_comment_outlined,
+                        color: const Color(0xFF6A7489),
+                        size: scale.rs(24, min: 22, max: 24),
+                      ),
+                      SizedBox(width: scale.rs(6, min: 4, max: 6)),
+                      Text(
+                        widget.post.commentCount.toString(),
+                        style: const TextStyle(
+                          color: Color(0xFF42506A),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () => setState(() => _isSaved = !_isSaved),
+                child: Container(
+                  width: scale.rs(34, min: 30, max: 34),
+                  height: scale.rs(34, min: 30, max: 34),
+                  decoration: BoxDecoration(
+                    color: _isSaved
+                        ? _accent.withValues(alpha: 0.12)
+                        : const Color(0xFFF3F5FA),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    _isSaved
+                        ? Icons.bookmark_rounded
+                        : Icons.bookmark_border_rounded,
+                    color: _isSaved ? _accent : const Color(0xFF7B859B),
+                    size: scale.rs(20, min: 18, max: 20),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<String> _buildTags(String content) {
+    final matches = RegExp(r'#([\p{L}\p{N}_]+)', unicode: true)
+        .allMatches(content)
+        .map((match) => '#${match.group(1)}')
+        .where((tag) => tag.length > 1)
+        .toSet()
+        .take(3)
+        .toList();
+    if (matches.isNotEmpty) {
+      return matches;
+    }
+
+    return content
+        .replaceAll(RegExp(r'[^\p{L}\p{N}\s]', unicode: true), ' ')
+        .split(RegExp(r'\s+'))
+        .map((word) => word.trim())
+        .where((word) => word.length >= 4)
+        .take(3)
+        .map((word) => '#$word')
+        .toList();
+  }
+
+  _PostBadge _resolvePostBadge(String content) {
+    final normalized = content.toLowerCase();
+    if (normalized.contains('?') || normalized.contains('ทำไม')) {
+      return const _PostBadge(
+        label: 'คำถาม',
+        backgroundColor: Color(0xFFE9F1FF),
+        foregroundColor: Color(0xFF4166D5),
+      );
+    }
+    if (normalized.contains('เหงา') ||
+        normalized.contains('เหนื่อย') ||
+        normalized.contains('เศร้า')) {
+      return const _PostBadge(
+        label: 'ขอกำลังใจ',
+        backgroundColor: Color(0xFFFFECEC),
+        foregroundColor: Color(0xFFE35D6A),
+      );
+    }
+    if (normalized.contains('รู้สึก') ||
+        normalized.contains('happy') ||
+        normalized.contains('sad')) {
+      return const _PostBadge(
+        label: 'อารมณ์',
+        backgroundColor: Color(0xFFEAFBF3),
+        foregroundColor: Color(0xFF1E9E63),
+      );
+    }
+
+    return const _PostBadge(
+      label: 'ทั่วไป',
+      backgroundColor: Color(0xFFEFF7FF),
+      foregroundColor: Color(0xFF4489D7),
+    );
+  }
+
+  String _buildHandle(String authorName) {
+    final compact = authorName.trim().replaceAll(RegExp(r'\s+'), '_');
+    if (compact.isEmpty) {
+      return '@member';
+    }
+    return '@${compact.toLowerCase()}';
+  }
+}
+
+class _PostBadge {
+  const _PostBadge({
+    required this.label,
+    required this.backgroundColor,
+    required this.foregroundColor,
+  });
+
+  final String label;
+  final Color backgroundColor;
+  final Color foregroundColor;
+}
+
+class _FeedHeader extends StatelessWidget {
+  const _FeedHeader({
+    required this.composerAvatarUrl,
+    required this.composerName,
+    required this.isLoadingComposer,
+    required this.onComposerTap,
+    required this.onImageTap,
+  });
+
+  final String composerAvatarUrl;
+  final String composerName;
+  final bool isLoadingComposer;
+  final VoidCallback onComposerTap;
+  final VoidCallback onImageTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = context.responsive;
+    final cardRadius = scale.rs(22, min: 18, max: 22);
+    const appBlue = Color(0xFF4489D7);
+    const appLightBlue = Color(0xFFEEF8FF);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.only(
+            top: scale.rs(10, min: 8, max: 10),
+            bottom: scale.rs(14, min: 10, max: 14),
+          ),
+          child: Center(
+            child: Image.asset(
+              'assets/images/logo.png',
+              width: scale.rs(65, min: 52, max: 65),
+              height: scale.rs(88, min: 70, max: 88),
+            ),
+          ),
+        ),
+        Container(
+          padding: EdgeInsets.all(scale.rs(14, min: 12, max: 14)),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(cardRadius),
+            border: Border.all(color: const Color(0xFFDCEBFA)),
+            boxShadow: [
+              BoxShadow(
+                color: appBlue.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: InkWell(
+            onTap: onComposerTap,
+            borderRadius: BorderRadius.circular(cardRadius - 4),
+            child: Row(
+              children: [
+                _AuthorAvatar(
+                  name: composerName,
+                  avatarUrl: composerAvatarUrl,
+                  radius: scale.rs(20, min: 18, max: 20),
+                ),
+                SizedBox(width: scale.rs(12, min: 10, max: 12)),
+                Expanded(
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(16, min: 12, max: 16),
+                      vertical: scale.rs(12, min: 10, max: 12),
+                    ),
+                    decoration: BoxDecoration(
+                      color: appLightBlue,
+                      borderRadius: BorderRadius.circular(
+                        scale.rs(16, min: 14, max: 16),
+                      ),
+                    ),
+                    child: Text(
+                      isLoadingComposer
+                          ? 'Loading profile...'
+                          : 'แชร์สิ่งที่คุณกำลังรู้สึก...',
+                      style: TextStyle(
+                        color: const Color(0xFF6D8FB5),
+                        fontSize: scale.rf(15, min: 13.5, max: 15),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: scale.rs(10, min: 8, max: 10)),
+                InkWell(
+                  onTap: onImageTap,
+                  borderRadius:
+                      BorderRadius.circular(scale.rs(14, min: 12, max: 14)),
+                  child: Container(
+                    padding: EdgeInsets.all(scale.rs(10, min: 8, max: 10)),
+                    decoration: BoxDecoration(
+                      color: appLightBlue,
+                      borderRadius: BorderRadius.circular(
+                        scale.rs(14, min: 12, max: 14),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.image_outlined,
+                      color: appBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
     );
   }

@@ -15,6 +15,7 @@ import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
 import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
 import 'package:flutter_application_1/features/home/service/video_upload_prepare_service.dart';
+import 'package:flutter_application_1/features/home/service/daily_mission_streak_service.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/home/view/play_video_page.dart';
 import 'package:flutter_application_1/features/home/view/video_preview_controller_factory.dart';
@@ -45,14 +46,18 @@ class _HomePageState extends State<HomePage> {
       HomeVideoPrefetchService.instance;
   final VideoUploadPrepareService _videoUploadPrepareService =
       VideoUploadPrepareService.instance;
+  final DailyMissionStreakService _dailyMissionStreakService =
+      DailyMissionStreakService();
   final PostModerationService _postModerationService =
       PostModerationService.instance;
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isNameLoading = true;
+  bool _isMissionDaysLoading = true;
   bool _isUploadingClip = false;
   String _displayName = 'ผู้ใช้';
   String _lastWarmupSignature = '';
+  int _missionDays = _defaultMissionDays;
 
   final List<HomeArticle> _articleList = homeArticlesMock;
 
@@ -62,6 +67,7 @@ class _HomePageState extends State<HomePage> {
     _pageController = PageController(initialPage: 0);
     _videoClipsStream = _homeVideoRepository.watchVideoClips();
     _loadUsername();
+    _loadMissionDays();
 
     _timer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (_currentBannerIndex < 2) {
@@ -131,6 +137,22 @@ class _HomePageState extends State<HomePage> {
         _isNameLoading = false;
       });
     }
+  }
+
+  Future<void> _loadMissionDays() async {
+    if (mounted) {
+      setState(() => _isMissionDaysLoading = true);
+    }
+
+    final streakDays = await _dailyMissionStreakService.getCurrentStreakDays();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _missionDays = streakDays > 0 ? streakDays : 0;
+      _isMissionDaysLoading = false;
+    });
   }
 
   void _openVideoClip(List<HomeVideoClip> clips, int initialIndex) {
@@ -494,6 +516,11 @@ class _HomePageState extends State<HomePage> {
       return;
     }
 
+    await _loadMissionDays();
+    if (!mounted) {
+      return;
+    }
+
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(message)));
@@ -591,7 +618,9 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             DailyMissionBanner(
                               onTap: _openDailyMission,
-                              dayCount: _defaultMissionDays.toString(),
+                              dayCount: _isMissionDaysLoading
+                                  ? '...'
+                                  : _missionDays.toString(),
                             ),
                             ClownFishBanner(),
                             LoveJobBanner(),
