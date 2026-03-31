@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/module/coin/controller/coin_controller.dart';
 import 'package:flutter_application_1/module/shop/view/shop_view.dart';
 import 'package:get/get.dart';
 
@@ -10,10 +11,10 @@ class Pet extends GetxController {
   static const int maxFoodCount = 5;
   static const int refillSeconds = 5 * 60 * 60; // 5 ชั่วโมง/ปลา 1 ตัว
 
+  late final CoinController coinController;
   var ownedItems = <int>[].obs;
 
   // --- ตัวแปรทั่วไป ---
-  var coins = 833.obs;
   var level = 1.obs;
   var energyPercent = 50.obs; // ค่าพลังงานเริ่มต้น
   var username = "Seal".obs;
@@ -25,6 +26,16 @@ class Pet extends GetxController {
   var isTimerRunning = false.obs;
   Timer? _timer;
   int _secondsLeft = 0;
+
+  RxInt get coins => coinController.coins;
+
+  @override
+  void onInit() {
+    super.onInit();
+    coinController = Get.isRegistered<CoinController>()
+        ? Get.find<CoinController>()
+        : Get.put(CoinController(), permanent: true);
+  }
 
   @override
   void onClose() {
@@ -84,9 +95,7 @@ class Pet extends GetxController {
   // ฟังก์ชัน 2: ปลาตัวกลาง (ใช้เหรียญ)
   // -----------------------------------------------------------------------
   void feedWithCoin(int cost) {
-    if (coins.value >= cost) {
-      // หักเหรียญ
-      coins.value -= cost;
+    if (coinController.spendCoins(cost)) {
       energyPercent.value += 10; // <--- เพิ่มทีละ 10%
 
       if (energyPercent.value > 100) {

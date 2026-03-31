@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_application_1/module/coin/controller/coin_controller.dart';
 import 'package:flutter_application_1/module/setting/view/setting_view.dart';
 import 'package:flutter_application_1/module/user_Profile/widget/app_profile_avatar.dart';
 import 'package:flutter_application_1/module/user_Profile/app_user_controller.dart'; // 💡 นำเข้า AppUserController
@@ -13,8 +14,8 @@ class ProfileController extends GetxController {
 
   // 💡 ดึงข้อมูล User (เพื่อเช็คเพศ)
   late final AppUserController userController;
+  late final CoinController coinController;
 
-  var coins = 138.obs;
   var whaleStreakStack = <int>[].obs;
   var today = DateTime.now().day.obs;
   var selectedMonth = DateTime.now().month.obs;
@@ -55,12 +56,17 @@ class ProfileController extends GetxController {
   int get currentWhaleStreak =>
       whaleStreakStack.isEmpty ? 0 : whaleStreakStack.last;
 
+  RxInt get coins => coinController.coins;
+
   @override
   void onInit() {
     super.onInit();
     userController = Get.isRegistered<AppUserController>()
         ? Get.find<AppUserController>()
         : Get.put(AppUserController(), permanent: true);
+    coinController = Get.isRegistered<CoinController>()
+        ? Get.find<CoinController>()
+        : Get.put(CoinController(), permanent: true);
     recalculateWhaleStreakStack();
   }
 
