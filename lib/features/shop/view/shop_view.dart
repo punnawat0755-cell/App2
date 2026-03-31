@@ -30,6 +30,7 @@ class ShopPage extends StatelessWidget {
             final crossAxisSpacing = isCompact
                 ? scale.rs(10, min: 8, max: 10)
                 : scale.rs(15, min: 10, max: 15);
+            final childAspectRatio = isCompact ? 0.68 : 0.84;
 
             return Center(
               child: ConstrainedBox(
@@ -174,7 +175,7 @@ class ShopPage extends StatelessWidget {
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: crossAxisCount,
-                            childAspectRatio: 0.92,
+                            childAspectRatio: childAspectRatio,
                             crossAxisSpacing: crossAxisSpacing,
                             mainAxisSpacing: scale.rs(10, min: 8, max: 10),
                           ),
@@ -222,18 +223,20 @@ class ShopPage extends StatelessWidget {
         borderRadius: BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          Container(
-            height: scale.rs(75, min: 60, max: 75),
-            width: double.infinity,
-            alignment: Alignment.center,
-            padding: EdgeInsets.all(scale.rs(10, min: 8, max: 10)),
-            child: Image.asset(
-              item.imagePath,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) =>
-                  const Icon(Icons.image_not_supported, color: Colors.grey),
+          SizedBox(height: scale.rs(8, min: 6, max: 8)),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              alignment: Alignment.center,
+              padding: EdgeInsets.all(scale.rs(10, min: 8, max: 10)),
+              child: Image.asset(
+                item.imagePath,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) =>
+                    const Icon(Icons.image_not_supported, color: Colors.grey),
+              ),
             ),
           ),
           Padding(
@@ -244,6 +247,7 @@ class ShopPage extends StatelessWidget {
               item.name,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: const Color(0xFF2C5E92),
                 fontWeight: FontWeight.w700,
@@ -282,8 +286,8 @@ class ShopPage extends StatelessWidget {
                       }
                     },
                     child: Container(
-                      margin: EdgeInsets.only(
-                        bottom: scale.rs(5, min: 3, max: 5),
+                      constraints: BoxConstraints(
+                        minHeight: scale.rs(28, min: 26, max: 30),
                       ),
                       padding: EdgeInsets.symmetric(
                         horizontal: scale.rs(12, min: 8, max: 12),
@@ -350,8 +354,8 @@ class ShopPage extends StatelessWidget {
                     }
                   },
                   child: Container(
-                    margin: EdgeInsets.only(
-                      bottom: scale.rs(5, min: 3, max: 5),
+                    constraints: BoxConstraints(
+                      minHeight: scale.rs(28, min: 26, max: 30),
                     ),
                     padding: EdgeInsets.symmetric(
                       horizontal: scale.rs(8, min: 6, max: 8),
@@ -397,6 +401,7 @@ class ShopPage extends StatelessWidget {
               ),
             );
           }),
+          SizedBox(height: scale.rs(8, min: 6, max: 8)),
         ],
       ),
     );
