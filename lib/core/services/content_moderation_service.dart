@@ -119,6 +119,607 @@ class ContentModerationService {
     'blowjob',
     'handjob',
   ];
+  static const String _userReportedProfanityBlock = '''
+aisus
+ai sus
+i sus
+sus
+susss
+sussss
+aisat
+ai sat
+isat
+sat
+sas
+aikwai
+ai kwai
+ikwai
+kwai
+kwaii
+kwaiii
+aingo
+ai ngo
+ingo
+ngo
+ngoo
+aiba
+ai ba
+iba
+ba
+bah
+aihere
+ai here
+ihere
+here
+hia
+heea
+hiaaa
+aihia
+aimaeng
+ai maeng
+imaeng
+maeng
+meng
+meang
+aihay
+ai hay
+ihay
+hay
+aihee
+ai hee
+ihee
+hee
+sus maeng
+sus mak
+sus sud
+here maeng
+here mak
+here sud
+kwai maeng
+kwai mak
+ngo maeng
+ngo mak
+ba maeng
+hia maeng
+sus wa
+here wa
+kwai wa
+ngo wa
+mung ngo
+mung ngo wa
+mung pen arai
+mung pen arai wa
+mung kid arai
+mung kid arai wa
+kid arai yu
+kid arai wa
+mai mee samaa
+mai mee samaa loei
+ba pai laew
+arai khong mung
+arai khong mung wa
+kwai mak mak
+ngo mak mak
+aisusmaeng
+aiheresud
+aikwaimak
+aingomaeng
+aibamaeng
+susssmaeng
+hereeewa
+kwaiiimak
+ngooomak
+isus
+iss
+isss
+issss
+isssss
+aisuss
+aisusss
+aisussss
+aisusssss
+susmak
+susmakmak
+susmaeng
+susmaengง
+susmaenggg
+suswa
+susวะ
+susวะะ
+susเลย
+sussud
+sussudๆ
+sussudสุด
+aiheree
+aihereee
+aihereeee
+aihereeeee
+iheree
+ihereee
+ihereeee
+hereee
+hereeee
+hereeeee
+hiaaa
+hiaaaa
+hiaaaaa
+hiaaaaaa
+hiaaamak
+hiaaamaeng
+hiawa
+hiaวะ
+hiaวะะ
+hiaเลย
+hiasud
+hiasudๆ
+aikwaii
+aikwaiii
+aikwaiiii
+ikwaii
+ikwaiii
+ikwaiiii
+kwaiii
+kwaiiii
+kwaiiiii
+kwaimak
+kwaimaeng
+kwaiwa
+kwaiวะ
+kwaisud
+kwaisudๆ
+aingoo
+aingooo
+aingoooo
+ingoo
+ingooo
+ingoooo
+ngooo
+ngoooo
+ngooooo
+ngoomak
+ngomaeng
+ngowa
+ngoวะ
+ngosud
+ngosudๆ
+aibaa
+aibaaa
+aibaaaa
+ibaa
+ibaaa
+ibaaaa
+baaa
+baaaa
+baaaaa
+baamak
+baamaeng
+bawa
+baวะ
+basud
+basudๆ
+aimaengg
+aimaenggg
+aimaengggg
+imaengg
+imaenggg
+imaengggg
+maengg
+maenggg
+maengggg
+mengg
+menggg
+mengggg
+meanggg
+meangggg
+aiheeey
+aiheee
+aiheeee
+iheee
+iheeee
+heee
+heeee
+heeeee
+aihayy
+aihayyy
+ihayy
+ihayyy
+hayyy
+hayyyy
+susๆ
+susๆๆ
+hereๆ
+hereๆๆ
+kwaiๆ
+kwaiๆๆ
+ngoๆ
+ngoๆๆ
+baๆ
+baๆๆ
+hiaๆ
+hiaๆๆ
+maengๆ
+maengๆๆ
+sus555
+here555
+kwai555
+ngo555
+ba555
+hia555
+maeng555
+mung555
+suslol
+herelol
+kwailol
+ngolol
+balol
+hialol
+maenglol
+suswtf
+herewtf
+kwaiwtf
+ngowtf
+bawtf
+hiawtf
+maengwtf
+mung ngo mak
+mung ngo mak mak
+mung ngo sus
+mung ngo sus maeng
+mung ngo here
+mung ngo here maeng
+mung ngo kwai
+mung ngo kwai mak
+mung ngo ba
+mung ngo ba mak
+mung pen kwai
+mung pen kwai mak
+mung pen sus
+mung pen here
+mung pen ngo
+mung pen ba
+mung pen rai
+mung pen arai waaa
+mung pen arai waaaa
+mung pen arai waaaaa
+mung pen arai sus
+mung pen arai here
+mung kid arai waaa
+mung kid arai waaaa
+mung kid arai waaaaa
+mung kid arai sus
+mung kid arai here
+mung kid arai kwai
+mung kid arai ba
+arai khong mung sus
+arai khong mung here
+arai khong mung kwai
+arai khong mung ngo
+arai khong mung ba
+arai khong mung maeng
+arai khong mung waaa
+arai khong mung waaaa
+arai khong mung waaaaa
+mai mee samaa sus
+mai mee samaa here
+mai mee samaa kwai
+mai mee samaa ngo
+mai mee samaa ba
+mai mee samaa maeng
+mai mee samaa loei sus
+mai mee samaa loei here
+mai mee samaa loei kwai
+mai mee samaa loei ngo
+mai mee samaa loei ba
+mai mee samaa loei maeng
+ba pai laew sus
+ba pai laew here
+ba pai laew kwai
+ba pai laew ngo
+ba pai laew maeng
+kwai mak sus
+kwai mak here
+kwai mak ngo
+kwai mak ba
+ngo mak sus
+ngo mak here
+ngo mak kwai
+ngo mak ba
+sus mak here
+sus mak kwai
+sus mak ngo
+sus mak ba
+here mak sus
+here mak kwai
+here mak ngo
+here mak ba
+kuy
+ikuy
+ai kuy
+aikuy
+kuyy
+kuyyy
+kuyyyy
+kuyyyyy
+kuy mak
+kuy mak mak
+kuy maeng
+kuy maengง
+kuy wa
+kuyวะ
+kuyวะะ
+kuy sud
+kuy sudๆ
+kuy sud sud
+kuyเลย
+kuy555
+kuywtf
+kuylol
+kuyๆ
+kuyๆๆ
+aikuyy
+aikuyyy
+aikuyyyy
+ikuyy
+ikuyyy
+ikuyyyy
+kuymaeng
+kuymak
+kuysud
+kuywa
+kuyhere
+kuysus
+kuykwai
+kuyngo
+kuyba
+kuyhia
+kuymaenggg
+kuymaengggg
+kuymaengงง
+kuymaengงงง
+kuywaaa
+kuywaaaa
+kuywaaaaa
+kuyhereee
+kuyhereeee
+kuyhereeeee
+kuysusss
+kuysussss
+kuysusssss
+kuykwaiii
+kuykwaiiii
+kuyngooo
+kuyngoooo
+kuyngooooo
+kuybaaa
+kuybaaaa
+kuybaaaaa
+kuyhiaaa
+kuyhiaaaa
+kuyhiaaaaa
+kuy hee
+kuy hia
+kuy here
+kuy sus
+kuy kwai
+kuy ngo
+kuy ba
+kuy maeng
+kuy mak
+kuy sud
+kuy wa
+ไอสัส
+ไอสัตว์
+สัส
+สัตว์
+เหี้ย
+ไอเหี้ย
+เหี้ยๆ
+ควาย
+ไอควาย
+โง่
+ไอโง่
+บ้า
+ไอบ้า
+ห่า
+ไอห่า
+แม่ง
+มึง
+กู
+อีดอก
+ดอกทอง
+อีเหี้ย
+อีควาย
+อีโง่
+อีบ้า
+สันดาน
+ชิบหาย
+ชิบหายวายวอด
+ระยำ
+เลว
+เหี้ยมาก
+เหี้ยสุด
+ควายมาก
+โง่มาก
+โง่ชิบหาย
+บ้าชิบหาย
+มึงโง่
+มึงโง่วะ
+มึงเป็นอะไร
+มึงเป็นอะไรของมึง
+คิดได้ไง
+คิดอะไรอยู่
+ไม่มีสมอง
+โง่ชิบหาย
+ควายมาก
+บ้าไปแล้ว
+อะไรของมึง
+มึงทำอะไร
+มึงคิดอะไร
+ไอสัสๆ
+ไอสัสๆๆ
+ไอสัส555
+ไอสัสวะ
+ไอสัสวะะ
+ไอสัสเลย
+ไอสัสมาก
+ไอสัสมากๆ
+ไอสัสสุด
+ไอสัสสุดๆ
+ไอสัสแม่ง
+ไอสัสแม่งง
+ไอสัสแม่งงง
+ไอเหี้ยๆ
+ไอเหี้ยๆๆ
+ไอเหี้ย555
+ไอเหี้ยวะ
+ไอเหี้ยวะะ
+ไอเหี้ยเลย
+ไอเหี้ยมาก
+ไอเหี้ยมากๆ
+ไอเหี้ยสุด
+ไอเหี้ยสุดๆ
+ไอเหี้ยแม่ง
+ไอเหี้ยแม่งง
+ไอเหี้ยแม่งงง
+ไอควายๆ
+ไอควายๆๆ
+ไอควาย555
+ไอควายวะ
+ไอควายวะะ
+ไอควายเลย
+ไอควายมาก
+ไอควายมากๆ
+ไอควายสุด
+ไอควายสุดๆ
+ไอควายแม่ง
+ไอควายแม่งง
+ไอควายแม่งงง
+ไอโง่ๆ
+ไอโง่ๆๆ
+ไอโง่555
+ไอโง่วะ
+ไอโง่วะะ
+ไอโง่เลย
+ไอโง่มาก
+ไอโง่มากๆ
+ไอโง่สุด
+ไอโง่สุดๆ
+ไอโง่แม่ง
+ไอโง่แม่งง
+ไอโง่แม่งงง
+ไอบ้าๆ
+ไอบ้าๆๆ
+ไอบ้า555
+ไอบ้าวะ
+ไอบ้าวะะ
+ไอบ้าเลย
+ไอบ้ามาก
+ไอบ้ามากๆ
+ไอบ้าสุด
+ไอบ้าสุดๆ
+ไอบ้าแม่ง
+ไอบ้าแม่งง
+ไอบ้าแม่งงง
+เหี้ยๆๆ
+เหี้ยๆๆๆ
+เหี้ย555
+เหี้ยวะ
+เหี้ยวะะ
+เหี้ยเลย
+เหี้ยมาก
+เหี้ยมากๆ
+เหี้ยสุด
+เหี้ยสุดๆ
+เหี้ยแม่ง
+เหี้ยแม่งง
+เหี้ยแม่งงง
+ควายๆๆ
+ควายๆๆๆ
+ควาย555
+ควายวะ
+ควายวะะ
+ควายเลย
+ควายมาก
+ควายมากๆ
+ควายสุด
+ควายสุดๆ
+ควายแม่ง
+ควายแม่งง
+ควายแม่งงง
+โง่ๆๆ
+โง่ๆๆๆ
+โง่555
+โง่วะ
+โง่วะะ
+โง่เลย
+โง่มาก
+โง่มากๆ
+โง่สุด
+โง่สุดๆ
+โง่แม่ง
+โง่แม่งง
+โง่แม่งงง
+บ้าๆๆ
+บ้าๆๆๆ
+บ้า555
+บ้าวะ
+บ้าวะะ
+บ้าเลย
+บ้ามาก
+บ้ามากๆ
+บ้าสุด
+บ้าสุดๆ
+บ้าแม่ง
+บ้าแม่งง
+บ้าแม่งงง
+ควย
+ไอควย
+ควยๆ
+ควยๆๆ
+ควย555
+ควยวะ
+ควยวะะ
+ควยเลย
+ควยมาก
+ควยมากๆ
+ควยสุด
+ควยสุดๆ
+ควยแม่ง
+ควยแม่งง
+ควยแม่งงง
+ควยมึง
+ควยกู
+ควยไง
+ควยไร
+ควยอะ
+ควยสิ
+ควยจัง
+ควยว่ะ
+ควยเว้ย
+ควยนะ
+ควยแหละ
+ควยดิ
+ควยห่า
+ควยสัส
+ควยเหี้ย
+ควยควาย
+ควยโง่
+ควยบ้า
+ควยแม่งๆ
+ควยแม่งๆๆ
+ควยยย
+ควยยยย
+ควยยยยย
+ควยยยยยย
+''';
+
+  static final Set<String> _allLocalProfanityTokens = {
+    ..._localProfanityTokens.map((token) => token.toLowerCase()),
+    ..._userReportedProfanityBlock
+        .split('\n')
+        .map((token) => token.trim().toLowerCase())
+        .where((token) => token.isNotEmpty),
+  };
 
   late final http.Client _httpClient = _buildHttpClient();
 
@@ -251,10 +852,9 @@ class ContentModerationService {
         .replaceAll(RegExp(r'\s+'), '')
         .replaceAll(RegExp(r'[^a-zA-Z0-9\u0E00-\u0E7F]'), '');
 
-    for (final token in _localProfanityTokens) {
-      final normalizedToken = token.toLowerCase();
-      if (lowered.contains(normalizedToken) ||
-          compact.contains(normalizedToken.replaceAll(' ', ''))) {
+    for (final token in _allLocalProfanityTokens) {
+      if (lowered.contains(token) ||
+          compact.contains(token.replaceAll(' ', ''))) {
         return true;
       }
     }

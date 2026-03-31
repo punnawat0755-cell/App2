@@ -12,6 +12,7 @@ import 'package:flutter_application_1/core/services/media_moderation_service.dar
 import 'package:flutter_application_1/features/home/data/mock/home_articles_mock.dart';
 import 'package:flutter_application_1/features/home/model/home_article.dart';
 import 'package:flutter_application_1/features/home/model/home_video_clip.dart';
+import 'package:flutter_application_1/features/home/service/daily_mood_streak_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_prefetch_service.dart';
 import 'package:flutter_application_1/features/home/service/home_video_repository.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
@@ -33,8 +34,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const int _defaultMissionDays = 138;
-
   int _currentBannerIndex = 0;
   late final PageController _pageController;
   late Stream<List<HomeVideoClip>> _videoClipsStream;
@@ -47,9 +46,11 @@ class _HomePageState extends State<HomePage> {
   final ImagePicker _imagePicker = ImagePicker();
 
   bool _isNameLoading = true;
+  bool _isMissionStreakLoading = true;
   bool _isUploadingClip = false;
   String _displayName = 'ผู้ใช้';
   String _lastWarmupSignature = '';
+  int _missionStreakDays = 0;
 
   final List<HomeArticle> _articleList = homeArticlesMock;
 
@@ -59,6 +60,7 @@ class _HomePageState extends State<HomePage> {
     _pageController = PageController(initialPage: 0);
     _videoClipsStream = _homeVideoRepository.watchVideoClips();
     _loadUsername();
+    _loadMissionStreakDays();
 
     _timer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (_currentBannerIndex < 2) {
@@ -128,6 +130,18 @@ class _HomePageState extends State<HomePage> {
         _isNameLoading = false;
       });
     }
+  }
+
+  Future<void> _loadMissionStreakDays() async {
+    final days = await DailyMoodStreakService.fetchCurrentStreakDays();
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _missionStreakDays = days;
+      _isMissionStreakLoading = false;
+    });
   }
 
   void _openVideoClip(List<HomeVideoClip> clips, int initialIndex) {
@@ -218,9 +232,7 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      final suggestedCaption = source == ImageSource.camera
-          ? ''
-          : _fileNameWithoutExtension(file.name);
+      const suggestedCaption = '';
       final caption = await _promptClipCaption(
         initialValue: suggestedCaption,
         videoFileName: file.name,
@@ -251,7 +263,6 @@ class _HomePageState extends State<HomePage> {
         caption: caption,
         transcript: _buildModerationTranscript(
           caption: caption,
-          fileName: file.name,
         ),
         frameNotes: _buildModerationFrameNotes(
           caption: caption,
@@ -430,26 +441,12 @@ class _HomePageState extends State<HomePage> {
         defaultTargetPlatform == TargetPlatform.iOS;
   }
 
-  String _fileNameWithoutExtension(String fileName) {
-    final lastDotIndex = fileName.lastIndexOf('.');
-    if (lastDotIndex <= 0) {
-      return fileName;
-    }
-    return fileName.substring(0, lastDotIndex);
-  }
-
   String _buildModerationTranscript({
     required String caption,
-    required String fileName,
   }) {
     final normalizedCaption = caption.trim();
     if (normalizedCaption.isNotEmpty) {
       return normalizedCaption;
-    }
-
-    final fallbackName = _fileNameWithoutExtension(fileName).trim();
-    if (fallbackName.isNotEmpty) {
-      return '(no transcript) clip title: $fallbackName';
     }
 
     return '(no transcript)';
@@ -518,7 +515,16 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _openDailyMission() async {
     final message = await Get.to<String>(() => const DailyMoodPage());
-    if (!mounted || message == null || message.isEmpty) {
+    if (!mounted) {
+      return;
+    }
+
+    await _loadMissionStreakDays();
+    if (!mounted) {
+      return;
+    }
+
+    if (message == null || message.isEmpty) {
       return;
     }
 
@@ -619,7 +625,9 @@ class _HomePageState extends State<HomePage> {
                           children: [
                             DailyMissionBanner(
                               onTap: _openDailyMission,
-                              dayCount: _defaultMissionDays.toString(),
+                              dayCount: _isMissionStreakLoading
+                                  ? '...'
+                                  : _missionStreakDays.toString(),
                             ),
                             ClownFishBanner(),
                             LoveJobBanner(),

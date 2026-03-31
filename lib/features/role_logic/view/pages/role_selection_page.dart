@@ -22,7 +22,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   Future<void> _openListenerQuiz() async {
     final result = await Navigator.of(context).push<RoleQuizSelectionResult>(
       MaterialPageRoute(
-        builder: (_) => RoleQuizPage(),
+        builder: (_) => const RoleQuizPage(),
       ),
     );
 
@@ -33,7 +33,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
     await _saveMode(
       'listener',
       successMessage:
-          'เลือกคำตอบ "${result.selectedAnswer}" และบันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
+          'ทำแบบทดสอบแล้ว (คะแนน ${result.totalScore}) และบันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
     );
   }
 

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
+import 'package:flutter_application_1/features/home/service/daily_mood_streak_service.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/setting/view/setting_page.dart';
 import 'package:get/get.dart';
@@ -41,7 +42,7 @@ class ProfileController extends GetxController {
   );
   static const Duration _predictionTimeout = Duration(seconds: 8);
 
-  var coins = 138.obs;
+  var coins = 0.obs;
   var today = DateTime.now().day.obs;
   var selectedMonth = DateTime.now().month.obs;
   var selectedYear = DateTime.now().year.obs;
@@ -211,6 +212,7 @@ class ProfileController extends GetxController {
     final user = supabase.auth.currentUser;
     if (user == null) {
       _activeUserId = null;
+      coins.value = 0;
       isProfileReady.value = true;
       return;
     }
@@ -266,6 +268,13 @@ class ProfileController extends GetxController {
       fetchLatestCycle();
       fetchMenstrualStats();
     }
+
+    await _loadDailyMoodStreak();
+  }
+
+  Future<void> _loadDailyMoodStreak() async {
+    final streakDays = await DailyMoodStreakService.fetchCurrentStreakDays();
+    coins.value = streakDays;
   }
 
   void _resetProfileState() {
@@ -279,6 +288,7 @@ class ProfileController extends GetxController {
 
     profileName.value = 'Seal';
     userGender.value = 'other';
+    coins.value = 0;
 
     predictionText.value = "";
     predictionConfidence.value = "";
@@ -1698,7 +1708,7 @@ class ProfilePage extends StatelessWidget {
               ),
               SizedBox(width: scale.rs(1, min: 1, max: 2)),
               Obx(() => Text(
-                    "${controller.coins}",
+                    "${controller.coins.value}",
                     style: TextStyle(
                       color: const Color(0xFF5D4037),
                       fontWeight: FontWeight.bold,

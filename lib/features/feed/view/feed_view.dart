@@ -365,10 +365,15 @@ class _FeedPageState extends State<FeedPage> {
                               bottom: scale.rs(120, min: 90, max: 120),
                             ),
                             itemCount: posts.isEmpty ? 2 : posts.length + 1,
-                            separatorBuilder: (context, index) => Divider(
-                              thickness: 1,
-                              color: Colors.grey.shade200,
-                            ),
+                            separatorBuilder: (context, index) {
+                              if (index == 0) {
+                                return const SizedBox.shrink();
+                              }
+                              return Divider(
+                                thickness: 1,
+                                color: Colors.grey.shade200,
+                              );
+                            },
                             itemBuilder: (context, index) {
                               if (index == 0) {
                                 return feedHeader;
@@ -1647,6 +1652,14 @@ class _FeedHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scale = context.responsive;
+    const shellBackground = Color(0xFFF4F9FF);
+    const shellBorder = Color(0xFFD8E8FA);
+    const inputBackground = Color(0xFFE8F1FB);
+    const placeholderColor = Color(0xFF7C9FC4);
+    const iconShellBackground = Colors.white;
+    const iconShellBorder = Color(0xFFD0E2F5);
+    const iconColor = Color(0xFF5E8FC5);
+
     return Column(
       children: [
         Padding(
@@ -1661,71 +1674,94 @@ class _FeedHeader extends StatelessWidget {
             ),
           ),
         ),
-        Divider(thickness: 1, color: Colors.grey.shade200),
         Material(
           color: Colors.white,
           child: Padding(
             padding: EdgeInsets.symmetric(
               horizontal: scale.rs(16, min: 12, max: 16),
-              vertical: scale.rs(10, min: 8, max: 10),
+              vertical: scale.rs(14, min: 10, max: 14),
             ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    borderRadius:
-                        BorderRadius.circular(scale.rs(18, min: 14, max: 18)),
-                    onTap: onComposerTap,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        vertical: scale.rs(4, min: 2, max: 4),
-                        horizontal: scale.rs(2, min: 1, max: 2),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: scale.rs(12, min: 9, max: 12),
+                vertical: scale.rs(10, min: 8, max: 10),
+              ),
+              decoration: BoxDecoration(
+                color: shellBackground,
+                borderRadius:
+                    BorderRadius.circular(scale.rs(22, min: 18, max: 22)),
+                border: Border.all(color: shellBorder),
+              ),
+              child: Row(
+                children: [
+                  _AuthorAvatar(
+                    name: 'คุณ',
+                    avatarUrl: composerAvatarUrl,
+                    radius: scale.rs(18, min: 15, max: 18),
+                  ),
+                  SizedBox(width: scale.rs(12, min: 9, max: 12)),
+                  Expanded(
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(
+                        scale.rs(18, min: 14, max: 18),
                       ),
-                      child: Row(
-                        children: [
-                          _AuthorAvatar(
-                            name: 'คุณ',
-                            avatarUrl: composerAvatarUrl,
-                            radius: scale.rs(20, min: 16, max: 20),
+                      onTap: onComposerTap,
+                      child: Container(
+                        height: scale.rs(46, min: 40, max: 46),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: scale.rs(18, min: 14, max: 18),
+                        ),
+                        alignment: Alignment.centerLeft,
+                        decoration: BoxDecoration(
+                          color: inputBackground,
+                          borderRadius: BorderRadius.circular(
+                            scale.rs(18, min: 14, max: 18),
                           ),
-                          SizedBox(width: scale.rs(15, min: 10, max: 15)),
-                          Expanded(
-                            child: Text(
-                              isLoadingComposer
-                                  ? 'กำลังโหลด...'
-                                  : 'คุณกำลังคิดอะไรอยู่.....',
-                              style: TextStyle(
-                                color: Colors.grey.shade400,
-                                fontSize: scale.rf(16, min: 14, max: 16),
-                              ),
-                            ),
+                        ),
+                        child: Text(
+                          isLoadingComposer
+                              ? 'กำลังโหลด...'
+                              : 'แชร์สิ่งที่คุณกำลังรู้สึก...',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: placeholderColor,
+                            fontSize: scale.rf(17, min: 14, max: 17),
+                            fontWeight: FontWeight.w600,
                           ),
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                SizedBox(width: scale.rs(6, min: 4, max: 6)),
-                InkWell(
-                  borderRadius:
-                      BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
-                  onTap: onImageTap,
-                  child: Padding(
-                    padding: EdgeInsets.all(scale.rs(6, min: 4, max: 6)),
-                    child: Image.asset(
-                      'assets/images/Picture.png',
-                      width: scale.rs(40, min: 32, max: 40),
-                      height: scale.rs(35, min: 28, max: 35),
-                      fit: BoxFit.contain,
-                      color: Colors.grey,
+                  SizedBox(width: scale.rs(10, min: 8, max: 10)),
+                  Material(
+                    color: iconShellBackground,
+                    shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(scale.rs(15, min: 12, max: 15)),
+                      side: const BorderSide(color: iconShellBorder),
+                    ),
+                    child: InkWell(
+                      borderRadius: BorderRadius.circular(
+                        scale.rs(15, min: 12, max: 15),
+                      ),
+                      onTap: onImageTap,
+                      child: SizedBox(
+                        width: scale.rs(44, min: 38, max: 44),
+                        height: scale.rs(44, min: 38, max: 44),
+                        child: Icon(
+                          Icons.image_outlined,
+                          size: scale.rs(24, min: 20, max: 24),
+                          color: iconColor,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-        Divider(thickness: 1, color: Colors.grey.shade200),
       ],
     );
   }
