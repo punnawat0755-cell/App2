@@ -32,48 +32,35 @@ class FavoritesController extends GetxController {
         return;
       }
 
-      final reactionRows = await _supabase
-          .from('post_reactions')
-          .select('post_id, created_at')
-          .eq('user_id', userId)
-          .eq('reaction', 'like')
-          .order('created_at', ascending: false);
+      final savedPostRows = await _supabase.rpc(
+        'get_saved_posts',
+        params: {
+          'p_limit': 300,
+          'p_offset': 0,
+        },
+      );
 
-      final postIds = <String>[];
-      final likedAtByPostId = <String, dynamic>{};
-      for (final row in reactionRows) {
-        final postId = row['post_id']?.toString() ?? '';
-        if (postId.isEmpty) {
-          continue;
-        }
-        if (postIds.contains(postId)) {
-          continue;
-        }
-        postIds.add(postId);
-        likedAtByPostId[postId] = row['created_at'];
-      }
-
-      if (postIds.isEmpty) {
+      if (savedPostRows is! List) {
         favoriteItems.clear();
         return;
       }
 
-      final postRows = await _supabase
-          .from('posts')
-          .select('*')
-          .inFilter('id', postIds)
-          .order('created_at', ascending: false);
+      final normalizedSavedRows = savedPostRows
+          .whereType<Map>()
+          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+          .toList()
+        ..sort(
+          (a, b) => _parseSavedAt(b).compareTo(_parseSavedAt(a)),
+        );
 
-      final postsById = <String, Map<String, dynamic>>{};
+      if (normalizedSavedRows.isEmpty) {
+        favoriteItems.clear();
+        return;
+      }
+
       final authorIds = <String>{};
-      for (final row in postRows) {
-        final map = Map<String, dynamic>.from(row);
-        final postId = map['id']?.toString() ?? '';
-        if (postId.isEmpty) {
-          continue;
-        }
-        postsById[postId] = map;
-        final authorId = map['user_id']?.toString() ?? '';
+      for (final postData in normalizedSavedRows) {
+        final authorId = postData['user_id']?.toString() ?? '';
         if (authorId.isNotEmpty) {
           authorIds.add(authorId);
         }
@@ -110,11 +97,13 @@ class FavoritesController extends GetxController {
       }
 
       final loadedItems = <Map<String, dynamic>>[];
-      for (final postId in postIds) {
-        final postData = postsById[postId];
-        if (postData == null) {
+      final seenPostIds = <String>{};
+      for (final postData in normalizedSavedRows) {
+        final postId = _extractPostId(postData);
+        if (postId.isEmpty || seenPostIds.contains(postId)) {
           continue;
         }
+        seenPostIds.add(postId);
 
         final authorId = postData['user_id']?.toString() ?? '';
         final postTitle = (authorNameById[authorId] ?? '').trim();
@@ -125,8 +114,7 @@ class FavoritesController extends GetxController {
 
         loadedItems.add({
           'post_id': postId,
-          'date':
-              _formatDate(likedAtByPostId[postId] ?? postData['created_at']),
+          'date': _formatDate(_savedAtValue(postData)),
           'title': postTitle.isNotEmpty
               ? postTitle
               : (fallbackTitle.isNotEmpty ? fallbackTitle : 'โพสต์'),
@@ -175,6 +163,43 @@ class FavoritesController extends GetxController {
     }
 
     return '-';
+  }
+
+  dynamic _savedAtValue(Map<String, dynamic> row) {
+    return row['saved_at'] ?? row['updated_at'] ?? row['created_at'];
+  }
+
+  String _extractPostId(Map<String, dynamic> row) {
+    final candidates = <dynamic>[
+      row['id'],
+      row['post_id'],
+      row['saved_post_id'],
+      row['user_saved_posts'],
+    ];
+    for (final candidate in candidates) {
+      if (candidate is List) {
+        for (final item in candidate) {
+          final postId = item?.toString().trim() ?? '';
+          if (postId.isNotEmpty) {
+            return postId;
+          }
+        }
+        continue;
+      }
+      final postId = candidate?.toString().trim() ?? '';
+      if (postId.isNotEmpty) {
+        return postId;
+      }
+    }
+    return '';
+  }
+
+  DateTime _parseSavedAt(Map<String, dynamic> row) {
+    final raw = _savedAtValue(row);
+    if (raw is String) {
+      return DateTime.tryParse(raw) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 }
 

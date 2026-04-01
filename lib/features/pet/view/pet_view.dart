@@ -1,9 +1,12 @@
 import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+
 import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/shop/view/shop_view.dart';
-import 'package:get/get.dart';
 
 // ==========================================
 // 1. Class Pet (Logic Controller) - แก้ไขแล้ว
@@ -27,10 +30,9 @@ class Pet extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _coinService =
-        Get.isRegistered<CoinService>()
-            ? Get.find<CoinService>()
-            : Get.put(CoinService(), permanent: true);
+    _coinService = Get.isRegistered<CoinService>()
+        ? Get.find<CoinService>()
+        : Get.put(CoinService(), permanent: true);
   }
 
   @override
@@ -161,13 +163,41 @@ class Pet extends GetxController {
 // ==========================================
 // 2. ส่วนหน้าจอ (UI View)
 // ==========================================
-class PetPage extends StatelessWidget {
+class PetPage extends StatefulWidget {
   const PetPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final Pet controller = Get.put(Pet());
+  State<PetPage> createState() => _PetPageState();
+}
 
+class _PetPageState extends State<PetPage> {
+  late final Pet controller;
+  late final AudioPlayer _audioPlayer;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.isRegistered<Pet>() ? Get.find<Pet>() : Get.put(Pet());
+    _audioPlayer = AudioPlayer();
+    unawaited(_playEntrySound());
+  }
+
+  Future<void> _playEntrySound() async {
+    try {
+      await _audioPlayer.play(AssetSource('Sound/Wave.mp3'));
+    } catch (e) {
+      debugPrint('Failed to play pet entry sound: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [

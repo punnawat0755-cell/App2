@@ -74,6 +74,61 @@ class FeedRepository {
         );
   }
 
+  Future<List<Map<String, dynamic>>> getSavedPosts({
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    _requireUser();
+
+    final response = await _client.rpc(
+      'get_saved_posts',
+      params: {
+        'p_limit': limit,
+        'p_offset': offset,
+      },
+    );
+
+    if (response is! List) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    return response
+        .whereType<Map>()
+        .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+
+  Future<Set<String>> getSavedPostIds({
+    int limit = 300,
+    int offset = 0,
+  }) async {
+    final rows = await getSavedPosts(limit: limit, offset: offset);
+    return rows
+        .map(_extractSavedPostId)
+        .where((postId) => postId.isNotEmpty)
+        .toSet();
+  }
+
+  Future<void> savePost(String postId) async {
+    _requireUser();
+    await _client.rpc(
+      'save_post',
+      params: {
+        'p_post_id': postId,
+      },
+    );
+  }
+
+  Future<void> unsavePost(String postId) async {
+    _requireUser();
+    await _client.rpc(
+      'unsave_post',
+      params: {
+        'p_post_id': postId,
+      },
+    );
+  }
+
   Stream<List<FeedComment>> watchCommentsByPost(String postId) {
     if (postId.trim().isEmpty) {
       return Stream<List<FeedComment>>.value(const <FeedComment>[]);
@@ -746,6 +801,33 @@ class FeedRepository {
     } catch (_) {
       // Ignore cleanup failures to avoid masking the main action result.
     }
+  }
+
+  String _extractSavedPostId(Map<String, dynamic> row) {
+    final candidates = <dynamic>[
+      row['id'],
+      row['post_id'],
+      row['saved_post_id'],
+      row['user_saved_posts'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate is List) {
+        for (final item in candidate) {
+          final postId = item?.toString().trim() ?? '';
+          if (postId.isNotEmpty) {
+            return postId;
+          }
+        }
+        continue;
+      }
+      final postId = candidate?.toString().trim() ?? '';
+      if (postId.isNotEmpty) {
+        return postId;
+      }
+    }
+
+    return '';
   }
 
   String _resolveImageExtension(String? imageFileName) {

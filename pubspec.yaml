@@ -27,6 +27,7 @@ dependencies:
   google_fonts: ^8.0.1
   cloud_firestore: ^6.1.2
   get_storage: ^2.1.1
+  audioplayers: ^6.5.0
   intl: ^0.20.2
   dio: ^5.9.0
   curved_navigation_bar: ^1.0.6
@@ -54,3 +55,4 @@ flutter:
     - .env
     - assets/images/
     - assets/images/profile_avatars/
+    - assets/Sound/

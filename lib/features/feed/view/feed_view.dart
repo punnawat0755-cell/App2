@@ -37,6 +37,8 @@ class _FeedPageState extends State<FeedPage> {
   final Map<String, GlobalKey> _postItemKeys = <String, GlobalKey>{};
   late final Stream<List<FeedPost>> _postsStream;
   late final Stream<Set<String>> _likedPostIdsStream;
+  Set<String> _savedPostIds = <String>{};
+  bool _isLoadingSavedPostIds = false;
 
   String _composerName = 'คุณ';
   String _composerAvatarUrl = ProfileAvatarCatalog.defaultAvatar;
@@ -54,6 +56,7 @@ class _FeedPageState extends State<FeedPage> {
     _likedPostIdsStream = _currentUser == null
         ? Stream<Set<String>>.value(const <String>{})
         : _repository.watchLikedPostIds(_currentUser.id);
+    unawaited(_loadSavedPostIds());
     _loadComposerIdentity();
   }
 
@@ -173,7 +176,57 @@ class _FeedPageState extends State<FeedPage> {
 
   Future<void> _refreshFeed() async {
     await _loadComposerIdentity();
+    await _loadSavedPostIds();
     await Future<void>.delayed(const Duration(milliseconds: 300));
+  }
+
+  Future<void> _loadSavedPostIds() async {
+    if (_currentUser == null || _isLoadingSavedPostIds) {
+      return;
+    }
+
+    _isLoadingSavedPostIds = true;
+    try {
+      final postIds = await _repository.getSavedPostIds(limit: 400, offset: 0);
+      if (!mounted) return;
+      setState(() {
+        _savedPostIds = postIds;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      _showSnackBar('โหลดรายการบันทึกไม่สำเร็จ: $error', isError: true);
+    } finally {
+      _isLoadingSavedPostIds = false;
+    }
+  }
+
+  Future<void> _toggleSavedPost(FeedPost post, bool isSaved) async {
+    final previousSavedPostIds = _savedPostIds;
+    final nextSavedPostIds = Set<String>.from(_savedPostIds);
+    if (isSaved) {
+      nextSavedPostIds.remove(post.id);
+    } else {
+      nextSavedPostIds.add(post.id);
+    }
+
+    setState(() {
+      _savedPostIds = nextSavedPostIds;
+    });
+
+    try {
+      if (isSaved) {
+        await _repository.unsavePost(post.id);
+      } else {
+        await _repository.savePost(post.id);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _savedPostIds = previousSavedPostIds;
+      });
+      _showSnackBar('อัปเดตการบันทึกไม่สำเร็จ: $error', isError: true);
+      rethrow;
+    }
   }
 
   void _showSnackBar(String text, {bool isError = false}) {
@@ -417,11 +470,16 @@ class _FeedPageState extends State<FeedPage> {
                                     key: ValueKey(post.id),
                                     post: post,
                                     isLiked: isLiked,
+                                    isSaved: _savedPostIds.contains(post.id),
                                     onAuthorTap: () => _openAuthorProfile(post),
                                     onToggleLike:
                                         _repository.supportsLikeActions
                                             ? () => _toggleLike(post, isLiked)
                                             : null,
+                                    onToggleSaved: () => _toggleSavedPost(
+                                      post,
+                                      _savedPostIds.contains(post.id),
+                                    ),
                                     onDelete: post.authorId == currentUser.id
                                         ? () => _deletePost(post)
                                         : null,
@@ -693,6 +751,7 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
   bool _isPickingImage = false;
   Uint8List? _selectedImageBytes;
   String? _selectedImageName;
+  String? _composerAlertMessage;
 
   String _messageForModerationReason(String reason) {
     final normalizedReason = reason.toLowerCase();
@@ -700,6 +759,17 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       return 'ระบบตรวจพบว่าโพสต์นี้ไม่เหมาะสม จึงไม่อนุญาตให้เผยแพร่';
     }
     return 'ไม่สามารถโพสต์ข้อความนี้ได้ เนื่องจากผลคำไม่เหมาะสม';
+  }
+
+  void _showComposerAlert(String message) {
+    setState(() => _composerAlertMessage = message);
+  }
+
+  void _clearComposerAlert() {
+    if (_composerAlertMessage == null) {
+      return;
+    }
+    setState(() => _composerAlertMessage = null);
   }
 
   @override
@@ -780,27 +850,18 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       if (!mounted) return;
 
       if (imageBytes.lengthInBytes > _maxImageBytes) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('รูปใหญ่เกินไป กรุณาเลือกรูปที่ไม่เกิน 8 MB'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showComposerAlert('รูปใหญ่เกินไป กรุณาเลือกรูปที่ไม่เกิน 8 MB');
         return;
       }
 
       setState(() {
         _selectedImageBytes = imageBytes;
         _selectedImageName = selectedImage.name;
+        _composerAlertMessage = null;
       });
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('เลือกรูปไม่สำเร็จ: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showComposerAlert('เลือกรูปไม่สำเร็จ: $error');
     } finally {
       if (mounted) {
         setState(() => _isPickingImage = false);
@@ -826,6 +887,7 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
     setState(() {
       _selectedImageBytes = null;
       _selectedImageName = null;
+      _composerAlertMessage = null;
     });
   }
 
@@ -861,28 +923,30 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       return;
     }
 
-    setState(() => _isSubmitting = true);
+    setState(() {
+      _isSubmitting = true;
+      _composerAlertMessage = null;
+    });
     try {
-      // PRE-POST MODERATION HOOK: block submission unless webhook allows it.
-      final moderationResult = await _postModerationService.moderateImage(
-        userId: supabase.auth.currentUser?.id ?? '',
-        caption: content,
-        imageUrls: const <String>[],
-        imageNotes: _buildImageNotes(
+      // PRE-POST MODERATION HOOK: moderate only when image binary is present.
+      if (hasSelectedImage) {
+        final moderationResult = await _postModerationService.moderateImage(
+          userId: supabase.auth.currentUser?.id ?? '',
           caption: content,
-          hasSelectedImage: hasSelectedImage,
-        ),
-      );
-      if (!mounted) return;
-      if (moderationResult.allowed != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(moderationResult.summary),
-            backgroundColor: Colors.red,
+          imageBytes: _selectedImageBytes!,
+          imageFileName: _selectedImageName ?? 'image.jpg',
+          imageUrls: const <String>[],
+          imageNotes: _buildImageNotes(
+            caption: content,
+            hasSelectedImage: hasSelectedImage,
           ),
         );
-        setState(() => _isSubmitting = false);
-        return;
+        if (!mounted) return;
+        if (moderationResult.allowed != true) {
+          _showComposerAlert(moderationResult.summary);
+          setState(() => _isSubmitting = false);
+          return;
+        }
       }
 
       await widget.repository.createPost(
@@ -895,41 +959,21 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
       Navigator.of(context).pop(true);
     } on ContentModerationBlockedException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_messageForModerationReason(error.reason)),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showComposerAlert(_messageForModerationReason(error.reason));
       setState(() => _isSubmitting = false);
     } on FeedImageBucketNotFoundException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'ยังไม่พบ Supabase Storage bucket ชื่อ ${error.bucketName} กรุณาตรวจชื่อ bucket หรือสร้าง bucket นี้เป็น Public',
-          ),
-          backgroundColor: Colors.red,
-        ),
+      _showComposerAlert(
+        'ยังไม่พบ Supabase Storage bucket ชื่อ ${error.bucketName} กรุณาตรวจชื่อ bucket หรือสร้าง bucket นี้เป็น Public',
       );
       setState(() => _isSubmitting = false);
     } on AuthException catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(error.message),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showComposerAlert(error.message);
       setState(() => _isSubmitting = false);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('สร้างโพสต์ไม่สำเร็จ: $error'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showComposerAlert('สร้างโพสต์ไม่สำเร็จ: $error');
       setState(() => _isSubmitting = false);
     }
   }
@@ -1010,6 +1054,58 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                     ),
                   ),
                   Divider(height: 1, thickness: 1, color: Colors.grey[200]),
+                  if ((_composerAlertMessage ?? '').isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(
+                        scale.rs(14, min: 10, max: 14),
+                        scale.rs(10, min: 8, max: 10),
+                        scale.rs(14, min: 10, max: 14),
+                        scale.rs(6, min: 4, max: 6),
+                      ),
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: scale.rs(12, min: 10, max: 12),
+                          vertical: scale.rs(10, min: 8, max: 10),
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F3),
+                          borderRadius: BorderRadius.circular(
+                            scale.rs(14, min: 12, max: 14),
+                          ),
+                          border: Border.all(
+                            color: const Color(0xFFF4B8C0),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.only(
+                                top: scale.rs(1, min: 0, max: 1),
+                              ),
+                              child: Icon(
+                                Icons.error_outline_rounded,
+                                color: const Color(0xFFE53955),
+                                size: scale.rs(20, min: 18, max: 20),
+                              ),
+                            ),
+                            SizedBox(width: scale.rs(8, min: 6, max: 8)),
+                            Expanded(
+                              child: Text(
+                                _composerAlertMessage!,
+                                style: TextStyle(
+                                  color: const Color(0xFFD8354A),
+                                  fontSize: scale.rf(14, min: 12.5, max: 14),
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   Padding(
                     padding: EdgeInsets.symmetric(
                       horizontal: scale.rs(10, min: 8, max: 10),
@@ -1077,7 +1173,13 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                                 border: InputBorder.none,
                                 counterText: '',
                               ),
-                              onChanged: (_) => setState(() {}),
+                              onChanged: (_) {
+                                if (_composerAlertMessage != null) {
+                                  _clearComposerAlert();
+                                  return;
+                                }
+                                setState(() {});
+                              },
                             ),
                           ),
                           if (hasSelectedImage) ...[
@@ -1807,14 +1909,18 @@ class FeedPostCard extends StatefulWidget {
     super.key,
     required this.post,
     required this.isLiked,
+    this.isSaved = false,
     required this.onToggleLike,
+    this.onToggleSaved,
     required this.onAuthorTap,
     this.onDelete,
   });
 
   final FeedPost post;
   final bool isLiked;
+  final bool isSaved;
   final Future<void> Function()? onToggleLike;
+  final Future<void> Function()? onToggleSaved;
   final VoidCallback? onAuthorTap;
   final VoidCallback? onDelete;
 
@@ -1829,7 +1935,8 @@ class _FeedPostCardState extends State<FeedPostCard> {
   late bool _displayIsLiked;
   late int _displayLikeCount;
   bool _isUpdatingLike = false;
-  bool _isSaved = false;
+  late bool _displayIsSaved;
+  bool _isUpdatingSaved = false;
 
   String _formatRelativeTime(DateTime createdAt) {
     final now = DateTime.now();
@@ -1868,6 +1975,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
     super.initState();
     _displayIsLiked = widget.isLiked;
     _displayLikeCount = widget.post.likeCount;
+    _displayIsSaved = widget.isSaved;
   }
 
   @override
@@ -1878,6 +1986,9 @@ class _FeedPostCardState extends State<FeedPostCard> {
     }
     if (widget.post.likeCount != oldWidget.post.likeCount) {
       _displayLikeCount = widget.post.likeCount;
+    }
+    if (widget.isSaved != oldWidget.isSaved) {
+      _displayIsSaved = widget.isSaved;
     }
   }
 
@@ -1911,6 +2022,32 @@ class _FeedPostCardState extends State<FeedPostCard> {
     } finally {
       if (mounted) {
         setState(() => _isUpdatingLike = false);
+      }
+    }
+  }
+
+  Future<void> _handleToggleSaved() async {
+    final onToggleSaved = widget.onToggleSaved;
+    if (onToggleSaved == null || _isUpdatingSaved) {
+      return;
+    }
+
+    final previousIsSaved = _displayIsSaved;
+    setState(() {
+      _displayIsSaved = !previousIsSaved;
+      _isUpdatingSaved = true;
+    });
+
+    try {
+      await onToggleSaved();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _displayIsSaved = previousIsSaved;
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isUpdatingSaved = false);
       }
     }
   }
@@ -2178,21 +2315,21 @@ class _FeedPostCardState extends State<FeedPostCard> {
               const Spacer(),
               InkWell(
                 borderRadius: BorderRadius.circular(999),
-                onTap: () => setState(() => _isSaved = !_isSaved),
+                onTap: _handleToggleSaved,
                 child: Container(
                   width: scale.rs(34, min: 30, max: 34),
                   height: scale.rs(34, min: 30, max: 34),
                   decoration: BoxDecoration(
-                    color: _isSaved
+                    color: _displayIsSaved
                         ? _accent.withValues(alpha: 0.12)
                         : const Color(0xFFF3F5FA),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    _isSaved
+                    _displayIsSaved
                         ? Icons.bookmark_rounded
                         : Icons.bookmark_border_rounded,
-                    color: _isSaved ? _accent : const Color(0xFF7B859B),
+                    color: _displayIsSaved ? _accent : const Color(0xFF7B859B),
                     size: scale.rs(20, min: 18, max: 20),
                   ),
                 ),
