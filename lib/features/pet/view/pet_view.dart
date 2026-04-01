@@ -179,19 +179,21 @@ class _PetPageState extends State<PetPage> {
     super.initState();
     controller = Get.isRegistered<Pet>() ? Get.find<Pet>() : Get.put(Pet());
     _audioPlayer = AudioPlayer();
-    unawaited(_playEntrySound());
+    unawaited(_startLoopSound());
   }
 
-  Future<void> _playEntrySound() async {
+  Future<void> _startLoopSound() async {
     try {
-      await _audioPlayer.play(AssetSource('Sound/Wave.mp3'));
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(AssetSource('Sound/howareyou.mp3'));
     } catch (e) {
-      debugPrint('Failed to play pet entry sound: $e');
+      debugPrint('Failed to play looping pet sound: $e');
     }
   }
 
   @override
   void dispose() {
+    unawaited(_audioPlayer.stop());
     _audioPlayer.dispose();
     super.dispose();
   }
