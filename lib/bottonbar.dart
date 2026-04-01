@@ -29,7 +29,7 @@ class BottomNavController extends GetxController {
     // Signup(),
     // LoginPagetwo(),
     // QuizScreen(),
-    CoinRewardScreen(),
+    // CoinRewardScreen(),
     MoodTestScreen(),
     HomePage(),
     // Encouragement(),

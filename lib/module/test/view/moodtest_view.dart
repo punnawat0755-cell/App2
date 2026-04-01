@@ -178,10 +178,14 @@ class MoodTestController extends GetxController {
 
       if (currentStep.value > totalSteps) {
         // 💡 เมื่อ currentStep = 6 (วาฬชนหีบแล้ว)
-        print("=== ถึงหีบสมบัติแล้ว! จบแบบทดสอบ ===");
 
-        // 🚀 สั่งให้เปลี่ยนหน้าไปหน้ารับเหรียญ (ใช้ Get.off เพื่อไม่ให้กดย้อนกลับมาหน้าทำแบบทดสอบได้)
-        Get.off(() => const CoinRewardScreen());
+        Get.off(
+          () => const CoinRewardScreen(),
+          transition: Transition
+              .cupertino, // 💡 ใช้สไตล์สไลด์แบบ iOS (สมูทมากและภาพไม่จาง)
+          duration: const Duration(milliseconds: 600),
+          curve: Curves.easeOutQuart,
+        );
       } else {
         isProcessing.value = false;
       }
@@ -189,7 +193,6 @@ class MoodTestController extends GetxController {
   }
 
   void skipTest() {
-    print("ผู้ใช้กดข้ามแบบประเมิน");
     Get.to(() => HomePage());
   }
 }
@@ -212,17 +215,24 @@ class MoodTestScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 💡 1. ดึงขนาดหน้าจอมาเพื่อทำ Responsive
     final screenHeight = MediaQuery.of(context).size.height;
-    final questionFontSize = screenHeight < 760 ? 20.0 : 20.0;
-    final topQuestionSpacing = screenHeight < 760 ? 26.0 : 36.0;
-    final questionOptionsSpacing = screenHeight < 760 ? 18.0 : 28.0;
-    final bottomSpacing = screenHeight < 760 ? 8.0 : 12.0;
+    final isSmallScreen = screenHeight < 760;
+
+    // 💡 2. ปรับตัวแปรต่างๆ ให้ยืดหยุ่นตามหน้าจอ
+    final questionFontSize = isSmallScreen ? 18.0 : 20.0;
+    final topQuestionSpacing = isSmallScreen ? 16.0 : 36.0;
+    final questionOptionsSpacing = isSmallScreen ? 16.0 : 28.0;
+    final verticalPaddingMain = isSmallScreen ? 10.0 : 14.0;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          padding: EdgeInsets.symmetric(
+            horizontal: 24,
+            vertical: verticalPaddingMain,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -267,7 +277,10 @@ class MoodTestScreen extends StatelessWidget {
                   List<dynamic> currentOptions =
                       controller.assessmentData[safeIndex]["options"];
 
-                  final gap = currentOptions.length >= 4 ? 10.0 : 14.0;
+                  // 💡 ลดระยะห่างระหว่างปุ่มถ้าจอเล็ก
+                  final gap = isSmallScreen
+                      ? (currentOptions.length >= 4 ? 6.0 : 10.0)
+                      : (currentOptions.length >= 4 ? 10.0 : 14.0);
 
                   return Column(
                     children: List.generate(currentOptions.length, (index) {
@@ -284,13 +297,13 @@ class MoodTestScreen extends StatelessWidget {
                           child: _buildMoodOption(
                             index: index,
                             iconStr: option['icon'] ?? '',
-                            localIconStr:
-                                option['localIcon'] ??
-                                '', // 💡 แก้ไขให้ส่ง parameter ตรงนี้แล้ว
+                            localIconStr: option['localIcon'] ?? '',
                             text: option['text'] ?? '',
                             score: option['score'] ?? 0,
                             isSelected: isSelected,
                             optionCount: currentOptions.length,
+                            isSmallScreen:
+                                isSmallScreen, // ส่ง isSmallScreen เข้าไปคำนวณในฟังก์ชันปุ่ม
                           ),
                         ),
                       );
@@ -325,7 +338,6 @@ class MoodTestScreen extends StatelessWidget {
                   ),
                 ),
               ),
-              // SizedBox(height: 0),
             ],
           ),
         ),
@@ -354,23 +366,22 @@ class MoodTestScreen extends StatelessWidget {
             const double whaleWidth = 55.0;
             const double whaleLeftPadding = 8.0;
             final double trackHeight = outerHeight - (trackInset * 2);
-            final double trackWidth = maxWidth - (trackInset * 2);
 
-            // ตำแหน่งหยุดของน้องวาฬให้เหลือพื้นที่สำหรับหีบด้านขวา
+            // 1. คำนวณตำแหน่งซ้ายสุดของน้องวาฬก่อน
             final double maxWhaleLeft = maxWidth - chestWidth - whaleWidth;
             final double whaleLeft =
                 whaleLeftPadding +
                 ((maxWhaleLeft - whaleLeftPadding) * percent);
 
-            // ให้แถบสีฟ้าวิ่งไปเกือบสุดถึงหีบเหมือนภาพตัวอย่าง
-            final double fillWidth = (trackWidth * percent).clamp(
-              28.0,
-              trackWidth - 10,
-            );
+            // 💡 2. แก้ปัญหาหลอดสีฟ้าทะลุหน้า: ผูกความยาวหลอดเข้ากับตัวปลาวาฬเลย!
+            // เอาตำแหน่งปลาวาฬ + ครึ่งนึงของความกว้างปลาวาฬ (whaleWidth * 0.5)
+            // ทำให้ปลายหลอดสีฟ้า ซ่อนอยู่หลังช่วงกลางลำตัวปลาวาฬตลอดเวลา
+            final double fillWidth = whaleLeft + (whaleWidth * 0.5);
 
             return Stack(
               clipBehavior: Clip.none,
               children: [
+                // เลเยอร์ 1: พื้นหลังหลอด + เส้นขอบสีขาว (รวมร่างกันจะได้ไม่ทับวาฬ)
                 Positioned(
                   top: 7,
                   left: 0,
@@ -380,16 +391,22 @@ class MoodTestScreen extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: progressBarBgColor,
                       borderRadius: BorderRadius.circular(22),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.6),
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),
+
+                // เลเยอร์ 2: หลอดสีฟ้าเข้มที่ใช้วิ่ง
                 Positioned(
                   top: 7 + trackInset,
                   left: trackInset,
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 350),
                     curve: Curves.easeOutCubic,
-                    width: fillWidth,
+                    width: fillWidth, // 💡 ใช้สมการใหม่ที่ผูกกับตัววาฬ
                     height: trackHeight,
                     decoration: BoxDecoration(
                       color: progressBarFillColor,
@@ -398,6 +415,7 @@ class MoodTestScreen extends StatelessWidget {
                   ),
                 ),
 
+                // เลเยอร์ 3: หีบสมบัติ
                 Positioned(
                   right: 6,
                   top: 0,
@@ -411,6 +429,7 @@ class MoodTestScreen extends StatelessWidget {
                   ),
                 ),
 
+                // เลเยอร์ 4: น้องวาฬ (อยู่บนสุดของ Stack จะได้ทับหลอดสีฟ้ามิดชิด)
                 Positioned(
                   left: whaleLeft,
                   top: 1,
@@ -427,24 +446,6 @@ class MoodTestScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-
-                Positioned(
-                  top: 7,
-                  left: 0,
-                  right: 0,
-                  child: IgnorePointer(
-                    child: Container(
-                      height: outerHeight,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(22),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.45),
-                          width: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
               ],
             );
           },
@@ -454,6 +455,7 @@ class MoodTestScreen extends StatelessWidget {
   }
 
   // --- Widget ย่อย: ปุ่มเลือกอารมณ์ ---
+  // 💡 รับค่า isSmallScreen เข้ามาเพื่อปรับแต่ง UI ด้านใน
   Widget _buildMoodOption({
     required int index,
     required String iconStr,
@@ -462,13 +464,22 @@ class MoodTestScreen extends StatelessWidget {
     required int score,
     required bool isSelected,
     required int optionCount,
+    required bool isSmallScreen,
   }) {
     final bool isDenseLayout = optionCount >= 4;
-    final double verticalPadding = isDenseLayout ? 10 : 14;
-    final double horizontalPadding = isDenseLayout ? 12 : 14;
-    final double iconHeight = isDenseLayout ? 50 : 38;
-    final double textFontSize = isDenseLayout ? 14 : 15;
-    final double spacing = isDenseLayout ? 6 : 8;
+
+    // 💡 ปรับขนาดต่างๆ ตามหน้าจอ
+    final double verticalPadding = isSmallScreen
+        ? (isDenseLayout ? 6 : 10)
+        : (isDenseLayout ? 10 : 14);
+    final double horizontalPadding = isSmallScreen
+        ? 10
+        : (isDenseLayout ? 12 : 14);
+    final double iconHeight = isSmallScreen
+        ? (isDenseLayout ? 35 : 45)
+        : (isDenseLayout ? 45 : 55);
+    final double textFontSize = isSmallScreen ? 14 : 16;
+    final double spacing = isSmallScreen ? 4 : (isDenseLayout ? 6 : 8);
 
     return GestureDetector(
       onTap: () => controller.selectOption(index, score, text),
@@ -505,12 +516,14 @@ class MoodTestScreen extends StatelessWidget {
               text,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 16,
+                fontSize: textFontSize,
                 fontWeight: FontWeight.bold,
                 color: mainTextColor,
                 height: 1.2,
               ),
-              maxLines: isDenseLayout ? 3 : 4,
+              maxLines: isDenseLayout
+                  ? 2
+                  : 3, // ถ้าข้อเยอะให้บังคับแสดงแค่ 2 บรรทัด
               overflow: TextOverflow.ellipsis,
             ),
           ],
