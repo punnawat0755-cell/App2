@@ -24,7 +24,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AppEnv.load();
 
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
@@ -45,7 +44,8 @@ Future<void> main() async {
 
   if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
     throw StateError(
-      'Missing Supabase config. Add SUPABASE_URL and SUPABASE_ANON_KEY to .env.',
+      'Missing Supabase config. Pass SUPABASE_URL and SUPABASE_ANON_KEY via '
+      '--dart-define or --dart-define-from-file.',
     );
   }
 

@@ -31,6 +31,16 @@ class FeedDeleteService {
     }
 
     final media = detail.media;
+    final deletedRows = await _client
+        .from(_postsTable)
+        .delete()
+        .eq('id', normalizedPostId)
+        .eq('user_id', user.id)
+        .select('id');
+    if ((deletedRows as List<dynamic>).isEmpty) {
+      throw const FeedPostUnavailableException();
+    }
+
     if (media.isNotEmpty) {
       final storagePathsByBucket = <String, List<String>>{};
       for (final item in media) {
@@ -53,12 +63,6 @@ class FeedDeleteService {
         }
       }
     }
-
-    await _client
-        .from(_postsTable)
-        .delete()
-        .eq('id', normalizedPostId)
-        .eq('user_id', user.id);
   }
 
   Future<_PostDeleteDetail?> _loadPostDetailWithMedia({

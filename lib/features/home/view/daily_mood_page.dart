@@ -230,11 +230,32 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   }
 
   Future<void> _refreshCoinsIfNeeded() async {
-    final coinService =
-        Get.isRegistered<CoinService>()
-            ? Get.find<CoinService>()
-            : Get.put(CoinService(), permanent: true);
+    final coinService = Get.isRegistered<CoinService>()
+        ? Get.find<CoinService>()
+        : Get.put(CoinService(), permanent: true);
     await coinService.loadCoins();
+  }
+
+  Future<void> _awardEncouragementCoinsIfNeeded() async {
+    if (!_isLoggedIn) return;
+
+    final healingQuote = _healingCtrl.text.trim();
+    if (healingQuote.isEmpty) return;
+
+    final userId = _sb.auth.currentUser?.id;
+    if (userId == null || userId.isEmpty) return;
+
+    final coinService = Get.isRegistered<CoinService>()
+        ? Get.find<CoinService>()
+        : Get.put(CoinService(), permanent: true);
+
+    final todayKey = DailyMoodStatusService.todayAsKey();
+    await coinService.awardCoins(
+      amount: 2,
+      reason: 'daily_mood_healing_quote',
+      dedupeKey: 'daily_mood_healing_quote:$userId:$todayKey',
+      refType: 'daily_mood',
+    );
   }
 
   // ---------- Supabase ----------
@@ -335,6 +356,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
           emotions: _selectedTags,
           healingQuote: _healingCtrl.text,
         );
+        await _awardEncouragementCoinsIfNeeded();
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(

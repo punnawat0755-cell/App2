@@ -201,9 +201,9 @@ class FeedRepository {
         content: safeText,
       );
       createdPostId = postId;
-      await _rewardPostCreated(postId);
 
       if (!hasImage) {
+        await _rewardPostCreated(postId);
         await _refreshCoins();
         return;
       }
@@ -224,6 +224,7 @@ class FeedRepository {
             ),
         fileSizeBytes: selectedImageBytes.lengthInBytes,
       );
+      await _rewardPostCreated(postId);
       await _refreshCoins();
     } catch (error) {
       if (uploadedImagePath != null) {
@@ -538,12 +539,21 @@ class FeedRepository {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _loadPostRows({String? authorId}) async {
+    var query = _client.from(_postsTable).select('*');
+    if (authorId != null && authorId.isNotEmpty) {
+      query = query.eq('user_id', authorId);
+    }
+
+    final rows = await query.order('created_at', ascending: false);
+    return rows
+        .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+        .toList();
+  }
+
   Stream<List<FeedPost>> _watchMappedPosts({String? authorId}) {
     late final StreamController<List<FeedPost>> controller;
     StreamSubscription<List<Map<String, dynamic>>>? postsSubscription;
-    StreamSubscription<List<Map<String, dynamic>>>? mediaSubscription;
-    StreamSubscription<List<Map<String, dynamic>>>? likesSubscription;
-    StreamSubscription<List<Map<String, dynamic>>>? commentsSubscription;
 
     List<Map<String, dynamic>> latestPostRows = const [];
     var hasLoadedPosts = false;
@@ -560,6 +570,22 @@ class FeedRepository {
       }
     }
 
+    Future<void> refreshPostsFromQuery({bool reportErrors = false}) async {
+      try {
+        final rows = await _loadPostRows(authorId: authorId);
+        if (controller.isClosed) {
+          return;
+        }
+        latestPostRows = rows;
+        hasLoadedPosts = true;
+        await emitMappedPosts();
+      } catch (error, stackTrace) {
+        if (reportErrors && !controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      }
+    }
+
     controller = StreamController<List<FeedPost>>(
       onListen: () {
         void onPosts(List<Map<String, dynamic>> rows) {
@@ -572,6 +598,8 @@ class FeedRepository {
           unawaited(emitMappedPosts());
         }
 
+        unawaited(refreshPostsFromQuery(reportErrors: true));
+
         if (authorId != null && authorId.isNotEmpty) {
           postsSubscription = _client
               .from(_postsTable)
@@ -580,7 +608,7 @@ class FeedRepository {
               .order('created_at', ascending: false)
               .listen(
                 onPosts,
-                onError: controller.addError,
+                onError: (_, __) => unawaited(refreshPostsFromQuery()),
               );
         } else {
           postsSubscription = _client
@@ -589,36 +617,13 @@ class FeedRepository {
               .order('created_at', ascending: false)
               .listen(
                 onPosts,
-                onError: controller.addError,
+                onError: (_, __) => unawaited(refreshPostsFromQuery()),
               );
         }
 
-        mediaSubscription = _client
-            .from(_postMediaTable)
-            .stream(primaryKey: const ['post_id', 'storage_path']).listen(
-          (_) => unawaited(emitMappedPosts()),
-          onError: (_, __) {},
-        );
-
-        likesSubscription = _client
-            .from(_postLikesTable)
-            .stream(primaryKey: const ['post_id', 'user_id']).listen(
-          (_) => unawaited(emitMappedPosts()),
-          onError: (_, __) {},
-        );
-
-        commentsSubscription = _client
-            .from(_postCommentsTable)
-            .stream(primaryKey: const ['id']).listen(
-          (_) => unawaited(emitMappedPosts()),
-          onError: (_, __) {},
-        );
       },
       onCancel: () async {
         await postsSubscription?.cancel();
-        await mediaSubscription?.cancel();
-        await likesSubscription?.cancel();
-        await commentsSubscription?.cancel();
       },
     );
 

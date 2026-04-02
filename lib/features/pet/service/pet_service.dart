@@ -52,17 +52,11 @@ class PetService {
     try {
       final savedToTable = await _saveStateToTable(user.id, normalized);
       if (!savedToTable) {
-        final currentMetadata = Map<String, dynamic>.from(
-          user.userMetadata ?? const <String, dynamic>{},
-        );
-        currentMetadata['pet_state'] = normalized.toMap();
-
-        await supabaseClient.auth.updateUser(
-          UserAttributes(data: currentMetadata),
-        );
+        await _saveStateToMetadata(user, normalized);
       }
     } catch (error) {
       debugPrint('PetService.saveState error: $error');
+      rethrow;
     }
 
     _cachedState = normalized;
@@ -162,6 +156,17 @@ class PetService {
       debugPrint('PetService._saveStateToTable error: $error');
       return false;
     }
+  }
+
+  Future<void> _saveStateToMetadata(User user, PetState state) async {
+    final currentMetadata = Map<String, dynamic>.from(
+      user.userMetadata ?? const <String, dynamic>{},
+    );
+    currentMetadata['pet_state'] = state.toMap();
+
+    await supabaseClient.auth.updateUser(
+      UserAttributes(data: currentMetadata),
+    );
   }
 
   Map<String, dynamic>? _readMap(dynamic value) {

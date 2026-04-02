@@ -443,8 +443,7 @@ class _FeedPageState extends State<FeedPage> {
     );
   }
 }
-
-class FeedProfilePage extends StatelessWidget {
+class FeedProfilePage extends StatefulWidget {
   const FeedProfilePage({
     super.key,
     required this.repository,
@@ -460,6 +459,23 @@ class FeedProfilePage extends StatelessWidget {
   final String authorAvatarUrl;
   final String? currentUserId;
 
+  @override
+  State<FeedProfilePage> createState() => _FeedProfilePageState();
+}
+
+class _FeedProfilePageState extends State<FeedProfilePage> {
+  late final Stream<List<FeedPost>> _postsStream;
+  late final Stream<Set<String>> _likedPostIdsStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _postsStream = widget.repository.watchPostsByAuthor(widget.authorId);
+    _likedPostIdsStream = widget.currentUserId == null
+        ? Stream<Set<String>>.value(const <String>{})
+        : widget.repository.watchLikedPostIds(widget.currentUserId!);
+  }
+
   Future<void> _toggleLike(
     BuildContext context,
     FeedPost post,
@@ -467,15 +483,15 @@ class FeedProfilePage extends StatelessWidget {
   ) async {
     try {
       if (isLiked) {
-        await repository.unlikePost(post.id);
+        await widget.repository.unlikePost(post.id);
       } else {
-        await repository.likePost(post.id);
+        await widget.repository.likePost(post.id);
       }
     } catch (error) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('อัปเดตการกดถูกใจไม่สำเร็จ: $error'),
+          content: Text('???????????????????????????????????????????????????????????????????????????: $error'),
           backgroundColor: Colors.red,
         ),
       );
@@ -487,16 +503,18 @@ class FeedProfilePage extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('???????????'),
-        content: const Text('???????????????????????????????'),
+        title: const Text('???????????????????????????????'),
+        content: const Text(
+          '??????????????????????????????????????????????????????????????????????????????????????????????????????????',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('??????'),
+            child: const Text('??????????????????'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('??'),
+            child: const Text('??????'),
           ),
         ],
       ),
@@ -505,16 +523,16 @@ class FeedProfilePage extends StatelessWidget {
     if (confirmed != true) return;
 
     try {
-      await repository.deletePost(post.id);
+      await widget.repository.deletePost(post.id);
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('????????????????')),
+        const SnackBar(content: Text('????????????????????????????????????????????????????????????')),
       );
     } on FeedPostUnavailableException {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('???????????????????????????????????'),
+          content: Text('?????????????????????????????????????????????????????????'),
           backgroundColor: Colors.red,
         ),
       );
@@ -522,7 +540,7 @@ class FeedProfilePage extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('????????????????: $error'),
+          content: Text('????????????????????????????????????????????????????????????????????????: $error'),
           backgroundColor: Colors.red,
         ),
       );
@@ -556,14 +574,14 @@ class FeedProfilePage extends StatelessWidget {
             child: SizedBox(
               width: maxContentWidth,
               child: StreamBuilder<List<FeedPost>>(
-                stream: repository.watchPostsByAuthor(authorId),
+                stream: _postsStream,
                 builder: (context, postSnapshot) {
                   if (postSnapshot.hasError) {
                     return ListView(
                       children: [
                         _ProfileHeader(
-                          authorName: authorName,
-                          authorAvatarUrl: authorAvatarUrl,
+                          authorName: widget.authorName,
+                          authorAvatarUrl: widget.authorAvatarUrl,
                           postCount: 0,
                           totalLikes: 0,
                         ),
@@ -573,7 +591,7 @@ class FeedProfilePage extends StatelessWidget {
                           height: scale.rs(280, min: 220, max: 280),
                           child: _FeedMessageState(
                             icon: Icons.cloud_off_rounded,
-                            title: 'โหลดโปรไฟล์ไม่สำเร็จ',
+                            title: '????????????????????????????????????????????????????????????',
                             subtitle: '${postSnapshot.error}',
                           ),
                         ),
@@ -586,18 +604,17 @@ class FeedProfilePage extends StatelessWidget {
                   }
 
                   return StreamBuilder<Set<String>>(
-                    stream: currentUserId == null
-                        ? Stream<Set<String>>.value(const <String>{})
-                        : repository.watchLikedPostIds(currentUserId!),
+                    stream: _likedPostIdsStream,
                     builder: (context, likeSnapshot) {
                       final posts = postSnapshot.data ?? const <FeedPost>[];
-                      final likedPostIds =
-                          likeSnapshot.data ?? const <String>{};
+                      final likedPostIds = likeSnapshot.data ?? const <String>{};
                       final totalLikes = posts.fold<int>(
-                          0, (sum, post) => sum + post.likeCount);
+                        0,
+                        (sum, post) => sum + post.likeCount,
+                      );
                       final resolvedAuthorAvatarUrl = posts.isNotEmpty
                           ? posts.first.authorAvatarUrl
-                          : authorAvatarUrl;
+                          : widget.authorAvatarUrl;
 
                       return RefreshIndicator(
                         onRefresh: _refreshProfile,
@@ -608,11 +625,13 @@ class FeedProfilePage extends StatelessWidget {
                           ),
                           itemCount: posts.isEmpty ? 2 : posts.length + 1,
                           separatorBuilder: (context, index) => Divider(
-                              thickness: 1, color: Colors.grey.shade200),
+                            thickness: 1,
+                            color: Colors.grey.shade200,
+                          ),
                           itemBuilder: (context, index) {
                             if (index == 0) {
                               return _ProfileHeader(
-                                authorName: authorName,
+                                authorName: widget.authorName,
                                 authorAvatarUrl: resolvedAuthorAvatarUrl,
                                 postCount: posts.length,
                                 totalLikes: totalLikes,
@@ -624,27 +643,29 @@ class FeedProfilePage extends StatelessWidget {
                                 height: scale.rs(280, min: 220, max: 280),
                                 child: _FeedMessageState(
                                   icon: Icons.article_outlined,
-                                  title: 'ยังไม่มีโพสต์',
+                                  title: '????????????????????????????????????????????????????????????',
                                   subtitle:
-                                      'เมื่อผู้ใช้คนนี้เริ่มโพสต์ ข้อความจะขึ้นที่นี่',
+                                      '?????????????????????????????????????????????????????????????????????????????? ?????????????????????????????????????????????????????????',
                                 ),
                               );
                             }
 
                             final post = posts[index - 1];
+                            final isLiked = likedPostIds.contains(post.id);
+
                             return FeedPostCard(
                               key: ValueKey(post.id),
                               post: post,
-                              isLiked: likedPostIds.contains(post.id),
+                              isLiked: isLiked,
                               onAuthorTap: null,
-                              onToggleLike: repository.supportsLikeActions
+                              onToggleLike: widget.repository.supportsLikeActions
                                   ? () => _toggleLike(
                                         context,
                                         post,
-                                        likedPostIds.contains(post.id),
+                                        isLiked,
                                       )
                                   : null,
-                              onDelete: post.authorId == currentUserId
+                              onDelete: post.authorId == widget.currentUserId
                                   ? () => _deletePost(context, post)
                                   : null,
                             );
@@ -662,7 +683,6 @@ class FeedProfilePage extends StatelessWidget {
     );
   }
 }
-
 class _FeedComposerSheet extends StatefulWidget {
   const _FeedComposerSheet({
     required this.repository,

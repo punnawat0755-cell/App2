@@ -109,6 +109,34 @@ class CoinService extends GetxService {
     }
   }
 
+  Future<void> awardCoins({
+    required int amount,
+    required String reason,
+    required String dedupeKey,
+    String refType = 'app_client',
+  }) async {
+    if (amount <= 0) return;
+
+    final user = _supabase.auth.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    try {
+      await _supabase.rpc('_award_coins', params: {
+        'p_user_id': user.id,
+        'p_amount': amount,
+        'p_reason': reason,
+        'p_dedupe_key': dedupeKey,
+        'p_ref_type': refType,
+      });
+      await loadCoins();
+    } catch (error) {
+      Get.log('CoinService.awardCoins error: $error');
+      rethrow;
+    }
+  }
+
   int? _parseCoins(dynamic rawCoins) {
     if (rawCoins is int) return rawCoins;
     if (rawCoins is num) return rawCoins.toInt();

@@ -175,9 +175,10 @@ class Pet extends GetxController {
     }
 
     purchasingItemId.value = itemId;
+    var didSpendCoins = false;
     try {
-      final didSpend = await spendCoins(price);
-      if (!didSpend) {
+      didSpendCoins = await spendCoins(price);
+      if (!didSpendCoins) {
         return false;
       }
 
@@ -185,6 +186,9 @@ class Pet extends GetxController {
       _applyState(nextState);
       return true;
     } catch (error) {
+      if (didSpendCoins) {
+        await _refundCoinsSafely(price);
+      }
       Get.log('Pet.purchaseItem error: $error');
       Get.snackbar(
         'ซื้อของไม่สำเร็จ',
@@ -305,9 +309,10 @@ class Pet extends GetxController {
     }
 
     isFeedingCoin.value = true;
+    var didSpendCoins = false;
     try {
-      final didSpend = await _coinService.spendCoins(cost);
-      if (!didSpend) {
+      didSpendCoins = await _coinService.spendCoins(cost);
+      if (!didSpendCoins) {
         Get.snackbar(
           'เหรียญไม่พอ',
           'ต้องใช้ $cost coins เพื่อให้อาหารนี้นะ',
@@ -335,6 +340,9 @@ class Pet extends GetxController {
         margin: const EdgeInsets.all(10),
       );
     } catch (error) {
+      if (didSpendCoins) {
+        await _refundCoinsSafely(cost);
+      }
       Get.snackbar(
         'ให้อาหารไม่สำเร็จ',
         '$error',
@@ -349,6 +357,18 @@ class Pet extends GetxController {
   }
 
   Future<bool> spendCoins(int cost) => _coinService.spendCoins(cost);
+
+  Future<void> _refundCoinsSafely(int amount) async {
+    if (amount <= 0) {
+      return;
+    }
+
+    try {
+      await _coinService.addCoins(amount);
+    } catch (error) {
+      Get.log('Pet._refundCoinsSafely error: $error');
+    }
+  }
 
   void _startTimer(int seconds) {
     _timer?.cancel();

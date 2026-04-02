@@ -1,0 +1,9 @@
+{
+  "SUPABASE_URL": "https://dvbagdhjlklmysjjuvht.supabase.co",
+  "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR2YmFnZGhqbGtsbXlzamp1dmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgzNzQ0MjcsImV4cCI6MjA4Mzk1MDQyN30.pqinIw8uza_02BRRheQrBLNnRK0InCBBXG00HmB0Bys",
+  "N8N_MODERATION_WEBHOOK": "https://example.com/webhook/moderation",
+  "N8N_MODERATION_TOKEN": "optional-token",
+  "N8N_MODERATION_FAIL_OPEN": "false",
+  "N8N_ALLOW_BAD_CERT": "false",
+  "N8N_ALLOW_BAD_CERT_HOSTS": ""
+}
