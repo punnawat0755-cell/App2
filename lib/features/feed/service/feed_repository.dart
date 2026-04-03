@@ -40,6 +40,10 @@ class FeedRepository {
   static const _likeReaction = 'like';
 
   final SupabaseClient _client;
+  final StreamController<void> _allPostsRefreshController =
+      StreamController<void>.broadcast();
+  final StreamController<String> _authorPostsRefreshController =
+      StreamController<String>.broadcast();
   late final FeedDeleteService _deleteService = FeedDeleteService(
     client: _client,
   );
@@ -56,6 +60,18 @@ class FeedRepository {
 
   Stream<List<FeedPost>> watchPostsByAuthor(String authorId) {
     return _watchMappedPosts(authorId: authorId);
+  }
+
+  Future<void> refreshPosts() async {
+    _allPostsRefreshController.add(null);
+  }
+
+  Future<void> refreshPostsByAuthor(String authorId) async {
+    final normalizedAuthorId = authorId.trim();
+    if (normalizedAuthorId.isEmpty) {
+      return;
+    }
+    _authorPostsRefreshController.add(normalizedAuthorId);
   }
 
   Stream<Set<String>> watchLikedPostIds(String userId) {
@@ -554,6 +570,8 @@ class FeedRepository {
   Stream<List<FeedPost>> _watchMappedPosts({String? authorId}) {
     late final StreamController<List<FeedPost>> controller;
     StreamSubscription<List<Map<String, dynamic>>>? postsSubscription;
+    StreamSubscription<void>? allPostsRefreshSubscription;
+    StreamSubscription<String>? authorPostsRefreshSubscription;
 
     List<Map<String, dynamic>> latestPostRows = const [];
     var hasLoadedPosts = false;
@@ -601,6 +619,11 @@ class FeedRepository {
         unawaited(refreshPostsFromQuery(reportErrors: true));
 
         if (authorId != null && authorId.isNotEmpty) {
+          authorPostsRefreshSubscription = _authorPostsRefreshController.stream
+              .where((targetAuthorId) => targetAuthorId == authorId)
+              .listen((_) {
+            unawaited(refreshPostsFromQuery(reportErrors: true));
+          });
           postsSubscription = _client
               .from(_postsTable)
               .stream(primaryKey: const ['id'])
@@ -611,6 +634,10 @@ class FeedRepository {
                 onError: (_, __) => unawaited(refreshPostsFromQuery()),
               );
         } else {
+          allPostsRefreshSubscription =
+              _allPostsRefreshController.stream.listen((_) {
+            unawaited(refreshPostsFromQuery(reportErrors: true));
+          });
           postsSubscription = _client
               .from(_postsTable)
               .stream(primaryKey: const ['id'])
@@ -623,6 +650,8 @@ class FeedRepository {
 
       },
       onCancel: () async {
+        await allPostsRefreshSubscription?.cancel();
+        await authorPostsRefreshSubscription?.cancel();
         await postsSubscription?.cancel();
       },
     );

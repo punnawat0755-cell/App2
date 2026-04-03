@@ -173,7 +173,7 @@ class _FeedPageState extends State<FeedPage> {
 
   Future<void> _refreshFeed() async {
     await _loadComposerIdentity();
-    await Future<void>.delayed(const Duration(milliseconds: 300));
+    await _repository.refreshPosts();
   }
 
   void _showSnackBar(String text, {bool isError = false}) {
@@ -548,7 +548,7 @@ class _FeedProfilePageState extends State<FeedProfilePage> {
   }
 
   Future<void> _refreshProfile() async {
-    await Future<void>.delayed(const Duration(milliseconds: 300));
+    await widget.repository.refreshPostsByAuthor(widget.authorId);
   }
 
   @override
@@ -883,26 +883,28 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
 
     setState(() => _isSubmitting = true);
     try {
-      // PRE-POST MODERATION HOOK: block submission unless webhook allows it.
-      final moderationResult = await _postModerationService.moderateImage(
-        userId: supabase.auth.currentUser?.id ?? '',
-        caption: content,
-        imageUrls: const <String>[],
-        imageNotes: _buildImageNotes(
+      if (hasSelectedImage) {
+        // Only run image moderation when the user actually attaches an image.
+        final moderationResult = await _postModerationService.moderateImage(
+          userId: supabase.auth.currentUser?.id ?? '',
           caption: content,
-          hasSelectedImage: hasSelectedImage,
-        ),
-      );
-      if (!mounted) return;
-      if (moderationResult.allowed != true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(moderationResult.summary),
-            backgroundColor: Colors.red,
+          imageUrls: const <String>[],
+          imageNotes: _buildImageNotes(
+            caption: content,
+            hasSelectedImage: hasSelectedImage,
           ),
         );
-        setState(() => _isSubmitting = false);
-        return;
+        if (!mounted) return;
+        if (moderationResult.allowed != true) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(moderationResult.summary),
+              backgroundColor: Colors.red,
+            ),
+          );
+          setState(() => _isSubmitting = false);
+          return;
+        }
       }
 
       await widget.repository.createPost(
