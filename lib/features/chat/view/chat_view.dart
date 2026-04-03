@@ -748,7 +748,7 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
       final chatId = data?['chatId'];
       final hasChatId = chatId is String && chatId.isNotEmpty;
 
-      if (status == 'idle' && !hasChatId) {
+      if (!snap.exists || (status == 'idle' && !hasChatId)) {
         _exitByPeerEnd();
       }
     });

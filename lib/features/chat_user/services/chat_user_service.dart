@@ -2,7 +2,10 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
+import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
 import 'package:get/get.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:flutter_application_1/core/services/content_moderation_service.dart';
 import 'package:flutter_application_1/features/chat_user/models/user_message.dart';
@@ -48,15 +51,47 @@ class ActiveRandomChatSession {
   final String recipientUserId;
 }
 
+class ConversationPartnerProfile {
+  const ConversationPartnerProfile({
+    required this.userId,
+    required this.displayName,
+    required this.avatarUrl,
+  });
+
+  final String userId;
+  final String displayName;
+  final String avatarUrl;
+}
+
+class ConversationRelationship {
+  const ConversationRelationship({
+    required this.isFollowed,
+    required this.isBlocked,
+  });
+
+  final bool isFollowed;
+  final bool isBlocked;
+}
+
 class ChatUserService extends GetxService {
+  ChatUserService({SupabaseClient? supabaseClient})
+      : _supabase = supabaseClient ?? supabase;
+
   // Dependencies หลักของ service
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final ContentModerationService _moderationService =
       ContentModerationService.instance;
+  final SupabaseClient _supabase;
 
   // Firestore collections
   static const String _chatCollection = 'Chats';
   static const String _queueCollection = 'RandomQueue';
+  static const String _feedbackCollection = 'ChatFeedback';
+  static const String _usersCollection = 'Users';
+  static const String _usersBySupabaseCollection = 'UsersBySupabase';
+
+  // Supabase tables
+  static const String _profilesTable = 'profiles';
 
   MatchRole _matchRoleFromDbValue(String value) {
     switch (value) {
@@ -204,15 +239,9 @@ class ChatUserService extends GetxService {
     // (Optional) อาจจะเรียก Supabase RPC เพื่อบันทึก Log การเข้าคิวได้
   }
 
-  /// ให้ user ออกจากคิว และรีเซ็ตสถานะเป็น idle
+  /// ให้ user ออกจากคิว โดยลบเอกสารคิวทิ้ง
   Future<void> leaveRandomQueue(String userId) async {
-    await _firestore.collection(_queueCollection).doc(userId).set({
-      'status': 'idle',
-      'mode': null,
-      'chatId': null,
-      'matchedWith': null,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await _firestore.collection(_queueCollection).doc(userId).delete();
   }
 
   /// helper: คืนค่า chatId เมื่อสถานะ queue เป็น matched เท่านั้น
@@ -413,6 +442,132 @@ class ChatUserService extends GetxService {
   // 4. End Chat & Feedback (การจบแชทและการให้คะแนน)
   // ----------------------------------------------------------------
 
+  Future<ConversationPartnerProfile> getConversationPartnerProfile(
+    String userId,
+  ) async {
+    if (userId.trim().isEmpty) {
+      return ConversationPartnerProfile(
+        userId: userId,
+        displayName: 'ผู้ใช้',
+        avatarUrl: ProfileAvatarCatalog.defaultAvatar,
+      );
+    }
+
+    try {
+      final userDoc =
+          await _firestore.collection(_usersCollection).doc(userId).get();
+      final userData = userDoc.data();
+      final mappedSupabaseUserId = _firstNonEmpty([
+        userData?['supabaseUserId'],
+        userData?['supabase_user_id'],
+      ]);
+
+      final candidateProfileIds = <String>{
+        if (mappedSupabaseUserId != null) mappedSupabaseUserId,
+        userId,
+      };
+
+      Map<String, dynamic>? canonicalData;
+      if (mappedSupabaseUserId != null && mappedSupabaseUserId.isNotEmpty) {
+        final canonicalDoc = await _firestore
+            .collection(_usersBySupabaseCollection)
+            .doc(mappedSupabaseUserId)
+            .get();
+        canonicalData = canonicalDoc.data();
+      }
+
+      Map<String, dynamic>? row;
+      String? resolvedSupabaseUserId;
+      for (final candidate in candidateProfileIds) {
+        final profileRow = await _supabase
+            .from(_profilesTable)
+            .select('id, username, avatarurl')
+            .eq('id', candidate)
+            .maybeSingle();
+        if (profileRow != null) {
+          row = profileRow;
+          resolvedSupabaseUserId =
+              _firstNonEmpty([profileRow['id']?.toString(), candidate]);
+          break;
+        }
+      }
+
+      final displayName = _firstNonEmpty([
+            row?['username'],
+            canonicalData?['username'],
+            userData?['username'],
+          ]) ??
+          'ผู้ใช้';
+      final avatar = _normalizeAvatarUrl(row?['avatarurl']);
+
+      return ConversationPartnerProfile(
+        userId: resolvedSupabaseUserId ?? mappedSupabaseUserId ?? userId,
+        displayName: displayName,
+        avatarUrl: avatar,
+      );
+    } catch (e) {
+      debugPrint('getConversationPartnerProfile failed for $userId: $e');
+      return ConversationPartnerProfile(
+        userId: userId,
+        displayName: 'ผู้ใช้',
+        avatarUrl: ProfileAvatarCatalog.defaultAvatar,
+      );
+    }
+  }
+
+  Future<ConversationRelationship> getConversationRelationship({
+    required String fromUserId,
+    required String toUserId,
+  }) async {
+    if (fromUserId.trim().isEmpty || toUserId.trim().isEmpty) {
+      return const ConversationRelationship(
+        isFollowed: false,
+        isBlocked: false,
+      );
+    }
+
+    try {
+      final snapshot = await _firestore
+          .collection(_feedbackCollection)
+          .where('fromUserId', isEqualTo: fromUserId)
+          .limit(100)
+          .get();
+
+      Map<String, dynamic>? latest;
+      var latestAt = DateTime.fromMillisecondsSinceEpoch(0);
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        if ((data['toUserId'] ?? '').toString() != toUserId) {
+          continue;
+        }
+        final createdAt = _readDateTime(data['createdAt']);
+        if (latest == null || createdAt.isAfter(latestAt)) {
+          latest = data;
+          latestAt = createdAt;
+        }
+      }
+
+      if (latest == null) {
+        return const ConversationRelationship(
+          isFollowed: false,
+          isBlocked: false,
+        );
+      }
+      return ConversationRelationship(
+        isFollowed: _readBool(latest['starred']),
+        isBlocked: _readBool(latest['blocked']),
+      );
+    } catch (e) {
+      debugPrint(
+        'getConversationRelationship failed from $fromUserId to $toUserId: $e',
+      );
+      return const ConversationRelationship(
+        isFollowed: false,
+        isBlocked: false,
+      );
+    }
+  }
+
   /// จบแชทสุ่ม:
   /// 1) mark ห้องเป็น ended
   /// 2) เคลียร์ queue ของผู้ใช้ทั้งสองคน
@@ -434,22 +589,11 @@ class ChatUserService extends GetxService {
       'endedAt': FieldValue.serverTimestamp(),
     });
 
-    // เคลียร์ Queue ของ User ทั้งคู่ให้ว่าง (กลับเป็น idle)
+    // ลบ Queue ของ User ทั้งคู่ เพราะไม่ได้ใช้งานแล้ว
     final batch = _firestore.batch();
     for (final uid in users) {
-      final peerId = users.firstWhere((id) => id != uid, orElse: () => '');
       final queueRef = _firestore.collection(_queueCollection).doc(uid);
-      batch.set(
-          queueRef,
-          {
-            'status': 'idle',
-            'mode': null,
-            'chatId': null,
-            'matchedWith': null,
-            'lastMatchedWith': peerId,
-            'updatedAt': FieldValue.serverTimestamp(),
-          },
-          SetOptions(merge: true));
+      batch.delete(queueRef);
     }
     await batch.commit();
 
@@ -468,9 +612,10 @@ class ChatUserService extends GetxService {
     required int rating,
     required String comment,
     required bool starred,
+    required bool blocked,
     required int wordCount,
   }) async {
-    await _firestore.collection('ChatFeedback').add({
+    await _firestore.collection(_feedbackCollection).add({
       'sessionId': sessionId,
       'chatId': chatId,
       'fromUserId': fromUserId,
@@ -480,10 +625,11 @@ class ChatUserService extends GetxService {
       'rating': rating,
       'comment': comment,
       'starred': starred,
+      'blocked': blocked,
       'wordCount': wordCount,
       'createdAt': FieldValue.serverTimestamp(),
     });
-    debugPrint("✅ Feedback saved to Firestore (Words: $wordCount)");
+    debugPrint('Feedback saved to Firestore (Words: $wordCount)');
   }
 
   // ----------------------------------------------------------------
@@ -495,6 +641,52 @@ class ChatUserService extends GetxService {
     final ts = DateTime.now().millisecondsSinceEpoch;
     final rand = (ts ^ (ts >> 7)).toRadixString(36);
     return 'random_${ts}_$rand';
+  }
+
+  bool _readBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is num) return value != 0;
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      return normalized == 'true' || normalized == '1' || normalized == 't';
+    }
+    return false;
+  }
+
+  String? _firstNonEmpty(List<Object?> values) {
+    for (final value in values) {
+      final text = value?.toString().trim();
+      if (text != null && text.isNotEmpty) {
+        return text;
+      }
+    }
+    return null;
+  }
+
+  String _normalizeAvatarUrl(dynamic rawValue) {
+    final avatar = rawValue?.toString().trim() ?? '';
+    if (avatar.isEmpty) {
+      return ProfileAvatarCatalog.defaultAvatar;
+    }
+
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return avatar;
+    }
+
+    return ProfileAvatarCatalog.normalize(avatar);
+  }
+
+  DateTime _readDateTime(dynamic value) {
+    if (value is Timestamp) {
+      return value.toDate();
+    }
+    if (value is DateTime) {
+      return value;
+    }
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   /// ลบข้อความทั้งหมดในห้องแชท และลบ document ห้องทิ้งท้าย

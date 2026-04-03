@@ -5,6 +5,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function mySupabaseUserId() {
+      return get(/databases/$(database)/documents/Users/$(request.auth.uid)).data.supabaseUserId;
+    }
+
     function isRoomMember(roomId) {
       return isSignedIn() &&
         (request.auth.uid == get(/databases/$(database)/documents/rooms/$(roomId)).data.userA ||
@@ -19,7 +23,23 @@ service cloud.firestore {
     // FCM token per Firebase user
     match /Users/{userId} {
       allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && (!('supabaseUserId' in resource.data)
+            || request.resource.data.supabaseUserId == resource.data.supabaseUserId)
+        && (!('supabase_user_id' in resource.data)
+            || request.resource.data.supabase_user_id == resource.data.supabase_user_id);
+      allow delete: if isSignedIn()
+        && resource.data.supabaseUserId is string
+        && mySupabaseUserId() is string
+        && mySupabaseUserId() == resource.data.supabaseUserId;
+    }
+
+    // Canonical one-doc-per-supabase-user mapping
+    match /UsersBySupabase/{supabaseUserId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn();
       allow delete: if false;
     }
 

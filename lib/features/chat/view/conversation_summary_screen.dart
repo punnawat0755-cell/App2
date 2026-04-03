@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
-import 'package:flutter_application_1/features/chat/data/mock/conversation_partner_mock.dart';
+import 'package:flutter_application_1/features/profile/model/profile_avatar_catalog.dart';
 import 'package:get/get.dart';
 
 import 'package:flutter_application_1/features/chat/view/chat_confirm_dialog.dart';
@@ -31,6 +31,9 @@ class ConversationSummaryScreen extends StatefulWidget {
 class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
   late final ChatUserService _chatService;
 
+  String _partnerName = 'ผู้ใช้';
+  String _partnerAvatar = ProfileAvatarCatalog.defaultAvatar;
+  bool _loadingPartnerInfo = true;
   bool _isFollowed = false;
   bool _isBlocked = false;
   int _rating = 3;
@@ -40,10 +43,11 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
   void initState() {
     super.initState();
     _chatService = Get.find<ChatUserService>();
+    _loadPartnerInfo();
   }
 
   int _calculateWordCount(List<DocumentSnapshot> docs) {
-    int count = 0;
+    var count = 0;
     for (final doc in docs) {
       final data = doc.data() as Map<String, dynamic>;
       final text = (data['text'] ?? '').toString();
@@ -54,12 +58,55 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
     return count;
   }
 
+  Future<void> _loadPartnerInfo() async {
+    final recipientUserId = widget.recipientUserId.trim();
+    if (recipientUserId.isEmpty) {
+      if (!mounted) return;
+      setState(() => _loadingPartnerInfo = false);
+      return;
+    }
+
+    try {
+      final profileFuture =
+          _chatService.getConversationPartnerProfile(recipientUserId);
+      final relationshipFuture = _chatService.getConversationRelationship(
+        fromUserId: widget.currentUserId,
+        toUserId: recipientUserId,
+      );
+
+      final results = await Future.wait<dynamic>([
+        profileFuture,
+        relationshipFuture,
+      ]);
+      final profile = results[0] as ConversationPartnerProfile;
+      final relationship = results[1] as ConversationRelationship;
+
+      if (!mounted) return;
+      setState(() {
+        _partnerName = profile.displayName;
+        _partnerAvatar = profile.avatarUrl;
+        _isFollowed = relationship.isFollowed;
+        _isBlocked = relationship.isBlocked;
+        _loadingPartnerInfo = false;
+      });
+    } catch (e) {
+      debugPrint('Failed to load partner info: $e');
+      if (!mounted) return;
+      setState(() => _loadingPartnerInfo = false);
+    }
+  }
+
   Future<void> _submitFeedback() async {
     if (_sendingFeedback) return;
 
     setState(() => _sendingFeedback = true);
 
     try {
+      final recipientUserId = widget.recipientUserId.trim();
+      if (recipientUserId.isEmpty) {
+        throw StateError('ไม่พบข้อมูลคู่สนทนา');
+      }
+
       final messagesSnap = await FirebaseFirestore.instance
           .collection('Chats')
           .doc(widget.chatId)
@@ -84,12 +131,13 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
         sessionId: sessionId,
         chatId: widget.chatId,
         fromUserId: widget.currentUserId,
-        toUserId: widget.recipientUserId,
+        toUserId: recipientUserId,
         fromRole: myRoleStr,
         toRole: peerRoleStr,
         rating: _rating,
         comment: '',
         starred: _isFollowed,
+        blocked: _isBlocked,
         wordCount: sessionWordCount,
       );
 
@@ -117,6 +165,14 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
         });
       },
     );
+  }
+
+  ImageProvider<Object> _partnerAvatarProvider() {
+    final avatar = _partnerAvatar.trim();
+    if (avatar.startsWith('http://') || avatar.startsWith('https://')) {
+      return NetworkImage(avatar);
+    }
+    return ProfileAvatarCatalog.providerFor(avatar);
   }
 
   @override
@@ -152,7 +208,7 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
                     children: [
                       const SizedBox(height: 16),
                       Text(
-                        conversationPartnerNameMock,
+                        _partnerName,
                         style: TextStyle(
                           color: Color(0xFF4489D7),
                           fontSize: scale.rf(28, min: 24, max: 28),
@@ -170,10 +226,8 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
                             width: scale.rs(4, min: 3, max: 4),
                           ),
                           color: Colors.white,
-                          image: const DecorationImage(
-                            image: NetworkImage(
-                              conversationPartnerAvatarUrlMock,
-                            ),
+                          image: DecorationImage(
+                            image: _partnerAvatarProvider(),
                             fit: BoxFit.cover,
                           ),
                           boxShadow: [
@@ -185,6 +239,14 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
                           ],
                         ),
                       ),
+                      if (_loadingPartnerInfo) ...[
+                        const SizedBox(height: 12),
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      ],
                       const SizedBox(height: 40),
                       if (!_isBlocked) ...[
                         Wrap(
@@ -320,7 +382,8 @@ class _ConversationSummaryScreenState extends State<ConversationSummaryScreen> {
                         ),
                       ),
                       SizedBox(
-                          height: MediaQuery.of(context).padding.bottom + 16),
+                        height: MediaQuery.of(context).padding.bottom + 16,
+                      ),
                     ],
                   ),
                 ),

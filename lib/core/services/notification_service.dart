@@ -15,6 +15,8 @@ class NotificationService {
   static bool _initialized = false;
   static const String _broadcastTopic = 'all_users';
   static final List<StreamSubscription> _subscriptions = [];
+  static const String _usersCollection = 'Users';
+  static const String _usersBySupabaseCollection = 'UsersBySupabase';
 
   static const AndroidNotificationChannel _androidChannel =
       AndroidNotificationChannel(
@@ -130,6 +132,10 @@ class NotificationService {
       'username': username,
       'updatedAt': FieldValue.serverTimestamp(),
     };
+    if (supabaseUser != null) {
+      payload['supabaseUserId'] = supabaseUser.id;
+      payload['supabase_user_id'] = supabaseUser.id;
+    }
     if (email != null) {
       payload['email'] = email;
     }
@@ -138,9 +144,32 @@ class NotificationService {
     }
 
     await FirebaseFirestore.instance
-        .collection('Users')
+        .collection(_usersCollection)
         .doc(firebaseUser.uid)
         .set(payload, SetOptions(merge: true));
+
+    if (supabaseUser != null) {
+      final canonicalPayload = <String, dynamic>{
+        'supabaseUserId': supabaseUser.id,
+        'supabase_user_id': supabaseUser.id,
+        'lastFirebaseUid': firebaseUser.uid,
+        'firebaseUids': FieldValue.arrayUnion([firebaseUser.uid]),
+        'fcmTokens': FieldValue.arrayUnion([token]),
+        'username': username,
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      if (email != null) {
+        canonicalPayload['email'] = email;
+      }
+      if (displayName != null) {
+        canonicalPayload['displayName'] = displayName;
+      }
+
+      await FirebaseFirestore.instance
+          .collection(_usersBySupabaseCollection)
+          .doc(supabaseUser.id)
+          .set(canonicalPayload, SetOptions(merge: true));
+    }
   }
 
   static String _resolveUsername({
