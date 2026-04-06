@@ -132,6 +132,18 @@ class _RegisterPageState extends State<RegisterPage> {
         throw const AuthException('สมัครไม่สำเร็จ กรุณาลองใหม่');
       }
 
+      // Prevent auto-login after sign up. Daily flow should start only after
+      // an explicit login from LoginPage.
+      final hasSession =
+          res.session != null || supabase.auth.currentSession != null;
+      if (hasSession) {
+        try {
+          await supabase.auth.signOut();
+        } catch (_) {
+          // Ignore if there is no active session to clear.
+        }
+      }
+
       if (!mounted) return;
 
       _showSuccess('สมัครสำเร็จ! ถ้าเปิดยืนยันอีเมล ให้ไปกดยืนยันก่อนล็อกอิน');

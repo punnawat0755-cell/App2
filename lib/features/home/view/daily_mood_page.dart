@@ -111,8 +111,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   int _selectedMoodIndex = 2;
   final List<String> _selectedTags = [];
 
-  int? _todayScore;
-
   final TextEditingController _noteCtrl = TextEditingController();
   final TextEditingController _healingCtrl = TextEditingController();
   String? _serverNote;
@@ -171,14 +169,14 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     if (!mounted) return;
     setState(() {
       _answeredToday = (savedDate == today);
-      _todayScore =
+      final todayScore =
           _answeredToday ? prefs.getInt(DailyMoodStatusService.scoreKey) : null;
       _editUsedToday =
           (prefs.getString(DailyMoodStatusService.editUsedDateKey) == today);
       _isEditMode = false;
-      if (_answeredToday && _todayScore != null) {
+      if (_answeredToday && todayScore != null) {
         final option = _moodOptions.firstWhere(
-          (m) => m.score == _todayScore,
+          (m) => m.score == todayScore,
           orElse: () => _moodOptions[2],
         );
         _selectedMoodIndex = _indexFromOption(option);
@@ -188,8 +186,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     });
   }
 
-  Future<void> _saveLocalToday(_MoodOption option,
-      {required bool markEditUsed}) async {
+  Future<void> _saveLocalToday(
+    _MoodOption option, {
+    required bool markEditUsed,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final today = DailyMoodStatusService.todayAsKey();
 
@@ -204,7 +204,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
 
   Future<void> _clearDailyMoodCache({bool showSnackbar = true}) async {
     await DailyMoodStatusService.clearLocalCache();
-
     _noteCtrl.clear();
     _healingCtrl.clear();
     _selectedTags.clear();
@@ -212,6 +211,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     _serverHealingQuote = null;
 
     await _loadLocalStatus();
+
     if (!mounted) return;
 
     if (showSnackbar) {
@@ -230,10 +230,9 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   }
 
   Future<void> _refreshCoinsIfNeeded() async {
-    final coinService =
-        Get.isRegistered<CoinService>()
-            ? Get.find<CoinService>()
-            : Get.put(CoinService(), permanent: true);
+    final coinService = Get.isRegistered<CoinService>()
+        ? Get.find<CoinService>()
+        : Get.put(CoinService(), permanent: true);
     await coinService.loadCoins();
   }
 
@@ -272,8 +271,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       if (!mounted) return;
       setState(() {
         _answeredToday = true;
-        _todayScore = option.score;
-        // _todayLabel = option.label;
 
         _serverNote = note;
         _serverHealingQuote = healingQuote;
@@ -320,31 +317,33 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     final canEditNow = _answeredToday && _isEditMode && !_editUsedToday;
 
     if (!isFirstAnswer && !canEditNow) return;
+    if (!_isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนบันทึก Daily Mood')),
+      );
+      return;
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
           content: Text('กำลังบันทึก...'), duration: Duration(seconds: 1)),
     );
 
-    // 1) Save to Supabase
-    if (_isLoggedIn) {
-      try {
-        await _saveToSupabase(
-          option,
-          note: _noteCtrl.text,
-          emotions: _selectedTags,
-          healingQuote: _healingCtrl.text,
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('บันทึกไม่สำเร็จ (Supabase): $e')),
-        );
-        return;
-      }
+    try {
+      await _saveToSupabase(
+        option,
+        note: _noteCtrl.text,
+        emotions: _selectedTags,
+        healingQuote: _healingCtrl.text,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('บันทึกไม่สำเร็จ (Supabase): $e')),
+      );
+      return;
     }
 
-    // 2) Save to local cache
     await _saveLocalToday(option, markEditUsed: canEditNow);
     await _refreshProfileCalendarIfNeeded();
     await _refreshCoinsIfNeeded();
@@ -362,8 +361,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
 
     setState(() {
       _answeredToday = true;
-      _todayScore = option.score;
-      // _todayLabel = option.label;
 
       _serverNote =
           _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
@@ -539,7 +536,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               padding: EdgeInsets.only(
                                   left: scale.rs(4, min: 3, max: 4)),
                               child: Text(
-                                'ยังไม่ได้ล็อกอิน: จะบันทึกลงเครื่องเท่านั้น',
+                                'ยังไม่ได้ล็อกอิน: ไม่สามารถบันทึกข้อมูลได้',
                                 style: TextStyle(
                                   color: const Color(0xFF607D8B),
                                   fontSize: scale.rf(12, min: 10.5, max: 12),

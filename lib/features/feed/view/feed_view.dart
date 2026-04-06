@@ -15,6 +15,8 @@ import 'package:flutter_application_1/features/profile/model/profile_avatar_cata
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+final bool _isFeedCommentEnabled = false;
+
 class FeedPage extends StatefulWidget {
   const FeedPage({
     super.key,
@@ -1230,34 +1232,6 @@ class _FeedComposerSheetState extends State<_FeedComposerSheet> {
                                 ],
                               ),
                             ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: scale.rs(12, min: 8, max: 12),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.image_outlined,
-                                    size: scale.rs(18, min: 14, max: 18),
-                                    color: Colors.grey.shade500,
-                                  ),
-                                  SizedBox(width: scale.rs(6, min: 4, max: 6)),
-                                  Expanded(
-                                    child: Text(
-                                      _selectedImageName ?? 'รูปที่เลือก',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: Colors.grey.shade600,
-                                        fontSize:
-                                            scale.rf(13, min: 11.5, max: 13),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                             SizedBox(height: scale.rs(8, min: 6, max: 8)),
                           ],
                         ],
@@ -1560,6 +1534,9 @@ class _LegacyFeedPostCardState extends State<_LegacyFeedPostCard> {
   }
 
   void _handleCommentTap() {
+    if (!_isFeedCommentEnabled) {
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -1766,35 +1743,37 @@ class _LegacyFeedPostCardState extends State<_LegacyFeedPostCard> {
                   ),
                 ),
               ),
-              SizedBox(width: scale.rs(14, min: 10, max: 14)),
-              InkWell(
-                borderRadius:
-                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
-                onTap: _handleCommentTap,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: scale.rs(4, min: 2, max: 4),
-                    vertical: scale.rs(4, min: 2, max: 4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.mode_comment_outlined,
-                        color: Colors.grey,
-                        size: scale.rs(26, min: 22, max: 26),
-                      ),
-                      SizedBox(width: scale.rs(6, min: 4, max: 6)),
-                      Text(
-                        widget.post.commentCount.toString(),
-                        style: const TextStyle(
+              if (_isFeedCommentEnabled) ...[
+                SizedBox(width: scale.rs(14, min: 10, max: 14)),
+                InkWell(
+                  borderRadius:
+                      BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                  onTap: _handleCommentTap,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(4, min: 2, max: 4),
+                      vertical: scale.rs(4, min: 2, max: 4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.mode_comment_outlined,
                           color: Colors.grey,
+                          size: scale.rs(26, min: 22, max: 26),
                         ),
-                      ),
-                    ],
+                        SizedBox(width: scale.rs(6, min: 4, max: 6)),
+                        Text(
+                          widget.post.commentCount.toString(),
+                          style: const TextStyle(
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ],
@@ -1962,6 +1941,9 @@ class _FeedPostCardState extends State<FeedPostCard> {
   }
 
   void _handleCommentTap() {
+    if (!_isFeedCommentEnabled) {
+      return;
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -2282,36 +2264,38 @@ class _FeedPostCardState extends State<FeedPostCard> {
                   ),
                 ),
               ),
-              SizedBox(width: scale.rs(18, min: 12, max: 18)),
-              InkWell(
-                borderRadius:
-                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
-                onTap: _handleCommentTap,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: scale.rs(4, min: 2, max: 4),
-                    vertical: scale.rs(4, min: 2, max: 4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.mode_comment_outlined,
-                        color: const Color(0xFF6A7489),
-                        size: scale.rs(24, min: 22, max: 24),
-                      ),
-                      SizedBox(width: scale.rs(6, min: 4, max: 6)),
-                      Text(
-                        widget.post.commentCount.toString(),
-                        style: const TextStyle(
-                          color: Color(0xFF42506A),
-                          fontWeight: FontWeight.w500,
+              if (_isFeedCommentEnabled) ...[
+                SizedBox(width: scale.rs(18, min: 12, max: 18)),
+                InkWell(
+                  borderRadius:
+                      BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                  onTap: _handleCommentTap,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(4, min: 2, max: 4),
+                      vertical: scale.rs(4, min: 2, max: 4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.mode_comment_outlined,
+                          color: const Color(0xFF6A7489),
+                          size: scale.rs(24, min: 22, max: 24),
                         ),
-                      ),
-                    ],
+                        SizedBox(width: scale.rs(6, min: 4, max: 6)),
+                        Text(
+                          widget.post.commentCount.toString(),
+                          style: const TextStyle(
+                            color: Color(0xFF42506A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
+              ],
               const Spacer(),
               InkWell(
                 borderRadius: BorderRadius.circular(999),

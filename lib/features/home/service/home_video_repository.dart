@@ -16,9 +16,17 @@ class HomeVideoRepository {
     'SUPABASE_FEED_IMAGE_BUCKET',
     defaultValue: 'app_media',
   );
+  static const Duration _signedUrlTtl = Duration(minutes: 55);
+  static const int _maxAuthorCacheEntries = 500;
+  static const int _maxMediaUrlCacheEntries = 700;
 
   final SupabaseClient _client;
   final int _sessionSeed = DateTime.now().microsecondsSinceEpoch;
+  final Map<String, String> _cachedAuthorNamesById = <String, String>{};
+  final Map<String, _CachedSignedUrl> _cachedMediaUrls =
+      <String, _CachedSignedUrl>{};
+  final Map<String, Future<String>> _inFlightMediaUrlResolvers =
+      <String, Future<String>>{};
 
   String get _defaultBucket => _normalizeBucketName(_defaultBucketConfig);
 
@@ -26,6 +34,8 @@ class HomeVideoRepository {
     late final StreamController<List<HomeVideoClip>> controller;
     StreamSubscription<List<Map<String, dynamic>>>? postsSubscription;
     StreamSubscription<List<Map<String, dynamic>>>? mediaSubscription;
+    Timer? remapDebounceTimer;
+    var hasActiveListener = false;
 
     List<Map<String, dynamic>> latestPostRows = const [];
     List<Map<String, dynamic>> latestMediaRows = const [];
@@ -44,8 +54,19 @@ class HomeVideoRepository {
       }
     }
 
+    void scheduleEmitMappedClips({
+      Duration delay = const Duration(milliseconds: 120),
+    }) {
+      if (!hasLoadedPosts || !hasLoadedMedia || !hasActiveListener) {
+        return;
+      }
+      remapDebounceTimer?.cancel();
+      remapDebounceTimer = Timer(delay, () => unawaited(emitMappedClips()));
+    }
+
     controller = StreamController<List<HomeVideoClip>>(
       onListen: () {
+        hasActiveListener = true;
         postsSubscription = _client
             .from(_postsTable)
             .stream(primaryKey: const ['id'])
@@ -57,8 +78,14 @@ class HomeVideoRepository {
                       (row) => Map<String, dynamic>.from(row),
                     )
                     .toList();
+                final isInitialLoad = !hasLoadedPosts;
                 hasLoadedPosts = true;
-                unawaited(emitMappedClips());
+                if (isInitialLoad) {
+                  unawaited(emitMappedClips());
+                  return;
+                }
+                scheduleEmitMappedClips(
+                    delay: const Duration(milliseconds: 80));
               },
               onError: controller.addError,
             );
@@ -74,13 +101,21 @@ class HomeVideoRepository {
                       (row) => Map<String, dynamic>.from(row),
                     )
                     .toList();
+                final isInitialLoad = !hasLoadedMedia;
                 hasLoadedMedia = true;
-                unawaited(emitMappedClips());
+                if (isInitialLoad) {
+                  unawaited(emitMappedClips());
+                  return;
+                }
+                scheduleEmitMappedClips(
+                    delay: const Duration(milliseconds: 80));
               },
               onError: controller.addError,
             );
       },
       onCancel: () async {
+        hasActiveListener = false;
+        remapDebounceTimer?.cancel();
         await postsSubscription?.cancel();
         await mediaSubscription?.cancel();
       },
@@ -180,16 +215,33 @@ class HomeVideoRepository {
     }
 
     final authorNamesById = await _loadAuthorNames(userIds.toList());
-    final clips = <HomeVideoClip>[];
-
+    final candidates = <_VideoClipCandidate>[];
     for (final row in mediaRows) {
       final postId = row['post_id']?.toString() ?? '';
       final post = postsById[postId];
       if (post == null) {
         continue;
       }
+      candidates.add(
+        _VideoClipCandidate(
+          postId: postId,
+          post: post,
+          mediaRow: row,
+        ),
+      );
+    }
 
-      final videoUrl = await _resolveMediaUrl(row);
+    final resolvedVideoUrls = await Future.wait(
+      candidates.map((candidate) => _resolveMediaUrl(candidate.mediaRow)),
+    );
+
+    final clips = <HomeVideoClip>[];
+    for (var index = 0; index < candidates.length; index++) {
+      final candidate = candidates[index];
+      final row = candidate.mediaRow;
+      final post = candidate.post;
+      final postId = candidate.postId;
+      final videoUrl = resolvedVideoUrls[index];
       if (videoUrl.isEmpty) {
         continue;
       }
@@ -241,20 +293,50 @@ class HomeVideoRepository {
     }
 
     final authorNamesById = <String, String>{};
+    final missingUserIds = <String>[];
+    for (final userId in userIds) {
+      final cachedName = _cachedAuthorNamesById[userId];
+      if (cachedName != null) {
+        if (cachedName.isNotEmpty) {
+          authorNamesById[userId] = cachedName;
+        }
+        continue;
+      }
+      missingUserIds.add(userId);
+    }
+
+    if (missingUserIds.isEmpty) {
+      return authorNamesById;
+    }
+
     try {
       final profiles = await _client
           .from(_profilesTable)
           .select('id, username')
-          .inFilter('id', userIds);
+          .inFilter('id', missingUserIds);
 
+      final fetchedUserIds = <String>{};
       for (final row in profiles) {
         final map = Map<String, dynamic>.from(row);
         final userId = map['id']?.toString() ?? '';
-        final username = map['username']?.toString().trim() ?? '';
-        if (userId.isEmpty || username.isEmpty) {
+        if (userId.isEmpty) {
           continue;
         }
-        authorNamesById[userId] = username;
+        fetchedUserIds.add(userId);
+        final username = map['username']?.toString().trim() ?? '';
+        _cachedAuthorNamesById[userId] = username;
+        if (username.isNotEmpty) {
+          authorNamesById[userId] = username;
+        }
+      }
+
+      for (final userId in missingUserIds) {
+        if (!fetchedUserIds.contains(userId)) {
+          _cachedAuthorNamesById[userId] = '';
+        }
+      }
+      if (_cachedAuthorNamesById.length > _maxAuthorCacheEntries) {
+        _cachedAuthorNamesById.clear();
       }
     } catch (_) {
       // Keep fallback names when profiles cannot be loaded.
@@ -273,17 +355,69 @@ class HomeVideoRepository {
     final bucket = _normalizeBucketName(
       row['storage_bucket']?.toString() ?? _defaultBucket,
     );
+    final cacheKey = '$bucket/$storagePath';
+    final now = DateTime.now();
+    final cachedUrl = _cachedMediaUrls[cacheKey];
+    if (cachedUrl != null && cachedUrl.expiresAt.isAfter(now)) {
+      return cachedUrl.url;
+    }
 
-    try {
-      return await _client.storage.from(bucket).createSignedUrl(
-            storagePath,
-            60 * 60,
+    final inFlight = _inFlightMediaUrlResolvers[cacheKey];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    Future<String> resolve() async {
+      try {
+        final signedUrl = await _client.storage.from(bucket).createSignedUrl(
+              storagePath,
+              60 * 60,
+            );
+        if (signedUrl.isNotEmpty) {
+          _cachedMediaUrls[cacheKey] = _CachedSignedUrl(
+            url: signedUrl,
+            expiresAt: now.add(_signedUrlTtl),
           );
-    } catch (_) {
+          _trimMediaUrlCacheIfNeeded();
+          return signedUrl;
+        }
+      } catch (_) {
+        // Continue with fallback below.
+      }
+
       if (publicUrl != null && publicUrl.isNotEmpty) {
+        _cachedMediaUrls[cacheKey] = _CachedSignedUrl(
+          url: publicUrl,
+          expiresAt: now.add(const Duration(hours: 6)),
+        );
+        _trimMediaUrlCacheIfNeeded();
         return publicUrl;
       }
-      return _client.storage.from(bucket).getPublicUrl(storagePath);
+
+      final fallbackUrl =
+          _client.storage.from(bucket).getPublicUrl(storagePath);
+      if (fallbackUrl.isNotEmpty) {
+        _cachedMediaUrls[cacheKey] = _CachedSignedUrl(
+          url: fallbackUrl,
+          expiresAt: now.add(const Duration(hours: 6)),
+        );
+        _trimMediaUrlCacheIfNeeded();
+      }
+      return fallbackUrl;
+    }
+
+    final resolver = resolve();
+    _inFlightMediaUrlResolvers[cacheKey] = resolver;
+    try {
+      return await resolver;
+    } finally {
+      _inFlightMediaUrlResolvers.remove(cacheKey);
+    }
+  }
+
+  void _trimMediaUrlCacheIfNeeded() {
+    if (_cachedMediaUrls.length > _maxMediaUrlCacheEntries) {
+      _cachedMediaUrls.clear();
     }
   }
 
@@ -459,6 +593,28 @@ class HomeVideoRepository {
     hash = 0x1fffffff & (hash + ((0x00003fff & hash) << 15));
     return hash;
   }
+}
+
+class _VideoClipCandidate {
+  const _VideoClipCandidate({
+    required this.postId,
+    required this.post,
+    required this.mediaRow,
+  });
+
+  final String postId;
+  final Map<String, dynamic> post;
+  final Map<String, dynamic> mediaRow;
+}
+
+class _CachedSignedUrl {
+  const _CachedSignedUrl({
+    required this.url,
+    required this.expiresAt,
+  });
+
+  final String url;
+  final DateTime expiresAt;
 }
 
 class HomeVideoBucketNotFoundException implements Exception {

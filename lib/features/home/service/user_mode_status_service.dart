@@ -5,7 +5,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 class UserModeStatusService {
   static const String dateKey = 'user_mode_last_date';
   static const String modeKey = 'user_mode_current_mode';
-  static const String _tableName = 'user_modes';
+  static const String userIdKey = 'user_mode_user_id';
+  static const String selectedConfirmedKey = 'user_mode_selected_confirmed';
   static const String _listenerCapabilityTable = 'listener_capability';
 
   static String todayAsKey() {
@@ -20,62 +21,49 @@ class UserModeStatusService {
   }
 
   static Future<bool> hasSelectedModeToday() async {
-    final prefs = await SharedPreferences.getInstance();
-    final today = todayAsKey();
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
-
-    if (user != null) {
-      try {
-        final row = await _fetchModeRow(client, user.id);
-        final currentMode = row?['current_mode']?.toString().trim();
-        final updatedAt = _readRowDate(row);
-
-        if (currentMode == null || currentMode.isEmpty) {
-          await clearLocalCache();
-          return false;
-        }
-
-        if (updatedAt != null && _dateTimeToKey(updatedAt.toLocal()) != today) {
-          await clearLocalCache();
-          return false;
-        }
-
-        if (updatedAt == null) {
-          final savedDate = prefs.getString(dateKey);
-          final savedMode = prefs.getString(modeKey);
-          return savedDate == today && savedMode == currentMode;
-        }
-
-        await prefs.setString(dateKey, today);
-        await prefs.setString(modeKey, currentMode);
-        return true;
-      } catch (e) {
-        debugPrint('Error checking user mode status from Supabase: $e');
-      }
+    if (user == null) {
+      await clearLocalCache();
+      return false;
     }
 
-    final savedDate = prefs.getString(dateKey);
-    final savedMode = prefs.getString(modeKey);
-    return savedDate == today && savedMode != null && savedMode.isNotEmpty;
+    final snapshot = await _fetchModeSnapshot(client, user.id);
+    if (snapshot == null) {
+      await clearLocalCache();
+      return false;
+    }
+
+    if (!snapshot.isSelectedToday) {
+      await clearLocalCache();
+      return false;
+    }
+
+    final mode = _normalizeMode(snapshot.currentMode);
+    await _saveLocalSelection(
+      userId: user.id,
+      mode: mode,
+    );
+    return true;
   }
 
   static Future<String?> getCurrentModeToday() async {
-    final prefs = await SharedPreferences.getInstance();
-    final today = todayAsKey();
-    final savedDate = prefs.getString(dateKey);
-    final savedMode = prefs.getString(modeKey)?.trim();
-
-    if (savedDate == today && savedMode != null && savedMode.isNotEmpty) {
-      return savedMode;
-    }
-
-    final hasModeToday = await hasSelectedModeToday();
-    if (!hasModeToday) {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      await clearLocalCache();
       return null;
     }
 
-    return prefs.getString(modeKey)?.trim();
+    final snapshot = await _fetchModeSnapshot(client, user.id);
+    if (snapshot == null || !snapshot.isSelectedToday) {
+      await clearLocalCache();
+      return null;
+    }
+
+    final mode = _normalizeMode(snapshot.currentMode);
+    await _saveLocalSelection(userId: user.id, mode: mode);
+    return mode;
   }
 
   static Future<void> saveCurrentMode(String currentMode) async {
@@ -84,70 +72,40 @@ class UserModeStatusService {
       throw ArgumentError('currentMode must not be empty');
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final today = todayAsKey();
-    await prefs.setString(dateKey, today);
-    await prefs.setString(modeKey, normalizedMode);
-
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
     if (user == null) {
-      return;
+      throw StateError('กรุณาเข้าสู่ระบบก่อนเลือกบทบาท');
     }
 
-    final timestamp = DateTime.now().toUtc().toIso8601String();
-
-    final payloads = <Map<String, dynamic>>[
-      {
-        'user_id': user.id,
-        'current_mode': normalizedMode,
-        'updated_at': timestamp,
-      },
-      {
-        'id': user.id,
-        'current_mode': normalizedMode,
-        'updated_at': timestamp,
-      },
-      {
-        'user_id': user.id,
-        'current_mode': normalizedMode,
-      },
-      {
-        'id': user.id,
-        'current_mode': normalizedMode,
-      },
-    ];
-
-    final conflictTargets = ['user_id', 'id', 'user_id', 'id'];
-    Object? lastError;
-
-    for (var i = 0; i < payloads.length; i++) {
-      try {
-        await client
-            .from(_tableName)
-            .upsert(payloads[i], onConflict: conflictTargets[i]);
-        return;
-      } catch (e) {
-        lastError = e;
-      }
-    }
-
-    throw Exception(
-      'ไม่สามารถบันทึก current_mode ลง user_modes ได้: $lastError',
-    );
+    await _ensureRoleState(client);
+    await client.rpc('set_my_mode', params: {'p_mode': normalizedMode});
+    await _saveLocalSelection(userId: user.id, mode: normalizedMode);
   }
 
   static Future<void> clearLocalCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(dateKey);
     await prefs.remove(modeKey);
+    await prefs.remove(userIdKey);
+    await prefs.remove(selectedConfirmedKey);
   }
 
   static Future<bool> isListenerCapable() async {
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
     if (user == null) {
-      return true;
+      return false;
+    }
+
+    final snapshot = await _fetchModeSnapshot(client, user.id);
+    if (snapshot != null && snapshot.canBeListener != null) {
+      return snapshot.canBeListener!;
+    }
+
+    final statusRow = await getMyModeStatus();
+    if (statusRow != null && statusRow['can_be_listener'] is bool) {
+      return statusRow['can_be_listener'] == true;
     }
 
     final row = await _fetchListenerCapabilityRow(client, user.id);
@@ -156,20 +114,7 @@ class UserModeStatusService {
       return capability;
     }
 
-    return true;
-  }
-
-  static Future<Map<String, dynamic>?> _fetchModeRow(
-    SupabaseClient client,
-    String userId,
-  ) async {
-    final byUserId =
-        await _tryFetchRow(client, column: 'user_id', userId: userId);
-    if (byUserId != null) {
-      return byUserId;
-    }
-
-    return _tryFetchRow(client, column: 'id', userId: userId);
+    return false;
   }
 
   static Future<Map<String, dynamic>?> _fetchListenerCapabilityRow(
@@ -184,17 +129,104 @@ class UserModeStatusService {
     );
   }
 
-  static Future<Map<String, dynamic>?> _tryFetchRow(
-    SupabaseClient client, {
-    required String column,
+  static Future<void> _ensureRoleState(SupabaseClient client) async {
+    try {
+      await client.rpc('ensure_my_role_state');
+    } catch (e) {
+      debugPrint('ensure_my_role_state failed: $e');
+    }
+  }
+
+  static Future<_ModeSnapshot?> _fetchModeSnapshot(
+    SupabaseClient client,
+    String userId,
+  ) async {
+    try {
+      await _ensureRoleState(client);
+      final raw = await client.rpc('get_my_mode_today');
+      final row = _normalizeSingleRow(raw);
+      if (row == null) {
+        return null;
+      }
+
+      final mode = _normalizeMode(row['current_mode']?.toString());
+      final hasCanBeListener = row.containsKey('can_be_listener');
+      return _ModeSnapshot(
+        isSelectedToday: row['is_selected_today'] == true,
+        canBeListener: hasCanBeListener
+            ? _asBool(row['can_be_listener'], fallback: false)
+            : null,
+        currentMode: mode,
+      );
+    } catch (e) {
+      debugPrint('get_my_mode_today failed for $userId: $e');
+      return null;
+    }
+  }
+
+  static Map<String, dynamic>? _normalizeSingleRow(dynamic raw) {
+    if (raw is List) {
+      if (raw.isEmpty) {
+        return null;
+      }
+
+      final first = raw.first;
+      if (first is Map<String, dynamic>) {
+        return first;
+      }
+      if (first is Map) {
+        return Map<String, dynamic>.from(first);
+      }
+
+      return null;
+    }
+
+    if (raw is Map<String, dynamic>) {
+      return raw;
+    }
+    if (raw is Map) {
+      return Map<String, dynamic>.from(raw);
+    }
+
+    return null;
+  }
+
+  static bool _asBool(Object? value, {bool fallback = false}) {
+    if (value is bool) {
+      return value;
+    }
+    if (value is num) {
+      return value != 0;
+    }
+    if (value is String) {
+      final normalized = value.trim().toLowerCase();
+      if (normalized == 'true' || normalized == 't' || normalized == '1') {
+        return true;
+      }
+      if (normalized == 'false' || normalized == 'f' || normalized == '0') {
+        return false;
+      }
+    }
+    return fallback;
+  }
+
+  static String _normalizeMode(String? rawMode) {
+    final value = (rawMode ?? '').trim().toLowerCase();
+    if (value == 'listener') {
+      return 'listener';
+    }
+    return 'seeker';
+  }
+
+  static Future<void> _saveLocalSelection({
     required String userId,
+    required String mode,
   }) async {
-    return _tryFetchRowFromTable(
-      client,
-      tableName: _tableName,
-      column: column,
-      userId: userId,
-    );
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(dateKey, todayAsKey());
+    await prefs.setString(modeKey, mode);
+    await prefs.setString(userIdKey, userId);
+    await prefs.setBool(selectedConfirmedKey, true);
   }
 
   static Future<Map<String, dynamic>?> _tryFetchRowFromTable(
@@ -215,33 +247,78 @@ class UserModeStatusService {
     }
   }
 
-  static DateTime? _readRowDate(Map<String, dynamic>? row) {
-    if (row == null) {
+  static Future<Map<String, dynamic>?> getMyModeStatus() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
       return null;
     }
 
-    final rawValue =
-        row['updated_at'] ?? row['selected_at'] ?? row['created_at'];
-
-    if (rawValue is DateTime) {
-      return rawValue;
+    try {
+      await _ensureRoleState(client);
+      final raw = await client.rpc('get_my_mode_today');
+      return _normalizeSingleRow(raw);
+    } catch (e) {
+      debugPrint('getMyModeStatus failed for ${user.id}: $e');
+      return null;
     }
-
-    if (rawValue is String) {
-      return DateTime.tryParse(rawValue);
-    }
-
-    return null;
   }
 
-  static String _dateTimeToKey(DateTime value) {
-    var normalized = value;
-    if (normalized.hour < 5) {
-      normalized = normalized.subtract(const Duration(days: 1));
+  static Future<String?> setMyMode(String mode) async {
+    final normalizedMode = mode.trim().toLowerCase();
+    if (normalizedMode.isEmpty) {
+      return null;
     }
 
-    final month = normalized.month.toString().padLeft(2, '0');
-    final day = normalized.day.toString().padLeft(2, '0');
-    return '${normalized.year}-$month-$day';
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      return null;
+    }
+
+    try {
+      await _ensureRoleState(client);
+      final raw =
+          await client.rpc('set_my_mode', params: {'p_mode': normalizedMode});
+      final row = _normalizeSingleRow(raw);
+      if (row != null) {
+        final modeValue = row['current_mode'];
+        if (modeValue is String && modeValue.trim().isNotEmpty) {
+          final normalized = _normalizeMode(modeValue);
+          await _saveLocalSelection(userId: user.id, mode: normalized);
+          return normalized;
+        }
+      }
+
+      // Some deployments define set_my_mode as RETURNS void.
+      await _saveLocalSelection(userId: user.id, mode: normalizedMode);
+      return _normalizeMode(normalizedMode);
+    } catch (e) {
+      debugPrint('setMyMode failed for ${user.id}: $e');
+      return null;
+    }
   }
+
+  static Future<void> resetMyModeToday() async {
+    final client = Supabase.instance.client;
+    try {
+      await client.rpc('reset_my_mode_today');
+    } catch (_) {
+      // Optional debug helper; ignore if function is not deployed.
+    } finally {
+      await clearLocalCache();
+    }
+  }
+}
+
+class _ModeSnapshot {
+  const _ModeSnapshot({
+    required this.isSelectedToday,
+    required this.canBeListener,
+    required this.currentMode,
+  });
+
+  final bool isSelectedToday;
+  final bool? canBeListener;
+  final String currentMode;
 }

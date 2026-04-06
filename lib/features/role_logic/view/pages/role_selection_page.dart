@@ -15,25 +15,84 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   static const Color _backgroundColor = Colors.white;
   static const Color _cardListenerColor = Color(0xFFAEE4FC);
   static const Color _cardSeekerColor = Color(0xFFF5D586);
+  // Temporary switch: disable listener quiz flow for now.
+  // Set to true to restore quiz flow immediately.
+  static const bool _enableListenerQuiz = false;
 
   String _selectedMode = '';
   bool _isSaving = false;
 
   Future<void> _openListenerQuiz() async {
-    final result = await Navigator.of(context).push<RoleQuizSelectionResult>(
-      MaterialPageRoute(
-        builder: (_) => const RoleQuizPage(),
-      ),
-    );
+    if (_isSaving) {
+      return;
+    }
 
-    if (!mounted || result == null) {
+    var canBeListener = await UserModeStatusService.isListenerCapable();
+    if (!mounted) {
+      return;
+    }
+
+    if (!canBeListener) {
+      if (!_enableListenerQuiz) {
+        await _saveMode(
+          'seeker',
+          successMessage:
+              'ปิดระบบแบบประเมินชั่วคราว จึงบันทึกโหมดวันนี้เป็นผู้ขอรับคำปรึกษา',
+        );
+        return;
+      }
+
+      final result = await Navigator.of(context).push<RoleQuizSelectionResult>(
+        MaterialPageRoute(
+          builder: (_) => const RoleQuizPage(),
+        ),
+      );
+
+      if (!mounted || result == null) {
+        return;
+      }
+
+      if (result.errorMessage != null && result.errorMessage!.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.errorMessage!)),
+        );
+        return;
+      }
+
+      if (!result.isPass) {
+        await _saveMode(
+          'seeker',
+          successMessage:
+              'ผล assessment ยังไม่ผ่าน จึงบันทึกโหมดวันนี้เป็นผู้ขอรับคำปรึกษาแล้ว',
+        );
+        return;
+      }
+
+      canBeListener = await UserModeStatusService.isListenerCapable();
+      if (!mounted) {
+        return;
+      }
+
+      if (!canBeListener) {
+        await _saveMode(
+          'seeker',
+          successMessage:
+              'ผ่าน assessment แล้ว แต่ซิงก์สิทธิ์ผู้รับฟังยังไม่สำเร็จ จึงบันทึกเป็นผู้ขอรับคำปรึกษาก่อน',
+        );
+        return;
+      }
+
+      await _saveMode(
+        'listener',
+        successMessage:
+            'ผ่าน assessment แล้ว (คะแนน ${result.totalScore}) และบันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
+      );
       return;
     }
 
     await _saveMode(
       'listener',
-      successMessage:
-          'ทำแบบทดสอบแล้ว (คะแนน ${result.totalScore}) และบันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
+      successMessage: 'บันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
     );
   }
 
