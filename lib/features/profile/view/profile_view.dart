@@ -2792,12 +2792,10 @@ class ProfilePage extends StatelessWidget {
                 value: month,
                 child: Text(
                   month,
-                  style: GoogleFonts.mitr(
-                    textStyle: TextStyle(
-                      color: const Color(0xFF757575),
-                      fontSize: scale.rf(16, min: 14, max: 16),
-                      fontWeight: FontWeight.bold,
-                    ),
+                  style: TextStyle(
+                    color: const Color(0xFF757575),
+                    fontSize: scale.rf(16, min: 14, max: 16),
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
@@ -2808,12 +2806,10 @@ class ProfilePage extends StatelessWidget {
           children: [
             Text(
               selectedMonth,
-              style: GoogleFonts.mitr(
-                textStyle: TextStyle(
-                  color: const Color(0xFF757575),
-                  fontSize: scale.rf(16, min: 14, max: 16),
-                  fontWeight: FontWeight.bold,
-                ),
+              style: TextStyle(
+                color: const Color(0xFF757575),
+                fontSize: scale.rf(16, min: 14, max: 16),
+                fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(width: 3),
