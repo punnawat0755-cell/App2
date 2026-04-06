@@ -18,7 +18,6 @@ class _BottomNavBarState extends State<BottomNavBar> {
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
 
   final List<Widget> _pages = [
-    const HomePage(),
     const FeedPage(),
     const ChatSelectionPage(),
     const PetPage(),
