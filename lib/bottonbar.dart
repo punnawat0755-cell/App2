@@ -13,6 +13,7 @@ import 'package:flutter_application_1/module/login/view/logo_view.dart';
 import 'package:flutter_application_1/module/login/view/singup_view.dart';
 import 'package:flutter_application_1/module/pet/view/pet_view.dart';
 import 'package:flutter_application_1/module/profile/view/profile_view.dart';
+import 'package:flutter_application_1/module/pulse/view/pulsecheck_view.dart';
 import 'package:flutter_application_1/module/reset/view/newpassword_view.dart';
 import 'package:flutter_application_1/module/reset/view/reset_view.dart';
 import 'package:flutter_application_1/module/reset/view/resetsent_view.dart';
@@ -36,6 +37,7 @@ class BottomNavController extends GetxController {
     // QuizScreen(),
     // CoinRewardScreen(),
     // MoodTestScreen(),
+    Pulsecheck(),
     ChatWithBotScreen(),
     PauseChatPage(),
     ResetPasswordPage(),
