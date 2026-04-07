@@ -397,7 +397,6 @@ class _PlayVideoPageState extends State<PlayVideoPage>
                 vertical: scale.rs(12, min: 8, max: 12),
               ),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
@@ -406,24 +405,6 @@ class _PlayVideoPageState extends State<PlayVideoPage>
                       Icons.arrow_back_ios,
                       color: Colors.white,
                       size: scale.rs(28, min: 22, max: 28),
-                    ),
-                  ),
-                  Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: scale.rs(12, min: 9, max: 12),
-                      vertical: scale.rs(6, min: 4, max: 6),
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.34),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      '${_currentIndex + 1}/$totalClips',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: scale.rf(12, min: 10.5, max: 12),
-                        fontWeight: FontWeight.w700,
-                      ),
                     ),
                   ),
                 ],

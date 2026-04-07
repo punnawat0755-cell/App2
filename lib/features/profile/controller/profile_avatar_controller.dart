@@ -34,9 +34,9 @@ class ProfileAvatarController extends GetxController {
     super.onClose();
   }
 
-  Future<void> saveAvatar(String nextAvatarUrl) async {
+  Future<bool> saveAvatar(String nextAvatarUrl) async {
     final user = _supabase.auth.currentUser;
-    if (user == null || isSaving.value) return;
+    if (user == null || isSaving.value) return false;
 
     final normalizedAvatar = ProfileAvatarCatalog.normalize(nextAvatarUrl);
     final previousAvatar = avatarUrl.value;
@@ -54,6 +54,7 @@ class ProfileAvatarController extends GetxController {
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
+      return true;
     } catch (error) {
       avatarUrl.value = previousAvatar;
       Get.snackbar(
@@ -61,6 +62,7 @@ class ProfileAvatarController extends GetxController {
         '$error',
         snackPosition: SnackPosition.BOTTOM,
       );
+      return false;
     } finally {
       isSaving.value = false;
     }

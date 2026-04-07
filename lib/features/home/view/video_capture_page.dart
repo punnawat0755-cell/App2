@@ -189,6 +189,7 @@ class _VideoCapturePageState extends State<VideoCapturePage>
         if (!mounted) {
           return;
         }
+        // PRE-POST MODERATION HOOK runs in home_page.dart before createVideoClip().
         Navigator.of(context).pop(file);
       } on CameraException catch (error) {
         if (!mounted) {

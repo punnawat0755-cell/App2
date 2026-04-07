@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/pet/controller/pet_controller.dart';
@@ -13,12 +16,15 @@ class PetPage extends StatefulWidget {
 
 class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
   late final Pet controller;
+  late final AudioPlayer _audioPlayer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     controller = Get.isRegistered<Pet>() ? Get.find<Pet>() : Get.put(Pet());
+    _audioPlayer = AudioPlayer();
+    unawaited(_startLoopSound());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.refreshState(silent: true);
     });
@@ -27,6 +33,8 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_audioPlayer.stop());
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -34,6 +42,15 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       controller.refreshState(silent: true);
+    }
+  }
+
+  Future<void> _startLoopSound() async {
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(AssetSource('Sound/howareyou.mp3'));
+    } catch (e) {
+      debugPrint('Failed to play looping pet sound: $e');
     }
   }
 

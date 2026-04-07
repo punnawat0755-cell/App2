@@ -27,6 +27,7 @@ dependencies:
   google_fonts: ^8.0.1
   cloud_firestore: ^6.1.2
   get_storage: ^2.1.1
+  audioplayers: ^6.5.0
   intl: ^0.20.2
   dio: ^5.9.0
   curved_navigation_bar: ^1.0.6
@@ -36,6 +37,7 @@ dependencies:
   flutter_pdfview: ^1.4.1+1
   path_provider: ^2.1.5
   http: ^1.1.0
+  http_parser: ^4.1.2
   image_picker: ^1.1.2
   camera: ^0.12.0+1
   camera_android: ^0.10.10+15
@@ -52,3 +54,4 @@ flutter:
   assets:
     - assets/images/
     - assets/images/profile_avatars/
+    - assets/Sound/

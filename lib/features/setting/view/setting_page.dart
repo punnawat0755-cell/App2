@@ -274,44 +274,125 @@ class _SettingPageState extends State<SettingPage> {
     BuildContext context,
     ProfileAvatarController controller,
   ) async {
+    var pendingAvatar = controller.avatarUrl.value;
+    var isSubmitting = false;
+
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (sheetContext) {
-        return SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
-              final crossAxisCount = constraints.maxWidth < 360 ? 3 : 4;
-              final gridSpacing = scale.rs(14, min: 10, max: 14);
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+                  final crossAxisCount = constraints.maxWidth < 360 ? 3 : 4;
+                  final gridSpacing = scale.rs(14, min: 10, max: 14);
+                  final canSubmit =
+                      !isSubmitting && !controller.isSaving.value;
 
-              return Padding(
-                padding: EdgeInsets.fromLTRB(
-                  scale.rs(20, min: 16, max: 20),
-                  scale.rs(20, min: 16, max: 20),
-                  scale.rs(20, min: 16, max: 20),
-                  scale.rs(24, min: 18, max: 24),
-                ),
-                child: Obx(
-                  () {
-                    final selectedAvatar = controller.avatarUrl.value;
+                  Future<void> submitSelection() async {
+                    if (!canSubmit) {
+                      return;
+                    }
 
-                    return Column(
+                    if (pendingAvatar == controller.avatarUrl.value) {
+                      if (sheetContext.mounted) {
+                        Navigator.of(sheetContext).pop();
+                      }
+                      return;
+                    }
+
+                    setModalState(() => isSubmitting = true);
+                    final saved = await controller.saveAvatar(pendingAvatar);
+                    if (!sheetContext.mounted) {
+                      return;
+                    }
+
+                    if (saved) {
+                      Navigator.of(sheetContext).pop();
+                      return;
+                    }
+
+                    setModalState(() => isSubmitting = false);
+                  }
+
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      scale.rs(20, min: 16, max: 20),
+                      scale.rs(10, min: 8, max: 12),
+                      scale.rs(20, min: 16, max: 20),
+                      scale.rs(24, min: 18, max: 24),
+                    ),
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'เลือกรูปโปรไฟล์',
-                          style: GoogleFonts.mitr(
-                            textStyle: TextStyle(
-                              color: const Color(0xFF4489D7),
-                              fontSize: scale.rf(22, min: 18, max: 22),
-                              fontWeight: FontWeight.w500,
+                        Center(
+                          child: Container(
+                            width: scale.rs(78, min: 64, max: 78),
+                            height: scale.rs(7, min: 5, max: 7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFC7C7C7),
+                              borderRadius: BorderRadius.circular(999),
                             ),
                           ),
+                        ),
+                        SizedBox(height: scale.rs(16, min: 12, max: 16)),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'เลือกรูปโปรไฟล์',
+                                style: GoogleFonts.mitr(
+                                  textStyle: TextStyle(
+                                    color: const Color(0xFF4489D7),
+                                    fontSize: scale.rf(22, min: 18, max: 22),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            FilledButton(
+                              onPressed: canSubmit ? submitSelection : null,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF2FB8F5),
+                                foregroundColor: Colors.white,
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: scale.rs(20, min: 16, max: 20),
+                                  vertical: scale.rs(10, min: 8, max: 10),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                              ),
+                              child: isSubmitting
+                                  ? SizedBox(
+                                      width: scale.rs(18, min: 16, max: 18),
+                                      height: scale.rs(18, min: 16, max: 18),
+                                      child: const CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: Colors.white,
+                                      ),
+                                    )
+                                  : Text(
+                                      'ตกลง',
+                                      style: GoogleFonts.mitr(
+                                        textStyle: TextStyle(
+                                          fontSize:
+                                              scale.rf(16, min: 14, max: 16),
+                                          fontWeight: FontWeight.w600,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: scale.rs(6, min: 4, max: 6)),
                         Text(
@@ -336,21 +417,22 @@ class _SettingPageState extends State<SettingPage> {
                           ),
                           itemBuilder: (context, index) {
                             final avatarPath = controller.avatarOptions[index];
-                            final isSelected = selectedAvatar == avatarPath;
+                            final isSelected = pendingAvatar == avatarPath;
 
                             return GestureDetector(
-                              onTap: () async {
-                                await controller.saveAvatar(avatarPath);
-                                if (sheetContext.mounted) {
-                                  Navigator.of(sheetContext).pop();
-                                }
-                              },
+                              onTap: isSubmitting
+                                  ? null
+                                  : () {
+                                      setModalState(
+                                        () => pendingAvatar = avatarPath,
+                                      );
+                                    },
                               child: Container(
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   border: Border.all(
                                     color: isSelected
-                                        ? const Color(0xFF4489D7)
+                                        ? const Color(0xFF9EDCF8)
                                         : Colors.transparent,
                                     width: scale.rs(3, min: 2, max: 3),
                                   ),
@@ -370,7 +452,7 @@ class _SettingPageState extends State<SettingPage> {
                                           radius:
                                               scale.rs(12, min: 10, max: 12),
                                           backgroundColor:
-                                              const Color(0xFF4489D7),
+                                              const Color(0xFF8D8D8D),
                                           child: Icon(
                                             Icons.check,
                                             size:
@@ -386,12 +468,12 @@ class _SettingPageState extends State<SettingPage> {
                           },
                         ),
                       ],
-                    );
-                  },
-                ),
-              );
-            },
-          ),
+                    ),
+                  );
+                },
+              ),
+            );
+          },
         );
       },
     );

@@ -180,6 +180,7 @@ class _FeedPhotoCapturePageState extends State<FeedPhotoCapturePage>
       if (!mounted) {
         return;
       }
+      // PRE-POST MODERATION HOOK runs in feed_view.dart before createPost().
       Navigator.of(context).pop(file);
     } on CameraException catch (error) {
       if (!mounted) {

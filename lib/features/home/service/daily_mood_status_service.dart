@@ -28,34 +28,35 @@ class DailyMoodStatusService {
   }
 
   static Future<bool> hasAnsweredToday() async {
+    final client = Supabase.instance.client;
     final prefs = await SharedPreferences.getInstance();
     final today = todayAsKey();
-    final client = Supabase.instance.client;
-    if (client.auth.currentUser != null) {
-      try {
-        final response = await client
-            .from('v_my_mood_today')
-            .select('mood_level')
-            .maybeSingle();
-
-        final moodLevel = response?['mood_level'] as int?;
-        if (moodLevel == null) {
-          await clearLocalCache();
-          return false;
-        }
-
-        final cacheEntry = _cacheEntryFromMoodLevel(moodLevel);
-        await prefs.setString(dateKey, today);
-        await prefs.setInt(scoreKey, cacheEntry.score);
-        await prefs.setString(labelKey, cacheEntry.label);
-        return true;
-      } catch (e) {
-        debugPrint('Error checking daily mood status from Supabase: $e');
-      }
+    if (client.auth.currentUser == null) {
+      final savedDate = prefs.getString(dateKey);
+      return savedDate == today;
     }
 
-    final savedDate = prefs.getString(dateKey);
-    return savedDate == today;
+    try {
+      final response = await client
+          .from('v_my_mood_today')
+          .select('mood_level')
+          .maybeSingle();
+      final moodLevel = response?['mood_level'] as int?;
+      if (moodLevel == null) {
+        await clearLocalCache();
+        return false;
+      }
+
+      final cacheEntry = _cacheEntryFromMoodLevel(moodLevel);
+      await prefs.setString(dateKey, today);
+      await prefs.setInt(scoreKey, cacheEntry.score);
+      await prefs.setString(labelKey, cacheEntry.label);
+      return true;
+    } catch (e) {
+      debugPrint('Error checking daily mood status from Supabase: $e');
+      await clearLocalCache();
+      return false;
+    }
   }
 
   static Future<void> clearLocalCache() async {

@@ -27,6 +27,7 @@ class BottomNavBar extends StatefulWidget {
 
 class _BottomNavBarState extends State<BottomNavBar>
     with WidgetsBindingObserver {
+  static const bool _enableRoleSelectionFlow = true;
   int _page = 0;
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
   bool _checkingPausedChat = false;
@@ -141,6 +142,10 @@ class _BottomNavBarState extends State<BottomNavBar>
   }
 
   Future<void> _openRoleSelectionIfNeeded() async {
+    if (!_enableRoleSelectionFlow) {
+      return;
+    }
+
     if (!mounted || _checkingRoleMode || _roleSelectionPageOpen) {
       return;
     }
@@ -194,10 +199,13 @@ class _BottomNavBarState extends State<BottomNavBar>
 
     return Scaffold(
       extendBody: true,
-      body: _pages[_page],
+      body: IndexedStack(
+        index: _page,
+        children: _pages,
+      ),
       bottomNavigationBar: CurvedNavigationBar(
         key: _bottomNavigationKey,
-        index: 0,
+        index: _page,
         height: scale.rs(60, min: 54, max: 60),
         items: <Widget>[
           Icon(

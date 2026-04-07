@@ -2,6 +2,7 @@ class ModerationResult {
   const ModerationResult({
     required this.ok,
     required this.status,
+    required this.action,
     required this.allowed,
     required this.safeToPost,
     required this.reasonCodes,
@@ -12,6 +13,7 @@ class ModerationResult {
     return ModerationResult(
       ok: _readBool(json['ok']) ?? false,
       status: _readInt(json['status']),
+      action: _readSummary(json['action']) ?? '',
       allowed: _readBool(json['allowed']) ?? false,
       safeToPost: _readBool(json['safe_to_post']) ??
           _readBool(json['safeToPost']) ??
@@ -31,6 +33,7 @@ class ModerationResult {
     return ModerationResult(
       ok: false,
       status: status,
+      action: '',
       allowed: false,
       safeToPost: false,
       reasonCodes: reasonCode == null || reasonCode.isEmpty
@@ -42,6 +45,7 @@ class ModerationResult {
 
   final bool ok;
   final int? status;
+  final String action;
   final bool allowed;
   final bool safeToPost;
   final List<String> reasonCodes;
@@ -50,6 +54,7 @@ class ModerationResult {
   ModerationResult copyWith({
     bool? ok,
     int? status,
+    String? action,
     bool? allowed,
     bool? safeToPost,
     List<String>? reasonCodes,
@@ -58,6 +63,7 @@ class ModerationResult {
     return ModerationResult(
       ok: ok ?? this.ok,
       status: status ?? this.status,
+      action: action ?? this.action,
       allowed: allowed ?? this.allowed,
       safeToPost: safeToPost ?? this.safeToPost,
       reasonCodes: reasonCodes ?? this.reasonCodes,

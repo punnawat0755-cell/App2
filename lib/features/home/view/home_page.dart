@@ -270,6 +270,8 @@ class _HomePageState extends State<HomePage> {
       final moderationResult = await _postModerationService.moderateVideo(
         userId: supabase.auth.currentUser?.id ?? '',
         caption: caption,
+        videoBytes: originalVideoBytes,
+        videoFileName: file.name,
         transcript: caption.trim(),
         frameNotes: _buildFrameNotes(caption),
         frameUrls: const <String>[],
