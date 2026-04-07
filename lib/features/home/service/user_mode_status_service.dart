@@ -7,6 +7,10 @@ class UserModeStatusService {
   static const String modeKey = 'user_mode_current_mode';
   static const String userIdKey = 'user_mode_user_id';
   static const String selectedConfirmedKey = 'user_mode_selected_confirmed';
+  static const String listenerQuizRetryDateKey =
+      'listener_quiz_retry_used_date';
+  static const String listenerQuizRetryUserIdKey =
+      'listener_quiz_retry_used_user_id';
 
   static String todayAsKey() {
     var now = DateTime.now();
@@ -80,6 +84,34 @@ class UserModeStatusService {
     await prefs.remove(modeKey);
     await prefs.remove(userIdKey);
     await prefs.remove(selectedConfirmedKey);
+    await prefs.remove(listenerQuizRetryDateKey);
+    await prefs.remove(listenerQuizRetryUserIdKey);
+  }
+
+  static Future<bool> canTakeListenerQuizRetryToday() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final usedDate = prefs.getString(listenerQuizRetryDateKey) ?? '';
+    final usedUserId = prefs.getString(listenerQuizRetryUserIdKey) ?? '';
+    final usedToday = usedDate == todayAsKey() && usedUserId == user.id;
+    return !usedToday;
+  }
+
+  static Future<void> markListenerQuizRetryUsedToday() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(listenerQuizRetryDateKey, todayAsKey());
+    await prefs.setString(listenerQuizRetryUserIdKey, user.id);
   }
 
   static Future<bool> isListenerCapable() async {
