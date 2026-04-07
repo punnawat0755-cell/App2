@@ -111,6 +111,10 @@ class _FeedPageState extends State<FeedPage> {
     );
 
     if (!mounted || created != true) return;
+
+    await _refreshFeed();
+
+    if (!mounted) return;
     _showSnackBar('โพสต์ของคุณถูกเผยแพร่แล้ว');
   }
 
