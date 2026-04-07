@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:get/get.dart';
@@ -15,6 +16,8 @@ class DailyMoodPage extends StatefulWidget {
 }
 
 class _DailyMoodPageState extends State<DailyMoodPage> {
+  static const int _maxSelectedTags = 3;
+
   // ---------- UI mood options (5 levels) ----------
   static const List<_MoodOption> _moodOptions = [
     _MoodOption(
@@ -324,10 +327,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('กำลังบันทึก...'), duration: Duration(seconds: 1)),
-    );
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   const SnackBar(
+    //       content: Text('กำลังบันทึก...'), duration: Duration(seconds: 1)),
+    // );
 
     try {
       await _saveToSupabase(
@@ -347,17 +350,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     await _saveLocalToday(option, markEditUsed: canEditNow);
     await _refreshProfileCalendarIfNeeded();
     await _refreshCoinsIfNeeded();
-
-    final message = canEditNow
-        ? 'แก้ไขคำตอบสำเร็จ: ${option.label} (${option.score}/100)'
-        : 'บันทึกอารมณ์วันนี้แล้ว: ${option.label} (${option.score}/100)';
-
     if (!mounted) return;
-    if (Navigator.of(context).canPop()) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      Navigator.of(context).pop(message);
-      return;
-    }
 
     setState(() {
       _answeredToday = true;
@@ -374,9 +367,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       _isEditMode = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    Get.offAll(() => const BottomNavBar());
   }
 
   bool get _canLeavePage => _answeredToday;
@@ -513,7 +504,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                                   enabled: canSelectMood, scale: scale),
                             ],
                           ),
-                          SizedBox(height: scale.rs(24, min: 16, max: 24)),
+                          SizedBox(height: scale.rs(30, min: 16, max: 54)),
                           Text(
                             'บันทึกเรื่องราวของวันนี้',
                             style: TextStyle(
@@ -592,7 +583,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                             height: 84,
                             scale: scale,
                           ),
-                          SizedBox(height: scale.rs(40, min: 24, max: 40)),
+                          SizedBox(height: scale.rs(40, min: 24, max: 120)),
                           Center(
                             child: SizedBox(
                               width: scale.rw(0.85, min: 220, max: 420),
@@ -619,7 +610,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Image.asset(
-                                      'assets/images/heart.png',
+                                      "assets/images/heartpulse.png",
                                       height: scale.rs(40, min: 32, max: 40),
                                       width: scale.rs(40, min: 32, max: 40),
                                     ),
@@ -639,7 +630,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               ),
                             ),
                           ),
-                          SizedBox(height: scale.rs(30, min: 20, max: 30)),
+                          // SizedBox(height: scale.rs(30, min: 20, max: 30)),
                         ],
                       ),
                     );
@@ -676,13 +667,13 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
             keyboardType: TextInputType.multiline,
             enabled: enabled,
             style: TextStyle(
-              color: mainBlue,
+              color: Color(0xFF4489D7),
               fontSize: scale.rf(16, min: 14, max: 16),
             ),
             decoration: InputDecoration(
               hintText: 'มาเริ่มการบันทึกกันเถอะ......',
               hintStyle: TextStyle(
-                color: Colors.black38,
+                color: Color(0xFF9FBCDB),
                 fontSize: scale.rf(14, min: 12, max: 14),
               ),
               border: InputBorder.none,
@@ -703,7 +694,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
               builder: (_, value, __) => Text(
                 '${value.text.length}/$maxLength',
                 style: TextStyle(
-                  color: mainBlue.withValues(alpha: 0.5),
+                  color: Color(0xFF9FBCDB),
                   fontSize: scale.rf(12, min: 10.5, max: 12),
                   fontWeight: FontWeight.bold,
                 ),
@@ -720,10 +711,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     required bool enabled,
     required ResponsiveScale scale,
   }) {
-    const mainBlue = Color(0xFF4A89D8);
-    const lightFillBlue = Color(0xFFE0F2FE);
-    const tagFillBlue = Color(0xFF93C5FD);
-
     return Row(
       children: rowTags.map((tag) {
         final isSelected = _selectedTags.contains(tag);
@@ -735,6 +722,11 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
             child: GestureDetector(
               onTap: enabled
                   ? () {
+                      if (!isSelected &&
+                          _selectedTags.length >= _maxSelectedTags) {
+                        return;
+                      }
+
                       setState(() {
                         if (isSelected) {
                           _selectedTags.remove(tag);
@@ -749,12 +741,12 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                 height: scale.rs(42, min: 34, max: 42),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: isSelected ? tagFillBlue : lightFillBlue,
+                  color: isSelected ? Color(0xFF8BE2FB) : Color(0xFFCEEFFE),
                   borderRadius: BorderRadius.circular(
                     scale.rs(25, min: 18, max: 25),
                   ),
                   border: Border.all(
-                    color: mainBlue,
+                    color: Color(0xFF4489D7),
                     width: scale.rs(1.2, min: 1, max: 1.2),
                   ),
                 ),
@@ -763,7 +755,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                   child: Text(
                     tag,
                     style: TextStyle(
-                      color: mainBlue,
+                      color: Color(0xFF4489D7),
                       fontWeight: FontWeight.bold,
                       fontSize: scale.rf(14, min: 12, max: 14),
                     ),
