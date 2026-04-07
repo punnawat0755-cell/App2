@@ -15,9 +15,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   static const Color _backgroundColor = Colors.white;
   static const Color _cardListenerColor = Color(0xFFAEE4FC);
   static const Color _cardSeekerColor = Color(0xFFF5D586);
-  // Temporary switch: disable listener quiz flow for now.
-  // Set to true to restore quiz flow immediately.
-  static const bool _enableListenerQuiz = false;
+  static const bool _enableListenerQuiz = true;
 
   String _selectedMode = '';
   bool _isSaving = false;

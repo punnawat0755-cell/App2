@@ -27,9 +27,7 @@ class BottomNavBar extends StatefulWidget {
 
 class _BottomNavBarState extends State<BottomNavBar>
     with WidgetsBindingObserver {
-  // Temporary switch: disable daily role selection flow entirely.
-  // Set to true to re-enable RoleSelectionPage.
-  static const bool _enableRoleSelectionFlow = false;
+  static const bool _enableRoleSelectionFlow = true;
   int _page = 0;
   final GlobalKey<CurvedNavigationBarState> _bottomNavigationKey = GlobalKey();
   bool _checkingPausedChat = false;
