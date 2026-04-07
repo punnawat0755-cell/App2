@@ -4,7 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/firebase_chat_identity_service.dart';
+import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
+import 'package:flutter_application_1/features/role_logic/view/pages/role_selection_page.dart';
 import 'package:get/get.dart';
 
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
@@ -29,6 +31,10 @@ class ChatSelectionController extends GetxController {
   }
 
   Future<void> _openChatEntry(MatchRole role) async {
+    if (!await _ensureChatGate(role)) {
+      return;
+    }
+
     final user = await FirebaseChatIdentityService.ensureSignedIn();
     if (user == null) {
       Get.snackbar(
@@ -62,6 +68,71 @@ class ChatSelectionController extends GetxController {
       ),
       binding: UserChatBinding(),
     );
+  }
+
+  Future<bool> _ensureChatGate(MatchRole role) async {
+    final gateState = await UserModeStatusService.getMyChatGateState();
+    if (gateState == null) {
+      Get.snackbar(
+        'ยังตรวจสอบสิทธิ์ไม่ได้',
+        'กรุณาลองใหม่อีกครั้ง',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    final hasRoleToday = gateState['has_role_today'] == true;
+    final currentMode = (gateState['current_mode']?.toString() ?? '').trim();
+    final canChatAsListener = gateState['can_chat_as_listener'] == true;
+    final assessmentPassed = gateState['assessment_passed'] == true;
+
+    if (!hasRoleToday) {
+      final message = await Get.to<String>(() => const RoleSelectionPage());
+      if (message != null && message.isNotEmpty) {
+        Get.snackbar(
+          'อัปเดตบทบาทแล้ว',
+          message,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      }
+
+      final refreshedGateState =
+          await UserModeStatusService.getMyChatGateState();
+      if (refreshedGateState == null ||
+          refreshedGateState['has_role_today'] != true) {
+        return false;
+      }
+
+      if (role == MatchRole.listener) {
+        return refreshedGateState['can_chat_as_listener'] == true;
+      }
+
+      return true;
+    }
+
+    if (role != MatchRole.listener) {
+      return true;
+    }
+
+    if (currentMode != 'listener') {
+      Get.snackbar(
+        'ยังไม่ใช่โหมดผู้ให้คำปรึกษา',
+        'วันนี้คุณยังไม่ได้เลือกบทบาทผู้ให้คำปรึกษา',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    if (!assessmentPassed || !canChatAsListener) {
+      Get.snackbar(
+        'ยังไม่ผ่านแบบประเมิน',
+        'ต้องผ่านแบบประเมินก่อนจึงจะให้คำปรึกษาได้',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    return true;
   }
 }
 

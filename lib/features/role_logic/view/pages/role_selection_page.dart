@@ -25,12 +25,12 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       return;
     }
 
-    var canBeListener = await UserModeStatusService.isListenerCapable();
+    var hasPassedAssessment = await UserModeStatusService.isListenerCapable();
     if (!mounted) {
       return;
     }
 
-    if (!canBeListener) {
+    if (!hasPassedAssessment) {
       if (!_enableListenerQuiz) {
         await _saveMode(
           'seeker',
@@ -50,6 +50,15 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
         return;
       }
 
+      if (result.assessmentUnavailable) {
+        await _saveMode(
+          'seeker',
+          successMessage:
+              'ยังไม่มีแบบประเมินที่เปิดใช้งาน จึงบันทึกโหมดวันนี้เป็นผู้ขอรับคำปรึกษา',
+        );
+        return;
+      }
+
       if (result.errorMessage != null && result.errorMessage!.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(result.errorMessage!)),
@@ -66,12 +75,12 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
         return;
       }
 
-      canBeListener = await UserModeStatusService.isListenerCapable();
+      hasPassedAssessment = await UserModeStatusService.isListenerCapable();
       if (!mounted) {
         return;
       }
 
-      if (!canBeListener) {
+      if (!hasPassedAssessment) {
         await _saveMode(
           'seeker',
           successMessage:
