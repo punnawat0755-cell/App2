@@ -320,6 +320,15 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     final canEditNow = _answeredToday && _isEditMode && !_editUsedToday;
 
     if (!isFirstAnswer && !canEditNow) return;
+    if (_selectedTags.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเลือกความรู้สึกอย่างน้อย 1 ข้อก่อนส่งพลังใจ'),
+        ),
+      );
+      return;
+    }
     if (!_isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนบันทึก Daily Mood')),
@@ -371,6 +380,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   }
 
   bool get _canLeavePage => _answeredToday;
+  bool get _hasSelectedMoodTags => _selectedTags.isNotEmpty;
 
   void _showLockedExitHint() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -502,6 +512,18 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               SizedBox(height: scale.rs(12, min: 8, max: 12)),
                               _buildTagRow(currentTags.sublist(4, 8),
                                   enabled: canSelectMood, scale: scale),
+                              if (canSelectMood && !_hasSelectedMoodTags) ...[
+                                SizedBox(
+                                  height: scale.rs(8, min: 6, max: 8),
+                                ),
+                                Text(
+                                  'กรุณาเลือกความรู้สึกอย่างน้อย 1 ข้อ',
+                                  style: TextStyle(
+                                    color: const Color(0xFF607D8B),
+                                    fontSize: scale.rf(12, min: 10.5, max: 12),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                           SizedBox(height: scale.rs(30, min: 16, max: 54)),
@@ -589,9 +611,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               width: scale.rw(0.85, min: 220, max: 420),
                               height: scale.rs(55, min: 46, max: 55),
                               child: ElevatedButton(
-                                onPressed: canSelectMood
-                                    ? () => _submitMood(selectedOption)
-                                    : null,
+                                onPressed:
+                                    (canSelectMood && _hasSelectedMoodTags)
+                                        ? () => _submitMood(selectedOption)
+                                        : null,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFB5EFFF),
                                   disabledBackgroundColor:
