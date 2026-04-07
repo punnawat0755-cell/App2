@@ -12,6 +12,7 @@ import 'core/services/notification_service.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'features/login/view/login_page.dart';
+import 'features/login/view/privacy_policy_page.dart';
 import 'features/login/view/splash_screen_page.dart';
 
 @pragma('vm:entry-point')
@@ -108,6 +109,17 @@ class AuthStateHandler extends StatefulWidget {
 class _AuthStateHandlerState extends State<AuthStateHandler> {
   // ใช้ shared client จาก core/supabase/supabase_client.dart
   final _authStream = supabase.auth.onAuthStateChange;
+  Future<bool>? _pdpaAcceptedFuture;
+  String? _pdpaCheckedUserId;
+
+  Future<bool> _loadPdpaAccepted(String userId) async {
+    final response = await supabase
+        .from('profiles')
+        .select('pdpa_accepted_at')
+        .eq('id', userId)
+        .maybeSingle();
+    return response != null && response['pdpa_accepted_at'] != null;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,8 +133,38 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
         final session = snapshot.data?.session;
 
         if (session != null) {
-          return const BottomNavBar();
+          final userId = session.user.id;
+          if (_pdpaAcceptedFuture == null || _pdpaCheckedUserId != userId) {
+            _pdpaCheckedUserId = userId;
+            _pdpaAcceptedFuture = _loadPdpaAccepted(userId);
+          }
+
+          return FutureBuilder<bool>(
+            future: _pdpaAcceptedFuture,
+            builder: (context, pdpaSnapshot) {
+              if (pdpaSnapshot.connectionState == ConnectionState.waiting) {
+                return const SplashScreenPage();
+              }
+
+              final isAccepted = pdpaSnapshot.data ?? false;
+              if (isAccepted) {
+                return const BottomNavBar();
+              }
+
+              return PrivacyPolicyPage(
+                popOnAccept: false,
+                onAccepted: () {
+                  if (!mounted) return;
+                  setState(() {
+                    _pdpaAcceptedFuture = Future<bool>.value(true);
+                  });
+                },
+              );
+            },
+          );
         } else {
+          _pdpaAcceptedFuture = null;
+          _pdpaCheckedUserId = null;
           return const LoginPage();
         }
       },

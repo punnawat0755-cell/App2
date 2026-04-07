@@ -23,7 +23,7 @@ class ShopPage extends StatelessWidget {
     final List<ShopItem> shopItems = shopItemsMock;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFE6F7FF),
+      backgroundColor: Colors.white,
       body: SafeArea(
         top: false,
         bottom: false,
