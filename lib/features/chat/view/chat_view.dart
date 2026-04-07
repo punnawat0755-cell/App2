@@ -6,6 +6,7 @@ import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/firebase_chat_identity_service.dart';
 import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
+import 'package:flutter_application_1/features/role_logic/view/pages/role_quiz_page.dart';
 import 'package:flutter_application_1/features/role_logic/view/pages/role_selection_page.dart';
 import 'package:get/get.dart';
 
@@ -115,24 +116,127 @@ class ChatSelectionController extends GetxController {
     }
 
     if (currentMode != 'listener') {
-      Get.snackbar(
-        'ยังไม่ใช่โหมดผู้ให้คำปรึกษา',
-        'วันนี้คุณยังไม่ได้เลือกบทบาทผู้ให้คำปรึกษา',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return false;
+      if (assessmentPassed) {
+        return _switchToListenerModeAndValidate();
+      }
+      return _tryUnlockListenerWithOneTimeQuiz();
     }
 
     if (!assessmentPassed || !canChatAsListener) {
+      if (!assessmentPassed) {
+        return _tryUnlockListenerWithOneTimeQuiz();
+      }
       Get.snackbar(
-        'ยังไม่ผ่านแบบประเมิน',
-        'ต้องผ่านแบบประเมินก่อนจึงจะให้คำปรึกษาได้',
+        'ยังไม่พร้อมให้คำปรึกษา',
+        'กรุณาลองใหม่อีกครั้งในภายหลัง',
         snackPosition: SnackPosition.BOTTOM,
       );
       return false;
     }
 
     return true;
+  }
+
+  Future<bool> _switchToListenerModeAndValidate() async {
+    try {
+      await UserModeStatusService.saveCurrentMode('listener');
+    } catch (e) {
+      Get.snackbar(
+        'สลับโหมดไม่สำเร็จ',
+        e.toString(),
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    final refreshedGateState = await UserModeStatusService.getMyChatGateState();
+    final canChatAsListener =
+        refreshedGateState?['can_chat_as_listener'] == true;
+    if (!canChatAsListener) {
+      Get.snackbar(
+        'ยังไม่พร้อมให้คำปรึกษา',
+        'กรุณาลองใหม่อีกครั้ง',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    return true;
+  }
+
+  Future<bool> _tryUnlockListenerWithOneTimeQuiz() async {
+    final canRetryToday =
+        await UserModeStatusService.canTakeListenerQuizRetryToday();
+    if (!canRetryToday) {
+      Get.snackbar(
+        'ใช้สิทธิ์ครบแล้ว',
+        'วันนี้คุณใช้โอกาสทำแบบประเมินเพิ่มครบ 1 ครั้งแล้ว',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    final shouldStartQuiz = await Get.dialog<bool>(
+      AlertDialog(
+        title: const Text('ทำแบบประเมินก่อนให้คำปรึกษา'),
+        content: const Text(
+          'วันนี้คุณยังไม่ผ่านแบบประเมินสำหรับผู้ให้คำปรึกษา\n'
+          'คุณสามารถทำแบบประเมินเพิ่มได้อีก 1 ครั้ง',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(result: false),
+            child: const Text('ยกเลิก'),
+          ),
+          FilledButton(
+            onPressed: () => Get.back(result: true),
+            child: const Text('เริ่มทำแบบประเมิน'),
+          ),
+        ],
+      ),
+      barrierDismissible: false,
+    );
+    if (shouldStartQuiz != true) {
+      return false;
+    }
+
+    final result = await Get.to<RoleQuizSelectionResult>(
+      () => const RoleQuizPage(),
+    );
+    if (result == null) {
+      return false;
+    }
+
+    if (result.assessmentUnavailable) {
+      Get.snackbar(
+        'ยังไม่สามารถทำแบบประเมินได้',
+        'ขณะนี้ยังไม่มีแบบประเมินที่เปิดใช้งาน',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    if (result.errorMessage != null && result.errorMessage!.isNotEmpty) {
+      Get.snackbar(
+        'บันทึกผลไม่สำเร็จ',
+        result.errorMessage!,
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    await UserModeStatusService.markListenerQuizRetryUsedToday();
+
+    if (!result.isPass) {
+      Get.snackbar(
+        'ยังไม่ผ่านแบบประเมิน',
+        'วันนี้คุณยังไม่พร้อมสำหรับบทบาทผู้ให้คำปรึกษา',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return false;
+    }
+
+    return _switchToListenerModeAndValidate();
   }
 }
 
