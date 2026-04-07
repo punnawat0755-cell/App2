@@ -266,9 +266,11 @@ class FeedRepository {
     String? createdPostId;
     String? uploadedImagePath;
     try {
+      // FIX: ส่ง hasMedia เข้า _insertPost เพื่อ set status ให้ถูกต้อง
       final postId = await _insertPost(
         userId: identity.userId,
         content: safeText,
+        hasMedia: hasImage,
       );
       createdPostId = postId;
       await _rewardPostCreated(postId);
@@ -750,6 +752,70 @@ class FeedRepository {
     }
   }
 
+  // FIX: แก้ _loadPostRows ให้ใช้ RPC สำหรับ feed หลัก
+  // และ filter approved เท่านั้นสำหรับ profile ของคนอื่น
+  Future<List<Map<String, dynamic>>> _loadPostRows({String? authorId}) async {
+    // Profile page: query ตรงแต่ filter เฉพาะโพสต์ที่ approved
+    if (authorId != null && authorId.isNotEmpty) {
+      final currentUserId = _client.auth.currentUser?.id ?? '';
+      final isOwnProfile = currentUserId == authorId;
+
+      if (isOwnProfile) {
+        // โปรไฟล์ตัวเอง: เห็นทุกสถานะ (draft, active, hidden)
+        final rows = await _client
+            .from(_postsTable)
+            .select('*')
+            .eq('user_id', authorId)
+            .inFilter('status', ['draft', 'active', 'hidden'])
+            .order('created_at', ascending: false);
+        return rows
+            .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+            .toList();
+      } else {
+        // โปรไฟล์คนอื่น: เห็นเฉพาะ approved + visible
+        final rows = await _client
+            .from(_postsTable)
+            .select('*')
+            .eq('user_id', authorId)
+            .eq('status', 'active')
+            .eq('moderation_status', 'approved')
+            .eq('is_visible', true)
+            .order('created_at', ascending: false);
+        return rows
+            .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+            .toList();
+      }
+    }
+
+    // Feed หลัก: ใช้ RPC get_posts_feed_fast
+    // ซึ่ง include โพสต์ approved ของทุกคน + โพสต์ทุกสถานะของตัวเอง
+    try {
+      final response = await _client.rpc(
+        'get_posts_feed_fast',
+        params: {'p_limit': 60, 'p_offset': 0},
+      );
+
+      if (response is! List) return const [];
+
+      return response
+          .whereType<Map>()
+          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+          .toList();
+    } catch (_) {
+      // Fallback: query ตรงถ้า RPC ล้มเหลว (filter approved เท่านั้น)
+      final rows = await _client
+          .from(_postsTable)
+          .select('*')
+          .eq('status', 'active')
+          .eq('moderation_status', 'approved')
+          .eq('is_visible', true)
+          .order('created_at', ascending: false)
+          .limit(60);
+      return rows
+          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
+          .toList();
+    }
+  }
   Stream<List<FeedPost>> _watchMappedPosts({String? authorId}) {
     late final StreamController<List<FeedPost>> controller;
     StreamSubscription<List<Map<String, dynamic>>>? postsSubscription;
@@ -774,6 +840,22 @@ class FeedRepository {
       }
     }
 
+    Future<void> refreshPostsFromQuery({bool reportErrors = false}) async {
+      try {
+        final rows = await _loadPostRows(authorId: authorId);
+        if (controller.isClosed) {
+          return;
+        }
+        latestPostRows = rows;
+        hasLoadedPosts = true;
+        await emitMappedPosts();
+      } catch (error, stackTrace) {
+        if (reportErrors && !controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      }
+    }
+
     void scheduleEmitMappedPosts({
       Duration delay = const Duration(milliseconds: 120),
     }) {
@@ -788,20 +870,14 @@ class FeedRepository {
       onListen: () {
         hasActiveListener = true;
 
-        void onPosts(List<Map<String, dynamic>> rows) {
-          latestPostRows = rows
-              .map<Map<String, dynamic>>(
-                (row) => Map<String, dynamic>.from(row),
-              )
-              .toList();
-          final isInitialLoad = !hasLoadedPosts;
-          hasLoadedPosts = true;
-          if (isInitialLoad) {
-            unawaited(emitMappedPosts());
-            return;
-          }
-          scheduleEmitMappedPosts(delay: const Duration(milliseconds: 80));
+        void onPosts(List<Map<String, dynamic>> _) {
+          // FIX: realtime stream อาจดึงมาโดยไม่ filter -> ให้ refresh จาก
+          // _loadPostRows แทนการใช้ rows จาก stream โดยตรง
+          // เพื่อให้ได้ข้อมูลที่ถูก filter แล้วเสมอ
+          unawaited(refreshPostsFromQuery());
         }
+
+        unawaited(refreshPostsFromQuery(reportErrors: true));
 
         if (authorId != null && authorId.isNotEmpty) {
           postsSubscription = _client
@@ -811,7 +887,7 @@ class FeedRepository {
               .order('created_at', ascending: false)
               .listen(
                 onPosts,
-                onError: controller.addError,
+                onError: (_, __) => unawaited(refreshPostsFromQuery()),
               );
         } else {
           postsSubscription = _client
@@ -820,7 +896,7 @@ class FeedRepository {
               .order('created_at', ascending: false)
               .listen(
                 onPosts,
-                onError: controller.addError,
+                onError: (_, __) => unawaited(refreshPostsFromQuery()),
               );
         }
 
@@ -914,15 +990,25 @@ class FeedRepository {
     return storagePath;
   }
 
+  // FIX: เพิ่ม hasMedia parameter เพื่อ set status ให้ถูกต้องตั้งแต่ต้น
   Future<String> _insertPost({
     required String userId,
     required String content,
+    bool hasMedia = false,
   }) async {
+    final now = DateTime.now().toUtc().toIso8601String();
+
     final insertedRow = await _client
         .from(_postsTable)
         .insert({
           'user_id': userId,
           'content_text': content,
+          // text-only -> approved ทันที ไม่ต้องรอ moderation
+          // มี media -> pending รอ n8n/moderation approve ก่อน
+          'status': 'active',
+          'moderation_status': hasMedia ? 'pending' : 'approved',
+          'is_visible': !hasMedia,
+          if (!hasMedia) 'moderated_at': now,
         })
         .select('id')
         .single();
