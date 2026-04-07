@@ -166,7 +166,10 @@ class _VideoPreview extends StatelessWidget {
     }
 
     if (!videoPath.startsWith('http')) {
-      return _VideoThumbnail(videoPath: videoPath);
+      return _VideoThumbnail(
+        key: ValueKey(videoPath),
+        videoPath: videoPath,
+      );
     }
 
     return Container(
@@ -225,7 +228,10 @@ class _PreviewImage extends StatelessWidget {
 }
 
 class _VideoThumbnail extends StatefulWidget {
-  const _VideoThumbnail({required this.videoPath});
+  const _VideoThumbnail({
+    super.key,
+    required this.videoPath,
+  });
 
   final String videoPath;
 
@@ -234,34 +240,68 @@ class _VideoThumbnail extends StatefulWidget {
 }
 
 class _VideoThumbnailState extends State<_VideoThumbnail> {
-  late final VideoPlayerController _controller;
+  VideoPlayerController? _controller;
+  String? _controllerPath;
 
   @override
   void initState() {
     super.initState();
-    _controller = widget.videoPath.startsWith('http')
-        ? VideoPlayerController.networkUrl(Uri.parse(widget.videoPath))
-        : VideoPlayerController.file(File(widget.videoPath))
-      ..initialize().then((_) async {
-        await _controller.setLooping(false);
-        await _controller.seekTo(Duration.zero);
-        await _controller.play();
-        await _controller.pause();
-        if (mounted) {
-          setState(() {});
-        }
-      });
+    _initializeController(widget.videoPath);
+  }
+
+  @override
+  void didUpdateWidget(covariant _VideoThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.videoPath == widget.videoPath) {
+      return;
+    }
+    _initializeController(widget.videoPath);
+  }
+
+  Future<void> _initializeController(String path) async {
+    final previous = _controller;
+    _controller = null;
+    _controllerPath = path;
+    if (mounted) {
+      setState(() {});
+    }
+    await previous?.dispose();
+
+    final controller = path.startsWith('http')
+        ? VideoPlayerController.networkUrl(Uri.parse(path))
+        : VideoPlayerController.file(File(path));
+
+    _controller = controller;
+    try {
+      await controller.initialize();
+      await controller.setLooping(false);
+      await controller.seekTo(Duration.zero);
+      await controller.play();
+      await controller.pause();
+    } catch (_) {
+      // Keep fallback placeholder when preview initialization fails.
+    }
+
+    if (!mounted || _controllerPath != path || _controller != controller) {
+      await controller.dispose();
+      return;
+    }
+
+    setState(() {});
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    final controller = _controller;
+    _controller = null;
+    controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_controller.value.isInitialized) {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) {
       return Container(
         color: const Color(0xFFDDE7F0),
         alignment: Alignment.center,
@@ -276,9 +316,9 @@ class _VideoThumbnailState extends State<_VideoThumbnail> {
     return FittedBox(
       fit: BoxFit.cover,
       child: SizedBox(
-        width: _controller.value.size.width,
-        height: _controller.value.size.height,
-        child: VideoPlayer(_controller),
+        width: controller.value.size.width,
+        height: controller.value.size.height,
+        child: VideoPlayer(controller),
       ),
     );
   }

@@ -8,7 +8,12 @@ import 'package:flutter_application_1/features/shop/view/shop_view.dart';
 import 'package:get/get.dart';
 
 class PetPage extends StatefulWidget {
-  const PetPage({super.key});
+  const PetPage({
+    super.key,
+    required this.isActive,
+  });
+
+  final bool isActive;
 
   @override
   State<PetPage> createState() => _PetPageState();
@@ -24,24 +29,29 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     controller = Get.isRegistered<Pet>() ? Get.find<Pet>() : Get.put(Pet());
     _audioPlayer = AudioPlayer();
-    unawaited(_startLoopSound());
+    if (widget.isActive) {
+      unawaited(_startLoopSound());
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.refreshState(silent: true);
     });
   }
 
   @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    unawaited(_audioPlayer.stop());
-    _audioPlayer.dispose();
-    super.dispose();
-  }
-
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       controller.refreshState(silent: true);
+      if (widget.isActive) {
+        unawaited(_startLoopSound());
+      }
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      unawaited(_stopLoopSound());
     }
   }
 
@@ -49,9 +59,44 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.play(AssetSource('Sound/howareyou.mp3'));
+      if (!mounted || !widget.isActive) {
+        await _audioPlayer.stop();
+      }
     } catch (e) {
       debugPrint('Failed to play looping pet sound: $e');
     }
+  }
+
+  Future<void> _stopLoopSound() async {
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      debugPrint('Failed to stop looping pet sound: $e');
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant PetPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.isActive == oldWidget.isActive) {
+      return;
+    }
+
+    if (widget.isActive) {
+      unawaited(_startLoopSound());
+      return;
+    }
+
+    unawaited(_stopLoopSound());
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_stopLoopSound());
+    _audioPlayer.dispose();
+    super.dispose();
   }
 
   @override

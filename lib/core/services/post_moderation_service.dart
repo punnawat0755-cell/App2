@@ -75,6 +75,9 @@ class PostModerationService {
       mediaFileName: imageFileName,
       fields: <String, String>{
         'action': 'image_moderate',
+        'media_type': 'image',
+        'moderation_type': 'image',
+        'is_video': 'false',
         'token': _token,
         'user_id': userId,
         'caption': caption.trim(),
@@ -103,11 +106,15 @@ class PostModerationService {
       );
     }
 
+    final normalizedVideoFileName = _normalizedVideoFileName(videoFileName);
     return _moderateBinary(
       mediaBytes: videoBytes,
-      mediaFileName: videoFileName,
+      mediaFileName: normalizedVideoFileName,
       fields: <String, String>{
         'action': 'video_moderate',
+        'media_type': 'video',
+        'moderation_type': 'video',
+        'is_video': 'true',
         'token': _token,
         'user_id': userId,
         'caption': caption.trim(),
@@ -140,13 +147,22 @@ class PostModerationService {
           request.fields[key] = value;
         }
       });
+      final mediaType = _contentTypeForFileName(mediaFileName);
+      request.fields['file_size_bytes'] = mediaBytes.lengthInBytes.toString();
+      request.fields['media_mime_type'] = mediaType.mimeType;
+      final action = request.fields['action']?.trim().toLowerCase() ?? '';
+      if (action == 'video_moderate') {
+        request.fields['media_type'] = 'video';
+      } else if (action == 'image_moderate') {
+        request.fields['media_type'] = 'image';
+      }
 
       request.files.add(
         http.MultipartFile.fromBytes(
           'media',
           mediaBytes,
           filename: _normalizedFileName(mediaFileName),
-          contentType: _contentTypeForFileName(mediaFileName),
+          contentType: mediaType,
         ),
       );
 
@@ -219,6 +235,24 @@ class PostModerationService {
       return 'media.bin';
     }
     return trimmed;
+  }
+
+  String _normalizedVideoFileName(String rawFileName) {
+    final normalized = _normalizedFileName(rawFileName);
+    final lowered = normalized.toLowerCase();
+    final hasVideoExtension = lowered.endsWith('.mp4') ||
+        lowered.endsWith('.mov') ||
+        lowered.endsWith('.m4v') ||
+        lowered.endsWith('.avi') ||
+        lowered.endsWith('.webm') ||
+        lowered.endsWith('.mkv');
+    if (hasVideoExtension) {
+      return normalized;
+    }
+    if (normalized == 'media.bin') {
+      return 'video.mp4';
+    }
+    return '$normalized.mp4';
   }
 
   http_parser.MediaType _contentTypeForFileName(String rawFileName) {

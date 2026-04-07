@@ -37,14 +37,6 @@ class _BottomNavBarState extends State<BottomNavBar>
   bool _checkingDailyMood = false;
   bool _dailyMoodPageOpen = false;
 
-  final List<Widget> _pages = [
-    const HomePage(),
-    const FeedPage(),
-    const ChatSelectionPage(),
-    const PetPage(),
-    const ProfilePage(),
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -201,7 +193,13 @@ class _BottomNavBarState extends State<BottomNavBar>
       extendBody: true,
       body: IndexedStack(
         index: _page,
-        children: _pages,
+        children: [
+          const HomePage(),
+          const FeedPage(),
+          const ChatSelectionPage(),
+          PetPage(isActive: _page == 3),
+          const ProfilePage(),
+        ],
       ),
       bottomNavigationBar: CurvedNavigationBar(
         key: _bottomNavigationKey,

@@ -39,7 +39,7 @@ class _HomePageState extends State<HomePage> {
 
   int _currentBannerIndex = 0;
   late final PageController _pageController;
-  late final Stream<List<HomeVideoClip>> _videoClipsStream;
+  late Stream<List<HomeVideoClip>> _videoClipsStream;
   Timer? _timer;
   final HomeVideoRepository _homeVideoRepository = HomeVideoRepository();
   final HomeVideoPrefetchService _homeVideoPrefetchService =
@@ -65,7 +65,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
-    _videoClipsStream = _homeVideoRepository.watchVideoClips();
+    _videoClipsStream = _createVideoClipsStream();
     _loadUsername();
     _loadMissionDays();
 
@@ -168,6 +168,21 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Stream<List<HomeVideoClip>> _createVideoClipsStream() {
+    _lastWarmupSignature = '';
+    return _homeVideoRepository.watchVideoClips();
+  }
+
+  void _refreshVideoClips() {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _videoClipsStream = _createVideoClipsStream();
+    });
+  }
+
   void _warmUpVisibleClips(
     BuildContext context,
     List<HomeVideoClip> clips,
@@ -243,11 +258,8 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      final suggestedCaption = source == ImageSource.camera
-          ? ''
-          : _fileNameWithoutExtension(file.name);
       final caption = await _promptClipCaption(
-        initialValue: suggestedCaption,
+        initialValue: '',
         videoFileName: file.name,
         videoFilePath: file.path,
       );
@@ -265,13 +277,19 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
+      final preparedUpload = await _videoUploadPrepareService.prepareForUpload(
+        filePath: file.path,
+        fileName: file.name,
+        fallbackBytes: originalVideoBytes,
+      );
+
       setState(() => _isUploadingClip = true);
       // PRE-POST MODERATION HOOK: block submission unless webhook allows it.
       final moderationResult = await _postModerationService.moderateVideo(
         userId: supabase.auth.currentUser?.id ?? '',
         caption: caption,
-        videoBytes: originalVideoBytes,
-        videoFileName: file.name,
+        videoBytes: preparedUpload.bytes,
+        videoFileName: preparedUpload.fileName,
         transcript: caption.trim(),
         frameNotes: _buildFrameNotes(caption),
         frameUrls: const <String>[],
@@ -289,12 +307,6 @@ class _HomePageState extends State<HomePage> {
         return;
       }
 
-      final preparedUpload = await _videoUploadPrepareService.prepareForUpload(
-        filePath: file.path,
-        fileName: file.name,
-        fallbackBytes: originalVideoBytes,
-      );
-
       await _homeVideoRepository.createVideoClip(
         videoBytes: preparedUpload.bytes,
         videoFileName: preparedUpload.fileName,
@@ -304,6 +316,7 @@ class _HomePageState extends State<HomePage> {
       if (!mounted) {
         return;
       }
+      _refreshVideoClips();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('โพสต์เรียบร้อยแล้ว!')),
       );
@@ -445,14 +458,6 @@ class _HomePageState extends State<HomePage> {
 
     return defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS;
-  }
-
-  String _fileNameWithoutExtension(String fileName) {
-    final lastDotIndex = fileName.lastIndexOf('.');
-    if (lastDotIndex <= 0) {
-      return fileName;
-    }
-    return fileName.substring(0, lastDotIndex);
   }
 
   List<String> _buildFrameNotes(String caption) {
@@ -687,6 +692,7 @@ class _HomePageState extends State<HomePage> {
 
                                 final clip = clips[index - 1];
                                 return InkWell(
+                                  key: ValueKey('clip-card-${clip.id}'),
                                   onTap: () => _openVideoClip(clips, index - 1),
                                   child: FutureBuilder<String?>(
                                     future: index <= 2
@@ -1050,10 +1056,7 @@ class _ClipCaptionSheetState extends State<_ClipCaptionSheet> {
     }
     setState(() => _isSubmitting = true);
     FocusScope.of(context).unfocus();
-    final caption = _controller.text.trim();
-    Navigator.of(context).pop(
-      caption.isEmpty ? widget.initialValue : caption,
-    );
+    Navigator.of(context).pop(_controller.text.trim());
   }
 
   @override
