@@ -7,7 +7,6 @@ class UserModeStatusService {
   static const String modeKey = 'user_mode_current_mode';
   static const String userIdKey = 'user_mode_user_id';
   static const String selectedConfirmedKey = 'user_mode_selected_confirmed';
-  static const String _listenerCapabilityTable = 'listener_capability';
 
   static String todayAsKey() {
     var now = DateTime.now();
@@ -28,21 +27,15 @@ class UserModeStatusService {
       return false;
     }
 
-    final snapshot = await _fetchModeSnapshot(client, user.id);
-    if (snapshot == null) {
+    final state = await _fetchAppEntryState(client);
+    if (state == null || !state.hasRoleToday) {
       await clearLocalCache();
       return false;
     }
 
-    if (!snapshot.isSelectedToday) {
-      await clearLocalCache();
-      return false;
-    }
-
-    final mode = _normalizeMode(snapshot.currentMode);
     await _saveLocalSelection(
       userId: user.id,
-      mode: mode,
+      mode: state.currentMode,
     );
     return true;
   }
@@ -55,23 +48,21 @@ class UserModeStatusService {
       return null;
     }
 
-    final snapshot = await _fetchModeSnapshot(client, user.id);
-    if (snapshot == null || !snapshot.isSelectedToday) {
+    final state = await _fetchAppEntryState(client);
+    if (state == null || !state.hasRoleToday) {
       await clearLocalCache();
       return null;
     }
 
-    final mode = _normalizeMode(snapshot.currentMode);
-    await _saveLocalSelection(userId: user.id, mode: mode);
-    return mode;
+    await _saveLocalSelection(
+      userId: user.id,
+      mode: state.currentMode,
+    );
+    return state.currentMode;
   }
 
   static Future<void> saveCurrentMode(String currentMode) async {
-    final normalizedMode = currentMode.trim();
-    if (normalizedMode.isEmpty) {
-      throw ArgumentError('currentMode must not be empty');
-    }
-
+    final normalizedMode = _normalizeMode(currentMode);
     final client = Supabase.instance.client;
     final user = client.auth.currentUser;
     if (user == null) {
@@ -93,40 +84,111 @@ class UserModeStatusService {
 
   static Future<bool> isListenerCapable() async {
     final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) {
+    if (client.auth.currentUser == null) {
       return false;
     }
 
-    final snapshot = await _fetchModeSnapshot(client, user.id);
-    if (snapshot != null && snapshot.canBeListener != null) {
-      return snapshot.canBeListener!;
+    final gateState = await _fetchChatGateState(client);
+    if (gateState != null) {
+      return gateState.assessmentPassed;
     }
 
-    final statusRow = await getMyModeStatus();
-    if (statusRow != null && statusRow['can_be_listener'] is bool) {
-      return statusRow['can_be_listener'] == true;
-    }
-
-    final row = await _fetchListenerCapabilityRow(client, user.id);
-    final capability = row?['is_capable'];
-    if (capability is bool) {
-      return capability;
-    }
-
-    return false;
+    final entryState = await _fetchAppEntryState(client);
+    return entryState?.assessmentPassed ?? false;
   }
 
-  static Future<Map<String, dynamic>?> _fetchListenerCapabilityRow(
-    SupabaseClient client,
-    String userId,
-  ) async {
-    return _tryFetchRowFromTable(
-      client,
-      tableName: _listenerCapabilityTable,
-      column: 'user_id',
-      userId: userId,
-    );
+  static Future<bool> canChatAsListenerToday() async {
+    final client = Supabase.instance.client;
+    if (client.auth.currentUser == null) {
+      return false;
+    }
+
+    final gateState = await _fetchChatGateState(client);
+    return gateState?.canChatAsListener ?? false;
+  }
+
+  static Future<Map<String, dynamic>?> getMyModeStatus() async {
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      return null;
+    }
+
+    final appState = await _fetchAppEntryState(client);
+    final chatState = await _fetchChatGateState(client);
+    if (appState == null && chatState == null) {
+      return null;
+    }
+
+    final hasRoleToday = chatState?.hasRoleToday ?? appState?.hasRoleToday;
+    final currentMode = chatState?.currentMode ?? appState?.currentMode;
+    final selectedForDay =
+        chatState?.selectedForDay ?? appState?.selectedForDay;
+    final assessmentPassed =
+        chatState?.assessmentPassed ?? appState?.assessmentPassed;
+
+    return {
+      'has_role_today': hasRoleToday ?? false,
+      'is_selected_today': hasRoleToday ?? false,
+      'current_mode': currentMode,
+      'selected_for_day': selectedForDay,
+      'assessment_passed': assessmentPassed ?? false,
+      'can_chat_as_listener': chatState?.canChatAsListener ?? false,
+      'latest_assessment_result': appState?.latestAssessmentResult,
+    };
+  }
+
+  static Future<Map<String, dynamic>?> getMyChatGateState() async {
+    final client = Supabase.instance.client;
+    if (client.auth.currentUser == null) {
+      return null;
+    }
+
+    final state = await _fetchChatGateState(client);
+    if (state == null) {
+      return null;
+    }
+
+    return {
+      'has_role_today': state.hasRoleToday,
+      'current_mode': state.currentMode,
+      'selected_for_day': state.selectedForDay,
+      'can_chat_as_listener': state.canChatAsListener,
+      'assessment_passed': state.assessmentPassed,
+    };
+  }
+
+  static Future<String?> setMyMode(String mode) async {
+    final normalizedMode = _normalizeMode(mode);
+    final client = Supabase.instance.client;
+    final user = client.auth.currentUser;
+    if (user == null) {
+      return null;
+    }
+
+    try {
+      await _ensureRoleState(client);
+      final raw =
+          await client.rpc('set_my_mode', params: {'p_mode': normalizedMode});
+      final row = _normalizeSingleRow(raw);
+      final savedMode = _normalizeMode(row?['current_mode']?.toString());
+      await _saveLocalSelection(userId: user.id, mode: savedMode);
+      return savedMode;
+    } catch (e) {
+      debugPrint('setMyMode failed for ${user.id}: $e');
+      return null;
+    }
+  }
+
+  static Future<void> resetMyModeToday() async {
+    final client = Supabase.instance.client;
+    try {
+      await client.rpc('reset_my_mode_today');
+    } catch (_) {
+      // Optional debug helper; ignore if function is not deployed.
+    } finally {
+      await clearLocalCache();
+    }
   }
 
   static Future<void> _ensureRoleState(SupabaseClient client) async {
@@ -137,29 +199,48 @@ class UserModeStatusService {
     }
   }
 
-  static Future<_ModeSnapshot?> _fetchModeSnapshot(
+  static Future<_AppEntryState?> _fetchAppEntryState(
     SupabaseClient client,
-    String userId,
   ) async {
     try {
-      await _ensureRoleState(client);
-      final raw = await client.rpc('get_my_mode_today');
+      final raw = await client.rpc('get_my_app_entry_state');
       final row = _normalizeSingleRow(raw);
       if (row == null) {
         return null;
       }
 
-      final mode = _normalizeMode(row['current_mode']?.toString());
-      final hasCanBeListener = row.containsKey('can_be_listener');
-      return _ModeSnapshot(
-        isSelectedToday: row['is_selected_today'] == true,
-        canBeListener: hasCanBeListener
-            ? _asBool(row['can_be_listener'], fallback: false)
-            : null,
-        currentMode: mode,
+      return _AppEntryState(
+        hasRoleToday: _asBool(row['has_role_today']),
+        currentMode: _normalizeMode(row['current_mode']?.toString()),
+        selectedForDay: row['selected_for_day']?.toString(),
+        assessmentPassed: _asBool(row['assessment_passed']),
+        latestAssessmentResult: row['latest_assessment_result']?.toString(),
       );
     } catch (e) {
-      debugPrint('get_my_mode_today failed for $userId: $e');
+      debugPrint('get_my_app_entry_state failed: $e');
+      return null;
+    }
+  }
+
+  static Future<_ChatGateState?> _fetchChatGateState(
+    SupabaseClient client,
+  ) async {
+    try {
+      final raw = await client.rpc('get_my_chat_gate_state');
+      final row = _normalizeSingleRow(raw);
+      if (row == null) {
+        return null;
+      }
+
+      return _ChatGateState(
+        hasRoleToday: _asBool(row['has_role_today']),
+        currentMode: _normalizeMode(row['current_mode']?.toString()),
+        selectedForDay: row['selected_for_day']?.toString(),
+        canChatAsListener: _asBool(row['can_chat_as_listener']),
+        assessmentPassed: _asBool(row['assessment_passed']),
+      );
+    } catch (e) {
+      debugPrint('get_my_chat_gate_state failed: $e');
       return null;
     }
   }
@@ -212,10 +293,7 @@ class UserModeStatusService {
 
   static String _normalizeMode(String? rawMode) {
     final value = (rawMode ?? '').trim().toLowerCase();
-    if (value == 'listener') {
-      return 'listener';
-    }
-    return 'seeker';
+    return value == 'listener' ? 'listener' : 'seeker';
   }
 
   static Future<void> _saveLocalSelection({
@@ -228,97 +306,36 @@ class UserModeStatusService {
     await prefs.setString(userIdKey, userId);
     await prefs.setBool(selectedConfirmedKey, true);
   }
-
-  static Future<Map<String, dynamic>?> _tryFetchRowFromTable(
-    SupabaseClient client, {
-    required String tableName,
-    required String column,
-    required String userId,
-  }) async {
-    try {
-      return await client
-          .from(tableName)
-          .select()
-          .eq(column, userId)
-          .maybeSingle();
-    } catch (e) {
-      debugPrint('Unable to query $tableName by $column: $e');
-      return null;
-    }
-  }
-
-  static Future<Map<String, dynamic>?> getMyModeStatus() async {
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) {
-      return null;
-    }
-
-    try {
-      await _ensureRoleState(client);
-      final raw = await client.rpc('get_my_mode_today');
-      return _normalizeSingleRow(raw);
-    } catch (e) {
-      debugPrint('getMyModeStatus failed for ${user.id}: $e');
-      return null;
-    }
-  }
-
-  static Future<String?> setMyMode(String mode) async {
-    final normalizedMode = mode.trim().toLowerCase();
-    if (normalizedMode.isEmpty) {
-      return null;
-    }
-
-    final client = Supabase.instance.client;
-    final user = client.auth.currentUser;
-    if (user == null) {
-      return null;
-    }
-
-    try {
-      await _ensureRoleState(client);
-      final raw =
-          await client.rpc('set_my_mode', params: {'p_mode': normalizedMode});
-      final row = _normalizeSingleRow(raw);
-      if (row != null) {
-        final modeValue = row['current_mode'];
-        if (modeValue is String && modeValue.trim().isNotEmpty) {
-          final normalized = _normalizeMode(modeValue);
-          await _saveLocalSelection(userId: user.id, mode: normalized);
-          return normalized;
-        }
-      }
-
-      // Some deployments define set_my_mode as RETURNS void.
-      await _saveLocalSelection(userId: user.id, mode: normalizedMode);
-      return _normalizeMode(normalizedMode);
-    } catch (e) {
-      debugPrint('setMyMode failed for ${user.id}: $e');
-      return null;
-    }
-  }
-
-  static Future<void> resetMyModeToday() async {
-    final client = Supabase.instance.client;
-    try {
-      await client.rpc('reset_my_mode_today');
-    } catch (_) {
-      // Optional debug helper; ignore if function is not deployed.
-    } finally {
-      await clearLocalCache();
-    }
-  }
 }
 
-class _ModeSnapshot {
-  const _ModeSnapshot({
-    required this.isSelectedToday,
-    required this.canBeListener,
+class _AppEntryState {
+  const _AppEntryState({
+    required this.hasRoleToday,
     required this.currentMode,
+    required this.selectedForDay,
+    required this.assessmentPassed,
+    required this.latestAssessmentResult,
   });
 
-  final bool isSelectedToday;
-  final bool? canBeListener;
+  final bool hasRoleToday;
   final String currentMode;
+  final String? selectedForDay;
+  final bool assessmentPassed;
+  final String? latestAssessmentResult;
+}
+
+class _ChatGateState {
+  const _ChatGateState({
+    required this.hasRoleToday,
+    required this.currentMode,
+    required this.selectedForDay,
+    required this.canChatAsListener,
+    required this.assessmentPassed,
+  });
+
+  final bool hasRoleToday;
+  final String currentMode;
+  final String? selectedForDay;
+  final bool canChatAsListener;
+  final bool assessmentPassed;
 }

@@ -7,12 +7,14 @@ class RoleQuizSelectionResult {
     required this.totalScore,
     required this.answers,
     required this.isPass,
+    this.assessmentUnavailable = false,
     this.errorMessage,
   });
 
   final int totalScore;
   final List<Map<String, dynamic>> answers;
   final bool isPass;
+  final bool assessmentUnavailable;
   final String? errorMessage;
 }
 
@@ -606,6 +608,7 @@ class QuizController extends GetxController {
         totalScore: submitResult.submittedScore ?? totalScore.value,
         answers: answers,
         isPass: submitResult.isPass,
+        assessmentUnavailable: submitResult.assessmentUnavailable,
         errorMessage: submitResult.errorMessage,
       );
 
@@ -634,8 +637,7 @@ class QuizController extends GetxController {
       if (attemptId == null || attemptId.isEmpty) {
         return const _SubmitAssessmentResult(
           isPass: false,
-          errorMessage:
-              'ยังไม่มีแบบประเมินที่เปิดใช้งาน จึงยังบันทึกคะแนนไม่ได้',
+          assessmentUnavailable: true,
         );
       }
 
@@ -741,11 +743,13 @@ class QuizController extends GetxController {
 class _SubmitAssessmentResult {
   const _SubmitAssessmentResult({
     required this.isPass,
+    this.assessmentUnavailable = false,
     this.errorMessage,
     this.submittedScore,
   });
 
   final bool isPass;
+  final bool assessmentUnavailable;
   final String? errorMessage;
   final int? submittedScore;
 }
