@@ -13,7 +13,8 @@ class ProfileAvatarCatalog {
     ),
   );
 
-  static const String defaultAvatar = 'assets/images/profile_avatars/avatar_1.png';
+  static const String defaultAvatar =
+      'assets/images/profile_avatars/avatar_1.png';
 
   static String normalize(String? rawValue) {
     final value = rawValue?.trim() ?? '';

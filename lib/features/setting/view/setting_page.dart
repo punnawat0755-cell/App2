@@ -293,8 +293,7 @@ class _SettingPageState extends State<SettingPage> {
                   final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
                   final crossAxisCount = constraints.maxWidth < 360 ? 3 : 4;
                   final gridSpacing = scale.rs(14, min: 10, max: 14);
-                  final canSubmit =
-                      !isSubmitting && !controller.isSaving.value;
+                  final canSubmit = !isSubmitting && !controller.isSaving.value;
 
                   Future<void> submitSelection() async {
                     if (!canSubmit) {
