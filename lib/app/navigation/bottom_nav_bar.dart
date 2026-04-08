@@ -174,12 +174,12 @@ class _BottomNavBarState extends State<BottomNavBar>
 
     _runningEntryFlow = true;
     try {
-      await _openRoleSelectionIfNeeded();
+      await _openDailyMoodIfNeeded();
       if (!mounted) {
         return;
       }
 
-      await _openDailyMoodIfNeeded();
+      await _openRoleSelectionIfNeeded();
     } finally {
       _runningEntryFlow = false;
     }
