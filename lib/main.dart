@@ -61,8 +61,9 @@ Future<void> main() async {
 
   try {
     await NotificationService.initialize();
-  } catch (e) {
+  } catch (e, st) {
     debugPrint("Notification Init Error: $e");
+    debugPrint("Notification Init Stack: $st");
   }
 
   runApp(const MyApp());
