@@ -81,10 +81,19 @@ class UserModeStatusService {
       'listener_quiz_retry_used_user_id';
 
   static Future<void> saveCurrentMode(String mode) async {
-    await supabase.rpc(
-      'set_my_mode',
-      params: {'p_mode': mode},
-    );
+    try {
+      await supabase.rpc(
+        'set_my_mode',
+        params: {'p_mode': mode},
+      );
+      return;
+    } on PostgrestException catch (error) {
+      if (!_isAmbiguousUserIdError(error)) {
+        rethrow;
+      }
+    }
+
+    await _saveCurrentModeFallback(mode);
   }
 
   static Future<bool> hasSelectedModeToday() async {
@@ -340,6 +349,56 @@ class UserModeStatusService {
 
     final message = error.message.toLowerCase();
     return message.contains('could not find the function');
+  }
+
+  static bool _isAmbiguousUserIdError(PostgrestException error) {
+    if ((error.code ?? '').trim() != '42702') {
+      return false;
+    }
+
+    final message = error.message.toLowerCase();
+    return message.contains('user_id') && message.contains('ambiguous');
+  }
+
+  static Future<void> _saveCurrentModeFallback(String mode) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      throw StateError('กรุณาเข้าสู่ระบบก่อนเลือกบทบาท');
+    }
+
+    final normalizedMode = mode.trim().toLowerCase();
+    if (normalizedMode != 'seeker' && normalizedMode != 'listener') {
+      throw ArgumentError('invalid mode: $mode');
+    }
+
+    if (normalizedMode == 'listener') {
+      final passedToday = await hasPassedAssessmentToday();
+      if (!passedToday) {
+        throw StateError('listener mode requires passing assessment today');
+      }
+    }
+
+    final selectedForDay = await _resolveSelectedDateForDb();
+    await supabase.from('user_modes').upsert(
+      {
+        'user_id': currentUser.id,
+        'current_mode': normalizedMode,
+        'selected_for_day': selectedForDay,
+      },
+      onConflict: 'user_id',
+    );
+  }
+
+  static Future<String> _resolveSelectedDateForDb() async {
+    try {
+      final raw = await supabase.rpc('current_bangkok_date');
+      final serverDate = _stringOrNull(raw);
+      if (serverDate != null && serverDate.isNotEmpty) {
+        return serverDate;
+      }
+    } catch (_) {}
+
+    return todayAsKey();
   }
 }
 
