@@ -476,35 +476,40 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildAddClipCard() {
+    final scale = context.responsive;
+    final cardWidth = scale.rs(110, min: 96, max: 118);
+    final loadingSize = scale.rs(26, min: 22, max: 28);
+    final circleSize = scale.rs(45, min: 38, max: 48);
+
     return GestureDetector(
       onTap: _pickAndUploadClip,
       child: Container(
-        width: 110,
+        width: cardWidth,
         decoration: BoxDecoration(
           color: const Color(0xFFE2E2E2),
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(scale.rs(20, min: 16, max: 22)),
         ),
         child: Center(
           child: _isUploadingClip
               ? SizedBox(
-                  width: 26,
-                  height: 26,
-                  child: const CircularProgressIndicator(
+                  width: loadingSize,
+                  height: loadingSize,
+                  child: CircularProgressIndicator(
                     strokeWidth: 2.6,
                     color: Color(0xFF4489D7),
                   ),
                 )
               : Container(
-                  width: 45,
-                  height: 45,
+                  width: circleSize,
+                  height: circleSize,
                   decoration: const BoxDecoration(
                     color: Colors.white,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.add,
-                    color: Color(0xFF8A8A8A),
-                    size: 30,
+                    color: const Color(0xFF8A8A8A),
+                    size: scale.rs(30, min: 24, max: 32),
                   ),
                 ),
         ),
@@ -537,213 +542,232 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const SizedBox(width: 40),
-                  Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final horizontalPadding = scale.rs(24, min: 14, max: 24);
+            final bannerHeight = scale.rs(160, min: 145, max: 168);
+            final articleCardWidth = scale.rs(160, min: 140, max: 168);
+            final avatarSize = scale.rs(50, min: 44, max: 52);
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: 10,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(width: 8),
-                      GestureDetector(
-                        onTap: () async {
-                          await Get.to(() => const SettingPage());
-                          if (!mounted) {
-                            return;
-                          }
-                          await _loadUsername();
-                        },
-                        child: SizedBox(
-                          width: 50,
-                          height: 50,
-                          child: Obx(
-                            () => Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border:
-                                    Border.all(color: Colors.white, width: 3),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.06),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          GestureDetector(
+                            onTap: () async {
+                              await Get.to(() => const SettingPage());
+                              if (!mounted) {
+                                return;
+                              }
+                              await _loadUsername();
+                            },
+                            child: SizedBox(
+                              width: avatarSize,
+                              height: avatarSize,
+                              child: Obx(
+                                () => Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white, width: 3),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black
+                                            .withValues(alpha: 0.06),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                    image: DecorationImage(
+                                      image:
+                                          avatarController.avatarImageProvider,
+                                      fit: BoxFit.cover,
+                                    ),
                                   ),
-                                ],
-                                image: DecorationImage(
-                                  image: avatarController.avatarImageProvider,
-                                  fit: BoxFit.cover,
                                 ),
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        _isNameLoading ? 'สวัสดี, ...' : 'สวัสดี,$_displayName',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Color(0xFF4489D7),
+                          fontSize: scale.rf(24, min: 21, max: 25),
+                          fontWeight: FontWeight.w900,
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              Text(
-                _isNameLoading ? 'สวัสดี, ...' : 'สวัสดี,$_displayName',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF4489D7),
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 160,
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    setState(() {
-                      _currentBannerIndex = index;
-                    });
-                  },
-                  children: [
-                    DailyMissionBanner(
-                      onTap: _openDailyMission,
-                      dayCount: _isMissionDaysLoading
-                          ? '...'
-                          : _missionDays.toString(),
-                    ),
-                    const ClownFishBanner(),
-                    const LoveJobBanner(),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 15),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(3, (index) {
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 800),
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    width: _currentBannerIndex == index ? 24 : 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: _currentBannerIndex == index
-                          ? const Color(0xFF4489D7)
-                          : Colors.blue.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  );
-                }),
-              ),
-              const SizedBox(height: 10),
-              const HomeSectionHeader(title: 'คลิปสั้น'),
-              const SizedBox(height: 15),
-              SizedBox(
-                height: 160,
-                child: StreamBuilder<List<HomeVideoClip>>(
-                  stream: _videoClipsStream,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError && !snapshot.hasData) {
-                      return ListView(
-                        scrollDirection: Axis.horizontal,
-                        clipBehavior: Clip.none,
-                        padding: EdgeInsets.zero,
-                        children: [_buildAddClipCard()],
-                      );
-                    }
-
-                    if (!snapshot.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
-                    }
-
-                    final clips = snapshot.data ?? const <HomeVideoClip>[];
-                    _warmUpVisibleClips(context, clips);
-                    return ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      clipBehavior: Clip.none,
-                      padding: EdgeInsets.zero,
-                      itemCount: clips.length + 1,
-                      separatorBuilder: (_, __) => const SizedBox(width: 15),
-                      itemBuilder: (context, index) {
-                        if (index == 0) {
-                          return _buildAddClipCard();
-                        }
-
-                        final clip = clips[index - 1];
-                        return InkWell(
-                          key: ValueKey('clip-card-${clip.id}'),
-                          onTap: () => _openVideoClip(clips, index - 1),
-                          child: FutureBuilder<String?>(
-                            future: index <= 2
-                                ? _homeVideoPrefetchService.prefetchVideo(
-                                    clip.videoUrl,
-                                  )
-                                : _homeVideoPrefetchService.getCachedPath(
-                                    clip.videoUrl,
-                                  ),
-                            builder: (context, previewSnapshot) {
-                              final cachedPreviewPath =
-                                  previewSnapshot.data?.trim() ?? '';
-                              return ClipCard(
-                                title: _clipCardTitle(clip),
-                                subtitle: _clipCardSubtitle(clip),
-                                imagePath: cachedPreviewPath.isNotEmpty
-                                    ? cachedPreviewPath
-                                    : clip.videoUrl,
-                                thumbnailPath: clip.thumbnailUrl,
-                                forceVideoPreview: true,
-                              );
-                            },
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 25),
-              const HomeSectionHeader(title: 'บทความจิตวิทยา'),
-              const SizedBox(height: 15),
-              SizedBox(
-                height: 210,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  clipBehavior: Clip.none,
-                  padding: EdgeInsets.zero,
-                  itemCount: _articleList.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 15),
-                  itemBuilder: (context, index) {
-                    final article = _articleList[index];
-                    return SizedBox(
-                      width: 160,
-                      child: ArticleCard(
-                        title: article.title,
-                        subtitle: article.subtitle,
-                        imagePath: article.imagePath,
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ArticleDetailPage(
-                                title: article.detailTitle,
-                                imagePath: article.detailImagePath,
-                                content: article.content,
-                              ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: bannerHeight,
+                        child: PageView(
+                          controller: _pageController,
+                          onPageChanged: (index) {
+                            setState(() {
+                              _currentBannerIndex = index;
+                            });
+                          },
+                          children: [
+                            DailyMissionBanner(
+                              onTap: _openDailyMission,
+                              dayCount: _isMissionDaysLoading
+                                  ? '...'
+                                  : _missionDays.toString(),
+                            ),
+                            ClownFishBanner(),
+                            LoveJobBanner(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 15),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (index) {
+                          return AnimatedContainer(
+                            duration: const Duration(milliseconds: 800),
+                            margin: const EdgeInsets.symmetric(horizontal: 3),
+                            width: _currentBannerIndex == index ? 24 : 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: _currentBannerIndex == index
+                                  ? const Color(0xFF4489D7)
+                                  : Colors.blue.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
                             ),
                           );
-                        },
+                        }),
                       ),
-                    );
-                  },
+                      const SizedBox(height: 10),
+                      const HomeSectionHeader(title: 'คลิปสั้น'),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        height: scale.rs(160, min: 148, max: 168),
+                        child: StreamBuilder<List<HomeVideoClip>>(
+                          stream: _videoClipsStream,
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError && !snapshot.hasData) {
+                              return ListView(
+                                scrollDirection: Axis.horizontal,
+                                clipBehavior: Clip.none,
+                                padding: EdgeInsets.zero,
+                                children: [_buildAddClipCard()],
+                              );
+                            }
+
+                            if (!snapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            }
+
+                            final clips =
+                                snapshot.data ?? const <HomeVideoClip>[];
+                            _warmUpVisibleClips(context, clips);
+                            return ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              clipBehavior: Clip.none,
+                              padding: EdgeInsets.zero,
+                              itemCount: clips.length + 1,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 15),
+                              itemBuilder: (context, index) {
+                                if (index == 0) {
+                                  return _buildAddClipCard();
+                                }
+
+                                final clip = clips[index - 1];
+                                return InkWell(
+                                  key: ValueKey('clip-card-${clip.id}'),
+                                  onTap: () => _openVideoClip(clips, index - 1),
+                                  child: FutureBuilder<String?>(
+                                    future: index <= 2
+                                        ? _homeVideoPrefetchService
+                                            .prefetchVideo(
+                                            clip.videoUrl,
+                                          )
+                                        : _homeVideoPrefetchService
+                                            .getCachedPath(
+                                            clip.videoUrl,
+                                          ),
+                                    builder: (context, previewSnapshot) {
+                                      final cachedPreviewPath =
+                                          previewSnapshot.data?.trim() ?? '';
+                                      return ClipCard(
+                                        title: _clipCardTitle(clip),
+                                        subtitle: _clipCardSubtitle(clip),
+                                        imagePath: cachedPreviewPath.isNotEmpty
+                                            ? cachedPreviewPath
+                                            : clip.videoUrl,
+                                        thumbnailPath: clip.thumbnailUrl,
+                                        forceVideoPreview: true,
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 25),
+                      const HomeSectionHeader(title: 'บทความจิตวิทยา'),
+                      const SizedBox(height: 15),
+                      SizedBox(
+                        height: 210,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          clipBehavior: Clip.none,
+                          padding: EdgeInsets.zero,
+                          itemCount: _articleList.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 15),
+                          itemBuilder: (context, index) {
+                            final article = _articleList[index];
+                            return SizedBox(
+                              width: articleCardWidth,
+                              child: ArticleCard(
+                                title: article.title,
+                                subtitle: article.subtitle,
+                                imagePath: article.imagePath,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => ArticleDetailPage(
+                                        title: article.detailTitle,
+                                        imagePath: article.detailImagePath,
+                                        content: article.content,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 50),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 50),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:get/get.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RoleQuizSelectionResult {
   const RoleQuizSelectionResult({
@@ -23,7 +22,6 @@ class QuizController extends GetxController {
   static const String _clientVersion = 'assessment_v1';
   static const int _passScore = 11;
   static const int _maxScore = 20;
-  static const String _assessmentStateRpc = 'get_my_assessment_attempt';
 
   static const List<Map<String, dynamic>> _localQuestionBank = [
     {
@@ -328,64 +326,21 @@ class QuizController extends GetxController {
   }
 
   Future<String?> _fetchActiveAssessmentId() async {
-    final currentUser = supabase.auth.currentUser;
-    if (currentUser == null) {
-      throw StateError('กรุณาเข้าสู่ระบบใหม่ก่อนทำ assessment');
+    final assessmentRow = await supabase
+        .from('assessments')
+        .select('id')
+        .eq('is_active', true)
+        .order('created_at', ascending: false)
+        .limit(1)
+        .maybeSingle();
+    final assessmentId = assessmentRow?['id']?.toString().trim() ?? '';
+    if (assessmentId.isEmpty) {
+      return null;
     }
-
-    try {
-      final assessmentRow = await supabase
-          .from('assessments')
-          .select('id')
-          .eq('is_active', true)
-          .order('created_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      final assessmentId = assessmentRow?['id']?.toString().trim() ?? '';
-      if (assessmentId.isNotEmpty) {
-        return assessmentId;
-      }
-    } catch (_) {
-      // Fallback to RPC state when direct table select is restricted by RLS.
-    }
-
-    final stateRaw = await _fetchAssessmentStateRaw();
-    final stateRow = _extractSingleRow(stateRaw);
-    final assessmentId = stateRow['assessment_id']?.toString().trim() ?? '';
-    return assessmentId.isEmpty ? null : assessmentId;
-  }
-
-  Future<Object?> _fetchAssessmentStateRaw() async {
-    try {
-      return await supabase.rpc(_assessmentStateRpc);
-    } catch (error) {
-      if (_isMissingRpcFunctionError(error)) {
-        return null;
-      }
-      rethrow;
-    }
-  }
-
-  bool _isMissingRpcFunctionError(Object error) {
-    if (error is! PostgrestException) {
-      return false;
-    }
-
-    final code = (error.code ?? '').toUpperCase();
-    if (code == 'PGRST202' || code == '42883') {
-      return true;
-    }
-
-    final message = error.message.toLowerCase();
-    return message.contains('could not find the function');
+    return assessmentId;
   }
 
   Future<String?> _ensureAttemptId() async {
-    final currentUser = supabase.auth.currentUser;
-    if (currentUser == null) {
-      throw StateError('กรุณาเข้าสู่ระบบใหม่ก่อนบันทึก assessment');
-    }
-
     if (_attemptId != null && _attemptId!.isNotEmpty) {
       return _attemptId;
     }
@@ -451,29 +406,6 @@ class QuizController extends GetxController {
 
     final value = raw.toString().trim();
     return value.isEmpty ? null : value;
-  }
-
-  Map<String, dynamic> _extractSingleRow(Object? raw) {
-    if (raw == null) {
-      return <String, dynamic>{};
-    }
-
-    if (raw is List) {
-      if (raw.isEmpty) {
-        return <String, dynamic>{};
-      }
-      final first = raw.first;
-      if (first is Map) {
-        return Map<String, dynamic>.from(first);
-      }
-      return <String, dynamic>{};
-    }
-
-    if (raw is Map) {
-      return Map<String, dynamic>.from(raw);
-    }
-
-    return <String, dynamic>{};
   }
 
   Future<void> _prepareRandomLocalQuiz() async {
@@ -690,15 +622,6 @@ class QuizController extends GetxController {
 
   Future<_SubmitAssessmentResult> _submitAssessmentResult() async {
     try {
-      final currentUser = supabase.auth.currentUser;
-      if (currentUser == null) {
-        return const _SubmitAssessmentResult(
-          isPass: false,
-          errorMessage:
-              'ไม่พบ session การเข้าสู่ระบบ กรุณาออกจากระบบแล้วเข้าใหม่',
-        );
-      }
-
       final computedTotalScore = _calculateTotalScore();
       final maxRawScore = _calculateMaxRawScore();
       final backendScore = _normalizeScoreForBackend(
@@ -734,72 +657,12 @@ class QuizController extends GetxController {
         isPass: _toBool(passRaw),
         submittedScore: backendScore,
       );
-    } on PostgrestException catch (error, stackTrace) {
-      debugPrint(
-        'finish_assessment_from_client failed '
-        '[code=${error.code}, message=${error.message}, '
-        'details=${error.details}, hint=${error.hint}]',
-      );
-      debugPrintStack(stackTrace: stackTrace);
-
-      if (_isAlreadyDoneTodayError(error)) {
-        return const _SubmitAssessmentResult(
-          isPass: false,
-          errorMessage: 'วันนี้คุณทำแบบประเมินครบแล้ว ระบบอนุญาตวันละ 1 ครั้ง',
-        );
-      }
-
-      return _SubmitAssessmentResult(
-        isPass: false,
-        errorMessage: _formatAssessmentSaveError(error),
-      );
     } catch (error) {
-      debugPrint('Assessment submit failed: $error');
       return _SubmitAssessmentResult(
         isPass: false,
         errorMessage: 'บันทึกคะแนน assessment ไม่สำเร็จ: $error',
       );
     }
-  }
-
-  String _formatAssessmentSaveError(PostgrestException error) {
-    final code = (error.code ?? '').trim();
-    final message = error.message.trim();
-    final details = error.details?.toString().trim() ?? '';
-    final hint = (error.hint ?? '').trim();
-
-    if (code == 'PGRST301' || message.toLowerCase().contains('jwt')) {
-      return 'session หมดอายุ กรุณาออกจากระบบแล้วเข้าใหม่';
-    }
-
-    if (_isAlreadyDoneTodayError(error)) {
-      return 'วันนี้คุณทำแบบประเมินครบแล้ว ระบบอนุญาตวันละ 1 ครั้ง';
-    }
-
-    if (message.isNotEmpty) {
-      return 'บันทึกคะแนน assessment ไม่สำเร็จ: $message';
-    }
-
-    if (details.isNotEmpty) {
-      return 'บันทึกคะแนน assessment ไม่สำเร็จ: $details';
-    }
-
-    if (hint.isNotEmpty) {
-      return 'บันทึกคะแนน assessment ไม่สำเร็จ: $hint';
-    }
-
-    return 'บันทึกคะแนน assessment ไม่สำเร็จ';
-  }
-
-  bool _isAlreadyDoneTodayError(PostgrestException error) {
-    final message = error.message.toLowerCase();
-    final details = error.details?.toString().toLowerCase() ?? '';
-    final hint = (error.hint ?? '').toLowerCase();
-    final combined = '$message $details $hint';
-
-    return combined.contains('already completed today') ||
-        combined.contains('assessment already completed today') ||
-        combined.contains('day') && combined.contains('completed');
   }
 
   Map<String, dynamic> _buildAssessmentPayload({

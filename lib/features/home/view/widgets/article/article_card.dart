@@ -39,6 +39,7 @@ class ArticleCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // ส่วนรูปภาพ
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: isNetworkImage
@@ -72,6 +73,7 @@ class ArticleCard extends StatelessWidget {
                       ),
               ),
               const SizedBox(height: 12),
+
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Column(

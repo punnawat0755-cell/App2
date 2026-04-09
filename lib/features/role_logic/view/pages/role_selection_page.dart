@@ -15,6 +15,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   static const Color _backgroundColor = Colors.white;
   static const Color _cardListenerColor = Color(0xFFAEE4FC);
   static const Color _cardSeekerColor = Color(0xFFF5D586);
+  static const bool _enableListenerQuiz = true;
 
   String _selectedMode = '';
   bool _isSaving = false;
@@ -24,25 +25,17 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       return;
     }
 
-    try {
-      final todayState = await UserModeStatusService.getTodayAssessmentState();
-      if (!mounted) {
-        return;
-      }
+    var hasPassedAssessment = await UserModeStatusService.isListenerCapable();
+    if (!mounted) {
+      return;
+    }
 
-      if (todayState.assessmentPassedToday) {
-        await _saveMode(
-          'listener',
-          successMessage: 'บันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
-        );
-        return;
-      }
-
-      if (todayState.completedToday && !todayState.assessmentPassedToday) {
+    if (!hasPassedAssessment) {
+      if (!_enableListenerQuiz) {
         await _saveMode(
           'seeker',
           successMessage:
-              'วันนี้คุณทำแบบประเมินแล้ว แต่ผลยังไม่ผ่าน จึงบันทึกโหมดวันนี้เป็นผู้ขอรับคำปรึกษาแล้ว',
+              'ปิดระบบแบบประเมินชั่วคราว จึงบันทึกโหมดวันนี้เป็นผู้ขอรับคำปรึกษา',
         );
         return;
       }
@@ -77,22 +70,21 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
         await _saveMode(
           'seeker',
           successMessage:
-              'ผล assessment วันนี้ยังไม่ผ่าน จึงบันทึกโหมดวันนี้เป็นผู้ขอรับคำปรึกษาแล้ว',
+              'ผล assessment ยังไม่ผ่าน จึงบันทึกโหมดวันนี้เป็นผู้ขอรับคำปรึกษาแล้ว',
         );
         return;
       }
 
-      final passedToday =
-          await UserModeStatusService.hasPassedAssessmentToday();
+      hasPassedAssessment = await UserModeStatusService.isListenerCapable();
       if (!mounted) {
         return;
       }
 
-      if (!passedToday) {
+      if (!hasPassedAssessment) {
         await _saveMode(
           'seeker',
           successMessage:
-              'ผ่าน assessment แล้ว แต่สถานะรายวันยังไม่อัปเดต จึงบันทึกเป็นผู้ขอรับคำปรึกษาก่อน',
+              'ผ่าน assessment แล้ว แต่ซิงก์สิทธิ์ผู้รับฟังยังไม่สำเร็จ จึงบันทึกเป็นผู้ขอรับคำปรึกษาก่อน',
         );
         return;
       }
@@ -100,16 +92,15 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       await _saveMode(
         'listener',
         successMessage:
-            'ผ่าน assessment วันนี้แล้ว (คะแนน ${result.totalScore}) และบันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
+            'ผ่าน assessment แล้ว (คะแนน ${result.totalScore}) และบันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
       );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('เปิดแบบประเมินไม่สำเร็จ: $e')),
-      );
+      return;
     }
+
+    await _saveMode(
+      'listener',
+      successMessage: 'บันทึกโหมดวันนี้แล้ว: ผู้รับฟัง',
+    );
   }
 
   Future<void> _saveMode(
@@ -230,100 +221,121 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                       vertical: verticalPadding,
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
                         SizedBox(height: topLeadGap),
                         Text(
-                          'วันนี้คุณอยากเป็นแบบไหน',
+                          'วันนี้คุณต้องการที่จะเป็น\nผู้ให้คำปรึกษาไหม',
                           textAlign: TextAlign.center,
                           style: TextStyle(
+                            fontSize: scale.rf(27, min: 22, max: 30),
+                            fontWeight: FontWeight.bold,
                             color: const Color(0xFF4489D7),
-                            fontSize: scale.rf(28, min: 24, max: 31),
-                            fontWeight: FontWeight.w900,
-                            height: 1.15,
+                            height: 1.2,
                           ),
                         ),
                         SizedBox(height: titleToHintGap),
                         Text(
-                          'เลือกได้ 1 บทบาทสำหรับวันนี้',
+                          'กรุณากดที่รูปเพื่อเลือกคำตอบของคุณ',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            color: const Color(0xFF6B7280),
-                            fontSize: scale.rf(15, min: 13, max: 16),
-                            fontWeight: FontWeight.w600,
+                            fontSize: scale.rf(13.6, min: 12, max: 15),
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF4489D7),
+                            height: 1.3,
                           ),
                         ),
                         SizedBox(height: hintToCardsGap),
-                        Flex(
-                          direction:
-                              isCompact ? Axis.vertical : Axis.horizontal,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: ChoiceCard(
-                                id: 'listener',
-                                title: 'ผู้รับฟัง',
-                                imagePath: 'assets/images/fine.png',
-                                bgColor: _cardListenerColor,
-                                textColor: const Color(0xFF4489D7),
-                                isSelected: _selectedMode == 'listener',
-                                height: cardHeight,
-                                onTap: _openListenerQuiz,
-                              ),
-                            ),
-                            SizedBox(
-                              width: isCompact ? 0 : rowCardGap,
-                              height: isCompact ? cardsGap : 0,
-                            ),
-                            Expanded(
-                              child: ChoiceCard(
-                                id: 'seeker',
-                                title: 'ผู้ขอรับคำปรึกษา',
-                                imagePath: 'assets/images/sad.png',
-                                bgColor: _cardSeekerColor,
-                                textColor: const Color(0xFFC49A3E),
-                                isSelected: _selectedMode == 'seeker',
-                                height: cardHeight,
-                                onTap: () => _saveMode('seeker'),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: cardsToDetailGap),
-                        Container(
-                          padding: EdgeInsets.all(
-                            scale.rs(18, min: 14, max: 20),
+                        if (isCompact) ...[
+                          ChoiceCard(
+                            id: 'listener',
+                            title: 'ต้องการ',
+                            imagePath: 'assets/images/fine.png',
+                            bgColor: _cardListenerColor,
+                            textColor: const Color(0xFF4489D7),
+                            isSelected: _selectedMode == 'listener',
+                            onTap: _openListenerQuiz,
+                            height: cardHeight,
                           ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF7FAFF),
-                            borderRadius: BorderRadius.circular(22),
-                            border: Border.all(
-                              color: const Color(0xFFD9E8FF),
-                            ),
+                          SizedBox(height: cardsGap),
+                          ChoiceCard(
+                            id: 'seeker',
+                            title: 'ไม่ต้องการ',
+                            imagePath: 'assets/images/sad.png',
+                            bgColor: _cardSeekerColor,
+                            textColor: const Color(0xFFC49A3E),
+                            isSelected: _selectedMode == 'seeker',
+                            onTap: () => _saveMode('seeker'),
+                            height: cardHeight,
                           ),
-                          child: Column(
+                        ] else
+                          Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                'หมายเหตุ',
-                                style: TextStyle(
-                                  color: const Color(0xFF4489D7),
-                                  fontSize: scale.rf(15, min: 14, max: 16),
-                                  fontWeight: FontWeight.w800,
+                              Expanded(
+                                child: ChoiceCard(
+                                  id: 'listener',
+                                  title: 'ต้องการ',
+                                  imagePath: 'assets/images/fine.png',
+                                  bgColor: _cardListenerColor,
+                                  textColor: const Color(0xFF4489D7),
+                                  isSelected: _selectedMode == 'listener',
+                                  onTap: _openListenerQuiz,
+                                  height: cardHeight,
                                 ),
                               ),
-                              SizedBox(height: scale.rs(10, min: 8, max: 12)),
-                              Text(
-                                'หากเลือกบทบาทผู้รับฟัง ระบบอาจให้ทำแบบประเมินก่อนเพื่อความเหมาะสมของการสนทนา',
-                                style: TextStyle(
-                                  color: const Color(0xFF5C667A),
-                                  fontSize: scale.rf(13.5, min: 12.5, max: 14),
-                                  height: 1.45,
-                                  fontWeight: FontWeight.w500,
+                              SizedBox(width: rowCardGap),
+                              Expanded(
+                                child: ChoiceCard(
+                                  id: 'seeker',
+                                  title: 'ไม่ต้องการ',
+                                  imagePath: 'assets/images/sad.png',
+                                  bgColor: _cardSeekerColor,
+                                  textColor: const Color(0xFFC49A3E),
+                                  isSelected: _selectedMode == 'seeker',
+                                  onTap: () => _saveMode('seeker'),
+                                  height: cardHeight,
                                 ),
                               ),
                             ],
+                          ),
+                        SizedBox(height: cardsToDetailGap),
+                        if (_isSaving)
+                          Padding(
+                            padding: EdgeInsets.only(
+                              bottom: scale.rs(10, min: 8, max: 14),
+                            ),
+                            child: Column(
+                              children: [
+                                const CircularProgressIndicator(),
+                                SizedBox(height: scale.rs(8, min: 6, max: 10)),
+                                Text(
+                                  'กำลังบันทึกบทบาทของวันนี้...',
+                                  style: TextStyle(
+                                    fontSize: scale.rf(13, min: 11, max: 13.8),
+                                    color: const Color(0xFF4489D7),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        SizedBox(height: scale.rs(isShort ? 8 : 12)),
+                        Text(
+                          '"ผู้ให้คำปรึกษา" คือใคร? คือผู้ที่เป็น "พื้นที่ปลอดภัย"\n'
+                          'สำหรับใครสักคนที่กำลังต้องการคนรับฟัง\n'
+                          'ผู้ให้คำปรึกษาในแอปของเราพร้อมที่จะเปิดใจรับฟังปัญหา ความเครียด\n'
+                          'หรือความไม่สบายใจของผู้รับคำปรึกษาผ่านทางแชท\n'
+                          'โดยไม่มีการตัดสิน หน้าที่ของคุณคือการอยู่เคียงข้าง ให้กำลังใจ\n'
+                          'และชวนมองมุมกลับเพื่อให้เขารู้สึกดีขึ้น\n'
+                          'และเมื่อจบการให้คำปรึกษาในแต่ละครั้ง คุณจะได้รับ "คอยน์"\n'
+                          'เป็นการตอบแทนสำหรับความใส่ใจที่คุณมอบให้',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: scale.rf(11.9, min: 10.4, max: 13.2),
+                            height: 1.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF639CDD),
                           ),
                         ),
                       ],

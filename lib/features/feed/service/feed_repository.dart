@@ -783,9 +783,8 @@ class FeedRepository {
             .from(_postsTable)
             .select('*')
             .eq('user_id', authorId)
-            .inFilter('status', ['draft', 'active', 'hidden']).order(
-                'created_at',
-                ascending: false);
+            .inFilter('status', ['draft', 'active', 'hidden'])
+            .order('created_at', ascending: false);
         return rows
             .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
             .toList();

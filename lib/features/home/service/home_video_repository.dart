@@ -38,51 +38,26 @@ class HomeVideoRepository {
     var hasActiveListener = false;
 
     List<Map<String, dynamic>> latestPostRows = const [];
+    List<Map<String, dynamic>> latestMediaRows = const [];
     var hasLoadedPosts = false;
+    var hasLoadedMedia = false;
 
     Future<void> emitMappedClips() async {
-      if (!hasLoadedPosts) {
+      if (!hasLoadedPosts || !hasLoadedMedia) {
         return;
       }
 
       try {
-        final postIds = latestPostRows
-            .map((row) => row['id']?.toString() ?? '')
-            .where((postId) => postId.isNotEmpty)
-            .toSet()
-            .toList();
-        final mediaRows = await _loadVideoMediaRows(postIds);
-        if (controller.isClosed) {
-          return;
-        }
-        controller.add(await _mapVideoClips(latestPostRows, mediaRows));
+        controller.add(await _mapVideoClips(latestPostRows, latestMediaRows));
       } catch (error, stackTrace) {
-        if (!controller.isClosed) {
-          controller.addError(error, stackTrace);
-        }
-      }
-    }
-
-    Future<void> refreshPostsFromQuery({bool reportErrors = false}) async {
-      try {
-        final rows = await _loadVisiblePostRows();
-        if (controller.isClosed) {
-          return;
-        }
-        latestPostRows = rows;
-        hasLoadedPosts = true;
-        await emitMappedClips();
-      } catch (error, stackTrace) {
-        if (reportErrors && !controller.isClosed) {
-          controller.addError(error, stackTrace);
-        }
+        controller.addError(error, stackTrace);
       }
     }
 
     void scheduleEmitMappedClips({
       Duration delay = const Duration(milliseconds: 120),
     }) {
-      if (!hasLoadedPosts || !hasActiveListener) {
+      if (!hasLoadedPosts || !hasLoadedMedia || !hasActiveListener) {
         return;
       }
       remapDebounceTimer?.cancel();
@@ -92,15 +67,27 @@ class HomeVideoRepository {
     controller = StreamController<List<HomeVideoClip>>(
       onListen: () {
         hasActiveListener = true;
-        unawaited(refreshPostsFromQuery(reportErrors: true));
-
         postsSubscription = _client
             .from(_postsTable)
             .stream(primaryKey: const ['id'])
             .order('created_at', ascending: false)
             .listen(
-              (_) => unawaited(refreshPostsFromQuery()),
-              onError: (_, __) => unawaited(refreshPostsFromQuery()),
+              (rows) {
+                latestPostRows = rows
+                    .map<Map<String, dynamic>>(
+                      (row) => Map<String, dynamic>.from(row),
+                    )
+                    .toList();
+                final isInitialLoad = !hasLoadedPosts;
+                hasLoadedPosts = true;
+                if (isInitialLoad) {
+                  unawaited(emitMappedClips());
+                  return;
+                }
+                scheduleEmitMappedClips(
+                    delay: const Duration(milliseconds: 80));
+              },
+              onError: controller.addError,
             );
 
         mediaSubscription = _client
@@ -108,12 +95,22 @@ class HomeVideoRepository {
             .stream(primaryKey: const ['post_id', 'storage_path'])
             .eq('media_type', _videoMediaType)
             .listen(
-              (_) => scheduleEmitMappedClips(
-                delay: const Duration(milliseconds: 80),
-              ),
-              onError: (_, __) => scheduleEmitMappedClips(
-                delay: const Duration(milliseconds: 180),
-              ),
+              (rows) {
+                latestMediaRows = rows
+                    .map<Map<String, dynamic>>(
+                      (row) => Map<String, dynamic>.from(row),
+                    )
+                    .toList();
+                final isInitialLoad = !hasLoadedMedia;
+                hasLoadedMedia = true;
+                if (isInitialLoad) {
+                  unawaited(emitMappedClips());
+                  return;
+                }
+                scheduleEmitMappedClips(
+                    delay: const Duration(milliseconds: 80));
+              },
+              onError: controller.addError,
             );
       },
       onCancel: () async {
@@ -125,120 +122,6 @@ class HomeVideoRepository {
     );
 
     return controller.stream;
-  }
-
-  Future<List<Map<String, dynamic>>> _loadVisiblePostRows() async {
-    final currentUserId = _client.auth.currentUser?.id ?? '';
-
-    try {
-      final response = await _client.rpc(
-        'get_posts_feed_fast',
-        params: {'p_limit': 120, 'p_offset': 0},
-      );
-      if (response is! List) {
-        return const [];
-      }
-
-      final rows = response
-          .whereType<Map>()
-          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
-          .toList();
-      if (rows.isNotEmpty) {
-        return rows;
-      }
-      // Legacy compatibility: if RPC returns nothing, query directly.
-      return _loadLegacyCompatiblePostRows(currentUserId: currentUserId);
-    } catch (_) {
-      return _loadLegacyCompatiblePostRows(currentUserId: currentUserId);
-    }
-  }
-
-  Future<List<Map<String, dynamic>>> _loadLegacyCompatiblePostRows({
-    required String currentUserId,
-  }) async {
-    final rowsById = <String, Map<String, dynamic>>{};
-
-    void absorbRows(Iterable<dynamic> rows) {
-      for (final row in rows) {
-        if (row is! Map) {
-          continue;
-        }
-        final mapped = Map<String, dynamic>.from(row);
-        final postId = mapped['id']?.toString() ?? '';
-        if (postId.isEmpty) {
-          continue;
-        }
-        rowsById[postId] = mapped;
-      }
-    }
-
-    try {
-      final broadRows = await _client
-          .from(_postsTable)
-          .select('*')
-          .order('created_at', ascending: false)
-          .limit(180);
-      absorbRows(broadRows);
-    } catch (_) {}
-
-    if (rowsById.isEmpty) {
-      return const [];
-    }
-
-    final filteredRows = rowsById.values.where((row) {
-      final authorId = row['user_id']?.toString().trim() ?? '';
-      if (currentUserId.isNotEmpty && authorId == currentUserId) {
-        return true;
-      }
-      return _isReadableForOtherUsers(row);
-    }).toList(growable: false);
-
-    filteredRows.sort(
-      (a, b) =>
-          _toDateTime(b['created_at']).compareTo(_toDateTime(a['created_at'])),
-    );
-    return filteredRows;
-  }
-
-  Future<List<Map<String, dynamic>>> _loadVideoMediaRows(
-    List<String> postIds,
-  ) async {
-    if (postIds.isEmpty) {
-      return const [];
-    }
-
-    try {
-      final strictRows = await _client
-          .from(_postMediaTable)
-          .select(
-            'post_id, media_type, storage_bucket, storage_path, public_url, thumbnail_url, order_no',
-          )
-          .inFilter('post_id', postIds)
-          .eq('media_type', _videoMediaType)
-          .order('order_no', ascending: true);
-
-      final strictMappedRows = strictRows
-          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
-          .toList();
-      if (strictMappedRows.isNotEmpty) {
-        return strictMappedRows;
-      }
-
-      // Legacy compatibility: media_type may be empty on older rows.
-      final legacyRows = await _client
-          .from(_postMediaTable)
-          .select(
-            'post_id, media_type, storage_bucket, storage_path, public_url, thumbnail_url, order_no',
-          )
-          .inFilter('post_id', postIds)
-          .order('order_no', ascending: true);
-      return legacyRows
-          .map<Map<String, dynamic>>((row) => Map<String, dynamic>.from(row))
-          .where(_isLikelyVideoMediaRow)
-          .toList();
-    } catch (_) {
-      return const [];
-    }
   }
 
   Future<void> createVideoClip({
@@ -333,46 +216,17 @@ class HomeVideoRepository {
 
     final authorNamesById = await _loadAuthorNames(userIds.toList());
     final candidates = <_VideoClipCandidate>[];
-    final postIdsWithVideoMedia = <String>{};
     for (final row in mediaRows) {
       final postId = row['post_id']?.toString() ?? '';
       final post = postsById[postId];
       if (post == null) {
         continue;
       }
-      postIdsWithVideoMedia.add(postId);
       candidates.add(
         _VideoClipCandidate(
           postId: postId,
           post: post,
           mediaRow: row,
-        ),
-      );
-    }
-
-    // Legacy compatibility: allow direct video URL from posts table when post_media
-    // is missing.
-    for (final entry in postsById.entries) {
-      if (postIdsWithVideoMedia.contains(entry.key)) {
-        continue;
-      }
-      final mediaUrl = _extractLegacyVideoUrl(entry.value);
-      if (mediaUrl == null) {
-        continue;
-      }
-      candidates.add(
-        _VideoClipCandidate(
-          postId: entry.key,
-          post: entry.value,
-          mediaRow: <String, dynamic>{
-            'post_id': entry.key,
-            'media_type': _videoMediaType,
-            'storage_bucket': null,
-            'storage_path': '',
-            'public_url': mediaUrl,
-            'thumbnail_url': null,
-            'order_no': 0,
-          },
         ),
       );
     }
@@ -585,85 +439,6 @@ class HomeVideoRepository {
     return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
-  bool _isReadableForOtherUsers(Map<String, dynamic> row) {
-    final status = row['status']?.toString().trim().toLowerCase() ?? '';
-    if (status == 'draft' ||
-        status == 'hidden' ||
-        status == 'deleted' ||
-        status == 'archived') {
-      return false;
-    }
-
-    final isVisibleRaw = row['is_visible'];
-    if (isVisibleRaw is bool && isVisibleRaw == false) {
-      return false;
-    }
-
-    return true;
-  }
-
-  bool _isLikelyVideoMediaRow(Map<String, dynamic> row) {
-    final mediaType = row['media_type']?.toString().trim().toLowerCase() ?? '';
-    if (mediaType == _videoMediaType || mediaType.contains('video')) {
-      return true;
-    }
-    if (mediaType == 'mp4' ||
-        mediaType == 'mov' ||
-        mediaType == 'm4v' ||
-        mediaType == 'avi' ||
-        mediaType == 'webm' ||
-        mediaType == 'mkv') {
-      return true;
-    }
-
-    if (mediaType.isNotEmpty) {
-      return false;
-    }
-
-    final candidates = <String>[
-      row['storage_path']?.toString().trim() ?? '',
-      row['public_url']?.toString().trim() ?? '',
-      row['thumbnail_url']?.toString().trim() ?? '',
-    ];
-    for (final candidate in candidates) {
-      if (_looksLikeVideoPath(candidate)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  String? _extractLegacyVideoUrl(Map<String, dynamic> row) {
-    final candidates = <dynamic>[
-      row['video_url'],
-      row['media_url'],
-      row['file_url'],
-    ];
-
-    for (final candidate in candidates) {
-      final text = candidate?.toString().trim() ?? '';
-      if (text.startsWith('http') &&
-          (_looksLikeVideoPath(text) || text.contains('/storage/v1/object/'))) {
-        return text;
-      }
-    }
-    return null;
-  }
-
-  bool _looksLikeVideoPath(String path) {
-    final normalizedPath = path.trim().toLowerCase();
-    if (normalizedPath.isEmpty) {
-      return false;
-    }
-
-    return normalizedPath.endsWith('.mp4') ||
-        normalizedPath.endsWith('.mov') ||
-        normalizedPath.endsWith('.m4v') ||
-        normalizedPath.endsWith('.avi') ||
-        normalizedPath.endsWith('.webm') ||
-        normalizedPath.endsWith('.mkv');
-  }
-
   DateTime _toDateTime(dynamic value) {
     if (value is DateTime) {
       return value.toLocal();
@@ -699,17 +474,11 @@ class HomeVideoRepository {
     required String userId,
     required String content,
   }) async {
-    final now = DateTime.now().toUtc().toIso8601String();
-
     final insertedRow = await _client
         .from(_postsTable)
         .insert({
           'user_id': userId,
           'content_text': content,
-          'status': 'active',
-          'moderation_status': 'approved',
-          'is_visible': true,
-          'moderated_at': now,
         })
         .select('id')
         .single();
