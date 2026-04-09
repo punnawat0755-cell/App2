@@ -180,6 +180,7 @@ class _LoginPageState extends State<LoginPage> {
     bool isPassword = false,
     Widget? suffixIcon,
     double? iconSize,
+    bool reserveSuffixSpace = false,
   }) {
     return Container(
       height: scale.rs(62, min: 56, max: 64),
@@ -211,7 +212,14 @@ class _LoginPageState extends State<LoginPage> {
               fit: BoxFit.contain,
             ),
           ),
-          suffixIcon: suffixIcon,
+          suffixIcon:
+              suffixIcon ??
+              (reserveSuffixSpace
+                  ? SizedBox(
+                      width: scale.rs(48, min: 44, max: 48),
+                      height: scale.rs(48, min: 44, max: 48),
+                    )
+                  : null),
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(
             horizontal: scale.rs(4, min: 2, max: 6),
@@ -276,6 +284,7 @@ class _LoginPageState extends State<LoginPage> {
                         iconAsset: 'assets/images/Customer.png',
                         keyboardType: TextInputType.emailAddress,
                         scale: scale,
+                        reserveSuffixSpace: true,
                       ),
                       SizedBox(height: scale.rs(18, min: 14, max: 18)),
                       _buildTextField(
