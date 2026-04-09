@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
-import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'register_page.dart';
 import 'privacy_policy_page.dart';
+import 'register_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -115,11 +114,9 @@ class _LoginPageState extends State<LoginPage> {
         throw const AuthException('เข้าสู่ระบบไม่สำเร็จ');
       }
 
-      // พยายามเรียก RPC ถ้ามี
       try {
         await supabase.rpc('ensure_my_profile');
       } catch (_) {
-        // fallback สร้าง profile ถ้าไม่มี
         await supabase.from('profiles').upsert({
           'id': response.user!.id,
           'coins': 0,
@@ -173,13 +170,13 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  Widget _roundedField({
+  Widget _buildTextField({
     required TextEditingController controller,
+    required String hintText,
     required IconData icon,
-    required String hint,
     TextInputType? keyboardType,
-    bool obscure = false,
-    Widget? suffix,
+    bool isPassword = false,
+    Widget? suffixIcon,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -188,54 +185,16 @@ class _LoginPageState extends State<LoginPage> {
       ),
       child: TextField(
         controller: controller,
-        obscureText: obscure,
+        obscureText: isPassword,
         keyboardType: keyboardType,
         decoration: InputDecoration(
-          hintText: hint,
+          hintText: hintText,
+          hintStyle: const TextStyle(color: Colors.grey),
           prefixIcon: Icon(icon, color: Colors.grey),
-          suffixIcon: suffix,
+          suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+          contentPadding: const EdgeInsets.symmetric(vertical: 15),
         ),
-      ),
-    );
-  }
-
-  Widget _primaryButton({
-    required String text,
-    required VoidCallback? onPressed,
-    required bool loading,
-  }) {
-    final scale = context.responsive;
-    return SizedBox(
-      height: scale.rs(55, min: 50, max: 56),
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _lightBlue,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          elevation: 0,
-        ),
-        child: loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-            : Text(
-                text,
-                style: TextStyle(
-                  fontSize: scale.rf(18, min: 16, max: 18.5),
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
       ),
     );
   }
@@ -245,114 +204,121 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
-            final horizontalPadding = constraints.maxWidth < 360 ? 18.0 : 28.0;
-            final logoSize =
-                (constraints.maxWidth - (horizontalPadding * 2)).clamp(
-              180.0,
-              250.0,
-            );
-
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: 20,
-                  ),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 40),
-                      Image.asset(
-                        'assets/images/logo.png',
-                        width: logoSize,
-                        height: logoSize,
-                        fit: BoxFit.contain,
-                        errorBuilder: (ctx, obj, st) => const Icon(Icons.image,
-                            size: 10, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'เข้าสู่ระบบ',
-                        style: TextStyle(
-                          fontSize: scale.rf(28, min: 24, max: 28),
-                          fontWeight: FontWeight.bold,
-                          color: _mainBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      _roundedField(
-                        controller: _emailController,
-                        icon: Icons.person,
-                        hint: 'อีเมล',
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      const SizedBox(height: 20),
-                      _roundedField(
-                        controller: _passwordController,
-                        icon: Icons.lock,
-                        hint: 'รหัสผ่าน',
-                        obscure: _hidePw,
-                        suffix: IconButton(
-                          onPressed: () => setState(() => _hidePw = !_hidePw),
-                          icon: Icon(
-                            _hidePw ? Icons.visibility : Icons.visibility_off,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _isLoading ? null : _forgotPassword,
-                          child: const Text(
-                            'ลืมรหัสผ่าน?',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      _primaryButton(
-                        text: 'เข้าสู่ระบบ',
-                        onPressed: _isLoading ? null : _login,
-                        loading: _isLoading,
-                      ),
-                      SizedBox(
-                        height: constraints.maxHeight < 700 ? 48 : 100,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'ยังไม่มีบัญชีใช่ไหม? ',
-                            style: TextStyle(color: Colors.grey),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterPage(),
-                              ),
-                            ),
-                            child: const Text(
-                              'ลงทะเบียน',
-                              style: TextStyle(
-                                color: _lightBlue,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            children: [
+              const SizedBox(height: 60),
+              Image.asset(
+                'assets/images/logo.png',
+                width: 150,
+                height: 150,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.flutter_dash,
+                  size: 80,
+                  color: _mainBlue,
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'เข้าสู่ระบบ',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: _mainBlue,
+                ),
+              ),
+              const SizedBox(height: 40),
+              _buildTextField(
+                controller: _emailController,
+                hintText: 'อีเมล',
+                icon: Icons.person,
+                keyboardType: TextInputType.emailAddress,
+              ),
+              const SizedBox(height: 20),
+              _buildTextField(
+                controller: _passwordController,
+                hintText: 'รหัสผ่าน',
+                icon: Icons.lock,
+                isPassword: _hidePw,
+                suffixIcon: IconButton(
+                  onPressed: () => setState(() => _hidePw = !_hidePw),
+                  icon: Icon(
+                    _hidePw ? Icons.visibility : Icons.visibility_off,
+                    color: Colors.grey,
                   ),
                 ),
               ),
-            );
-          },
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: _isLoading ? null : _forgotPassword,
+                  child: const Text(
+                    'ลืมรหัสผ่าน?',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 30),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _login,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _lightBlue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'เข้าสู่ระบบ',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 150),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'ยังไม่มีบัญชีใช่ไหม? ',
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const RegisterPage()),
+                    ),
+                    child: const Text(
+                      'ลงทะเบียน',
+                      style: TextStyle(
+                        color: _lightBlue,
+                        fontWeight: FontWeight.w500,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

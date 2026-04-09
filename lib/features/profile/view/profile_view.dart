@@ -19,6 +19,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 // 1. Controller
 // ==========================================
 class ProfileController extends GetxController {
+  static const int maxSymptomsPerDay = 3;
+
   final supabase = Supabase.instance.client;
   late final http.Client _httpClient;
   late final CoinService _coinService;
@@ -68,6 +70,7 @@ class ProfileController extends GetxController {
   // ข้อมูลจาก Database (รายวัน)
   var dailyPeriodStatus = <String, bool>{}.obs;
   var dailySymptoms = <String, List<String>>{}.obs;
+  var draftSymptoms = <String, List<String>>{}.obs;
   var dailyMoodLevels = <String, int>{}.obs;
   var dailyFlowLevel = <String, String?>{}.obs; // [ใหม่]
   var dailyPainLevel = <String, int?>{}.obs; // [ใหม่]
@@ -159,6 +162,28 @@ class ProfileController extends GetxController {
   DateTime _dateOnly(DateTime value) =>
       DateTime(value.year, value.month, value.day);
 
+  DateTime dateForDay(int day) =>
+      DateTime(selectedYear.value, selectedMonth.value, day);
+
+  bool isFutureDay(int day) => _dateOnly(dateForDay(day)).isAfter(
+        _dateOnly(DateTime.now()),
+      );
+
+  bool get isSelectedDateInFuture {
+    final day = selectedDate.value;
+    if (day == 0) return false;
+    return isFutureDay(day);
+  }
+
+  void _showFutureDateBlockedSnackbar() {
+    Get.snackbar(
+      "แจ้งเตือน",
+      "ไม่สามารถบันทึกล่วงหน้าได้ (บันทึกได้เฉพาะวันนี้และย้อนหลัง)",
+      backgroundColor: const Color(0xFF2C5282),
+      colorText: Colors.white,
+    );
+  }
+
   String _normalizeCalendarDateKey(dynamic rawValue) {
     final parsedDate = _tryParseDate(rawValue);
     if (parsedDate != null) {
@@ -190,6 +215,7 @@ class ProfileController extends GetxController {
 
   void changeMonth(String? monthName) {
     if (monthName != null) {
+      _discardUnsavedSymptomChanges();
       selectedMonth.value = monthNames.indexOf(monthName) + 1;
       selectedDate.value = 0;
       _syncSelectedInputsForDate();
@@ -202,8 +228,18 @@ class ProfileController extends GetxController {
 
   // Sync input fields เมื่อ selectedDate เปลี่ยน
   void selectDay(int day) {
+    if (selectedDate.value != day) {
+      _discardUnsavedSymptomChanges();
+    }
     selectedDate.value = day;
     _syncSelectedInputsForDate();
+  }
+
+  void _discardUnsavedSymptomChanges() {
+    if (draftSymptoms.isNotEmpty) {
+      draftSymptoms.clear();
+      draftSymptoms.refresh();
+    }
   }
 
   void _syncSelectedInputsForDate() => _syncPeriodInputStateForDate();
@@ -304,6 +340,7 @@ class ProfileController extends GetxController {
 
     dailyPeriodStatus.clear();
     dailySymptoms.clear();
+    draftSymptoms.clear();
     dailyMoodLevels.clear();
     dailyFlowLevel.clear();
     dailyPainLevel.clear();
@@ -1226,33 +1263,82 @@ class ProfileController extends GetxController {
   bool getPeriodStatusForSelectedDay() =>
       getExplicitPeriodStatusForSelectedDay() == true;
 
-  List<String> getSymptomsForSelectedDay() => dailySymptoms[dateKey] ?? [];
+  List<String> getSymptomsForSelectedDay() {
+    if (selectedDate.value == 0) return <String>[];
+    if (draftSymptoms.containsKey(dateKey)) {
+      return draftSymptoms[dateKey] ?? <String>[];
+    }
+    return dailySymptoms[dateKey] ?? <String>[];
+  }
 
   void setPeriodStatus(bool status) {
-    if (selectedDate.value != 0) {
-      dailyPeriodStatus[dateKey] = status;
-      dailyPeriodStatus.refresh();
-      // ถ้าเปลี่ยนเป็น "ไม่เป็น" ให้ reset flow และ pain
-      if (!status) {
-        currentFlowLevel.value = null;
-        currentPainLevel.value = null;
-      }
+    if (selectedDate.value == 0) return;
+    if (isSelectedDateInFuture) {
+      _showFutureDateBlockedSnackbar();
+      return;
+    }
+
+    dailyPeriodStatus[dateKey] = status;
+    dailyPeriodStatus.refresh();
+    // ถ้าเปลี่ยนเป็น "ไม่เป็น" ให้ reset flow และ pain
+    if (!status) {
+      currentFlowLevel.value = null;
+      currentPainLevel.value = null;
     }
   }
 
   void toggleSymptom(String symptomName) {
     if (selectedDate.value == 0) return;
+    if (isSelectedDateInFuture) {
+      _showFutureDateBlockedSnackbar();
+      return;
+    }
     List<String> currentList = List.from(getSymptomsForSelectedDay());
     if (currentList.contains(symptomName)) {
       currentList.remove(symptomName);
     } else {
+      if (currentList.length >= maxSymptomsPerDay) {
+        Get.snackbar(
+          "แจ้งเตือน",
+          "เลือกอาการได้ไม่เกิน $maxSymptomsPerDay รายการต่อวัน",
+          backgroundColor: const Color(0xFF2C5282),
+          colorText: Colors.white,
+        );
+        return;
+      }
       currentList.add(symptomName);
     }
-    dailySymptoms[dateKey] = currentList;
-    dailySymptoms.refresh();
+    draftSymptoms[dateKey] = currentList;
+    draftSymptoms.refresh();
   }
 
   Future<bool> saveDailyData({bool showSuccessSnackbar = true}) async {
+    if (selectedDate.value == 0) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "กรุณาเลือกวันที่ต้องการ",
+        backgroundColor: const Color(0xFF2C5282),
+        colorText: Colors.white,
+      );
+      return false;
+    }
+
+    if (isSelectedDateInFuture) {
+      _showFutureDateBlockedSnackbar();
+      return false;
+    }
+
+    final selectedSymptoms = getSymptomsForSelectedDay();
+    if (selectedSymptoms.length > maxSymptomsPerDay) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "เลือกอาการได้ไม่เกิน $maxSymptomsPerDay รายการต่อวัน",
+        backgroundColor: const Color(0xFF2C5282),
+        colorText: Colors.white,
+      );
+      return false;
+    }
+
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) {
       Get.snackbar("ข้อผิดพลาด", "กรุณาเข้าสู่ระบบก่อน",
@@ -1269,7 +1355,7 @@ class ProfileController extends GetxController {
         params: {
           'p_log_date': dateKey,
           'p_is_menstruating': isPeriod,
-          'p_symptoms': getSymptomsForSelectedDay(),
+          'p_symptoms': selectedSymptoms,
           // [ใหม่] ส่งค่าใหม่ทั้งหมด (null ถ้าไม่เป็นประจำเดือน)
           'p_flow_level': isFemaleAccount && isPeriod == true
               ? currentFlowLevel.value
@@ -1284,6 +1370,14 @@ class ProfileController extends GetxController {
       );
 
       // อัปเดต local state
+      if (selectedSymptoms.isEmpty) {
+        dailySymptoms.remove(dateKey);
+      } else {
+        dailySymptoms[dateKey] = List<String>.from(selectedSymptoms);
+      }
+      draftSymptoms.remove(dateKey);
+      dailySymptoms.refresh();
+      draftSymptoms.refresh();
       dailyFlowLevel[dateKey] =
           isPeriod == true ? currentFlowLevel.value : null;
       dailyPainLevel[dateKey] =
@@ -1363,16 +1457,7 @@ class ProfileController extends GetxController {
     {'name': 'สิวขึ้น', 'img': 'assets/images/thunder 8.png'},
   ];
 
-  final List<Map<String, String>> maleSymptomsList = [
-    {'name': 'เครียด', 'img': 'assets/images/thunder 1.png'},
-    {'name': 'นอนไม่หลับ', 'img': 'assets/images/thunder 2.png'},
-    {'name': 'ปวดหัว', 'img': 'assets/images/thunder 3.png'},
-    {'name': 'อ่อนเพลีย', 'img': 'assets/images/thunder 4.png'},
-    {'name': 'ปวดเมื่อย', 'img': 'assets/images/thunder 5.png'},
-    {'name': 'เป็นไข้', 'img': 'assets/images/thunder 6.png'},
-    {'name': 'เวียนหัว', 'img': 'assets/images/thunder 7.png'},
-    {'name': 'เบื่ออาหาร', 'img': 'assets/images/thunder 8.png'},
-  ];
+  List<Map<String, String>> get maleSymptomsList => symptomsList;
 }
 
 // ==========================================
@@ -1457,6 +1542,92 @@ class ProfilePage extends StatelessWidget {
     ),
   ];
 
+  static const Map<String, List<String>> _symptomAdviceFemale = {
+    'ปวดท้อง': [
+      'ประคบร้อน: ใช้กระเป๋าน้ำร้อนหรือแผ่นแปะลดปวดท้องบริเวณท้องน้อย',
+      'ยาแก้ปวดกลุ่ม NSAIDs ตามคำแนะนำแพทย์หรือฉลากยา เพื่อบรรเทาปวดเกร็ง',
+      'ดื่มน้ำอุ่น และหลีกเลี่ยงน้ำเย็นจัด',
+      'เลี่ยงคาเฟอีน ชา หรือแอลกอฮอล์ที่อาจกระตุ้นอาการปวดเพิ่ม',
+    ],
+    'แปรปรวน': [
+      'กินอาหารเชิงซ้อน เช่น ข้าวกล้องหรือธัญพืช เพื่อให้พลังงานคงที่',
+      'ลดน้ำตาลและคาเฟอีน หากทำให้อารมณ์แปรปรวนหรือนอนไม่หลับ',
+      'พักผ่อนให้พอ และทำกิจกรรมเบาๆ เช่น เดินหรือยืดเหยียด',
+    ],
+    'หงุดหงิด': [
+      'Box breathing: หายใจเข้า 4 กลั้น 4 ออก 4 กลั้น 4 ทำ 3-4 รอบ',
+      'ลดสิ่งเร้า เช่น ปิดเสียงแจ้งเตือนหรือพักจากหน้าจอชั่วคราว',
+    ],
+    'ท้องอืด': [
+      'ขยับร่างกายเบาๆ เช่น เดินเล่น 10-15 นาที',
+      'เลี่ยงอาหารก่อแก๊ส เช่น บรอกโคลี กะหล่ำปลี หรือถั่วบางชนิด',
+      'ลดอาหารรสจัดและของเค็มเพื่อลดบวมน้ำ',
+    ],
+    'ปวดหัวไมเกรน': [
+      'อยู่ในที่เงียบหรือแสงน้อย และประคบเย็นบริเวณหน้าผากหรือขมับ',
+      'พักสายตาและนอนให้พอ',
+      'ดื่มน้ำให้เพียงพอเพื่อลดภาวะขาดน้ำที่กระตุ้นไมเกรน',
+    ],
+    'เป็นไข้': [
+      'เช็ดตัวด้วยน้ำอุณหภูมิห้องบริเวณข้อพับเพื่อระบายความร้อน',
+      'ดื่มน้ำเยอะๆ เพื่อชดเชยการสูญเสียน้ำ',
+      'พักผ่อนให้เต็มที่ เพราะร่างกายต้องใช้พลังงานในการฟื้นตัว',
+    ],
+    'หิวบ่อย': [
+      'เน้นโปรตีนและใยอาหารเพื่อให้อิ่มนานขึ้น',
+      'ลองดื่มน้ำก่อนกิน 1 แก้ว เผื่อร่างกายกำลังหิวน้ำ',
+      'ถ้าอยากของหวาน ลองเลือกดาร์กช็อกโกแลตแทนขนมหวานจัด',
+    ],
+    'สิวขึ้น': [
+      'หลีกเลี่ยงการสัมผัสหรือแกะสิว',
+      'เปลี่ยนปลอกหมอนสม่ำเสมอ',
+      'ลดนมและน้ำตาลถ้าสังเกตว่ากระตุ้นการอักเสบของผิว',
+    ],
+  };
+
+  static const Map<String, List<String>> _symptomAdviceMale = {
+    'เครียด': [
+      'เปลี่ยนสภาพแวดล้อมสักครู่ เดินออกจากโต๊ะทำงานหรือไปเจอแดดอ่อนๆ',
+      'หายใจแบบ Box breathing เพื่อลดความตึงของระบบประสาท',
+      'พักจากโซเชียลหรือสิ่งเร้าที่ทำให้คิดวนชั่วคราว',
+    ],
+    'นอนไม่หลับ': [
+      'ลดคาเฟอีนช่วงบ่ายและเย็น',
+      'งดเล่นมือถือก่อนนอน และลดแสงในห้องให้มากขึ้น',
+      'ถ้ายังไม่ง่วง ลองลุกไปทำกิจกรรมเบาๆ แล้วค่อยกลับมานอน',
+    ],
+    'ปวดหัว': [
+      'พักในที่เงียบหรือแสงน้อย และประคบเย็นบริเวณหน้าผาก',
+      'ดื่มน้ำเพิ่ม เพราะอาการปวดหัวอาจสัมพันธ์กับการขาดน้ำ',
+      'พักสายตาจากหน้าจอ และยืดคอหรือบ่าเบาๆ',
+    ],
+    'อ่อนเพลีย': [
+      'พักผ่อนให้พอ และอย่าฝืนใช้งานร่างกายหนักเกินไป',
+      'กินมื้อที่มีโปรตีนและคาร์บเชิงซ้อนเพื่อเติมพลังงาน',
+      'ถ้าเพลียร่วมกับมีไข้หรือเป็นนานผิดปกติ ควรเฝ้าดูอาการใกล้ชิด',
+    ],
+    'ปวดเมื่อย': [
+      'ยืดเหยียดกล้ามเนื้อเบาๆ หรืออาบน้ำอุ่นเพื่อลดอาการเกร็ง',
+      'หลีกเลี่ยงท่าเดิมนานเกินไป และขยับร่างกายระหว่างวัน',
+      'พักการออกกำลังกายหนักถ้ากล้ามเนื้อยังล้าอยู่',
+    ],
+    'เป็นไข้': [
+      'เช็ดตัวด้วยน้ำอุณหภูมิห้องบริเวณข้อพับเพื่อระบายความร้อน',
+      'ดื่มน้ำมากขึ้นเพื่อลดการขาดน้ำ',
+      'พักผ่อนให้เต็มที่ หากอาการหนักขึ้นควรพบแพทย์',
+    ],
+    'เวียนหัว': [
+      'นั่งพักและเปลี่ยนท่าช้าๆ อย่าลุกเร็ว',
+      'จิบน้ำหรือเกลือแร่ หากก่อนหน้านี้กินน้ำน้อย',
+      'ถ้าเวียนหัวร่วมกับใจสั่นหรือเป็นบ่อย ควรติดตามอาการต่อ',
+    ],
+    'เบื่ออาหาร': [
+      'เริ่มจากอาหารอ่อนหรือมื้อเล็กๆ ก่อน',
+      'ดื่มน้ำให้พอ แต่ไม่ต้องฝืนกินทีละมาก',
+      'ถ้ามีอาการร่วมเช่นไข้ คลื่นไส้ หรือกินได้น้อยหลายวัน ควรเฝ้าดูเพิ่ม',
+    ],
+  };
+
   @override
   Widget build(BuildContext context) {
     final ProfileController controller = Get.put(ProfileController());
@@ -1524,6 +1695,7 @@ class ProfilePage extends StatelessWidget {
 
   Future<void> _handleMenstrualSave(ProfileController controller) async {
     final selectedSections = _selectedPeriodCareSections(controller);
+    final selectedSymptoms = controller.getSymptomsForSelectedDay();
     final shouldShowPeriodCareDialog =
         controller.getPeriodStatusForSelectedDay() &&
             selectedSections.isNotEmpty;
@@ -1533,7 +1705,54 @@ class ProfilePage extends StatelessWidget {
 
     if (saved && shouldShowPeriodCareDialog) {
       await _showPeriodCareDialog(selectedSections);
+      return;
     }
+
+    if (saved &&
+        !controller.getPeriodStatusForSelectedDay() &&
+        selectedSymptoms.isNotEmpty) {
+      await _showSymptomAdviceDialog(
+        title: 'แนะนำวิธีการดูแลตัวเอง',
+        sections: _buildAdviceSections(
+          selectedSymptoms,
+          _symptomAdviceFemale,
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleMaleSave(ProfileController controller) async {
+    if (controller.selectedDate.value == 0) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "กรุณาเลือกวันที่ต้องการ",
+        backgroundColor: const Color(0xFF2C5282),
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final saved = await controller.saveDailyData(showSuccessSnackbar: false);
+    if (!saved) return;
+
+    final selectedSymptoms = controller.getSymptomsForSelectedDay();
+    if (selectedSymptoms.isNotEmpty) {
+      await _showSymptomAdviceDialog(
+        title: 'แนะนำวิธีการดูแลตัวเอง',
+        sections: _buildAdviceSections(
+          selectedSymptoms,
+          _symptomAdviceMale,
+        ),
+      );
+      return;
+    }
+
+    Get.snackbar(
+      "สำเร็จ",
+      "บันทึกเรียบร้อย",
+      backgroundColor: const Color(0xFF2C5282),
+      colorText: Colors.white,
+    );
   }
 
   List<_PeriodCareSectionData> _selectedPeriodCareSections(
@@ -1542,6 +1761,17 @@ class ProfilePage extends StatelessWidget {
     final selectedSymptoms = controller.getSymptomsForSelectedDay().toSet();
     return _periodCareSections
         .where((section) => selectedSymptoms.contains(section.symptomKey))
+        .toList();
+  }
+
+  List<MapEntry<String, List<String>>> _buildAdviceSections(
+    List<String> selectedSymptoms,
+    Map<String, List<String>> dataSource,
+  ) {
+    return selectedSymptoms
+        .toSet()
+        .map((name) => MapEntry(name, dataSource[name] ?? const <String>[]))
+        .where((entry) => entry.value.isNotEmpty)
         .toList();
   }
 
@@ -1656,6 +1886,130 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
+  Future<void> _showSymptomAdviceDialog({
+    required String title,
+    required List<MapEntry<String, List<String>>> sections,
+  }) {
+    if (sections.isEmpty) {
+      Get.snackbar(
+        'สำเร็จ',
+        'บันทึกเรียบร้อย',
+        backgroundColor: const Color(0xFF2C5282),
+        colorText: Colors.white,
+      );
+      return Future.value();
+    }
+
+    return Get.dialog<void>(
+      Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFFCEEFFE),
+            borderRadius: BorderRadius.circular(40),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Color(0xFF4489D7),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                height: Get.height * 0.55,
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final entry in sections) ...[
+                        Text(
+                          entry.key,
+                          style: const TextStyle(
+                            color: Color(0xFF4489D7),
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        for (final bullet in entry.value)
+                          _buildAdviceItem(bullet),
+                        const SizedBox(height: 16),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () => Get.back<void>(),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF20C2FF),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 50,
+                    vertical: 10,
+                  ),
+                ),
+                child: const Text(
+                  'ปิด',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdviceItem(String text) {
+    final normalized = text.replaceFirst(RegExp(r'^\s*[-•]\s*'), '').trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.only(top: 2),
+            child: Text(
+              '•',
+              style: TextStyle(
+                color: Color(0xFF4489D7),
+                fontSize: 16,
+                height: 1.2,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              normalized,
+              style: const TextStyle(
+                color: Color(0xFF5D4037),
+                fontSize: 14,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPeriodCareTip(String tip) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -1676,7 +2030,7 @@ class ProfilePage extends StatelessWidget {
               style: GoogleFonts.mitr(
                 textStyle: const TextStyle(
                   color: Color(0xFF4B94E9),
-                  fontSize: 13,
+                  fontSize: 16,
                   height: 1.28,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1752,7 +2106,7 @@ class ProfilePage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              "รอบเดือนและอาการ",
+              "ความเครียดและอารมณ์",
               style: GoogleFonts.mitr(
                 textStyle: TextStyle(
                   color: const Color(0xFF4489D7),
@@ -1761,32 +2115,7 @@ class ProfilePage extends StatelessWidget {
                 ),
               ),
             ),
-            Obx(() => DropdownButton<String>(
-                  value:
-                      controller.monthNames[controller.selectedMonth.value - 1],
-                  icon: Icon(
-                    Icons.arrow_drop_down,
-                    color: const Color(0xFF757575),
-                    size: scale.rs(24, min: 20, max: 24),
-                  ),
-                  underline: const SizedBox(),
-                  style: GoogleFonts.mitr(
-                    textStyle: TextStyle(
-                      color: const Color(0xFF757575),
-                      fontSize: scale.rf(16, min: 14, max: 16),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onChanged: (val) => controller.changeMonth(val),
-                  items: controller.monthNames
-                      .map(
-                        (m) => DropdownMenuItem(
-                          value: m,
-                          child: Text(m, style: GoogleFonts.mitr()),
-                        ),
-                      )
-                      .toList(),
-                )),
+            _buildMonthDropdownButton(controller, scale),
           ],
         ),
         SizedBox(height: scale.rs(15, min: 12, max: 15)),
@@ -1813,7 +2142,7 @@ class ProfilePage extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: const Color(0xFF4489D7),
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w300,
                             fontSize: scale.rf(16, min: 13.5, max: 16),
                           ),
                         ),
@@ -1851,10 +2180,14 @@ class ProfilePage extends StatelessWidget {
                       final isToday = controller.today.value == day &&
                           controller.selectedMonth.value ==
                               DateTime.now().month;
+                      final isFutureDay = controller.isFutureDay(day);
                       final isPeriodDay =
                           controller.dailyPeriodStatus[dayKey] ?? false;
                       final isPredictedDay =
                           controller.predictedPeriodDays.contains(dayKey);
+                      final hasSymptoms =
+                          (controller.dailySymptoms[dayKey]?.isNotEmpty ??
+                              false);
 
                       Color bgColor = Colors.transparent;
                       Color textColor = const Color(0xFF4489D7);
@@ -1871,6 +2204,13 @@ class ProfilePage extends StatelessWidget {
                         bgColor = const Color(0xFFCCCCCC);
                       }
 
+                      if (isFutureDay && !isSelected) {
+                        bgColor = bgColor.withValues(
+                          alpha: bgColor == Colors.transparent ? 0.0 : 0.35,
+                        );
+                        textColor = textColor.withValues(alpha: 0.4);
+                      }
+
                       return GestureDetector(
                         onTap: () => controller.selectDay(day),
                         behavior: HitTestBehavior.opaque,
@@ -1884,13 +2224,35 @@ class ProfilePage extends StatelessWidget {
                                 color: bgColor,
                                 shape: BoxShape.circle,
                               ),
-                              child: Text(
-                                "$day",
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: scale.rf(16, min: 13.5, max: 16),
-                                ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "$day",
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize:
+                                          scale.rf(16, min: 13.5, max: 16),
+                                      height: 1,
+                                    ),
+                                  ),
+                                  if (hasSymptoms) ...[
+                                    const SizedBox(height: 0),
+                                    Transform.translate(
+                                      offset: const Offset(0, 1),
+                                      child: Container(
+                                        width: scale.rs(16, min: 12, max: 16),
+                                        height: 2,
+                                        decoration: BoxDecoration(
+                                          color: textColor,
+                                          borderRadius:
+                                              BorderRadius.circular(99),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             if (whaleImage != null)
@@ -1898,11 +2260,17 @@ class ProfilePage extends StatelessWidget {
                             if (whaleImage != null)
                               Image.asset(
                                 whaleImage,
-                                width: scale.rs(30, min: 22, max: 30),
-                                height: scale.rs(30, min: 22, max: 30),
+                                width: scale.rs(32, min: 32, max: 40),
+                                height: scale.rs(32, min: 32, max: 40),
                                 fit: BoxFit.contain,
+                                color: isFutureDay && !isSelected
+                                    ? Colors.white.withValues(alpha: 0.55)
+                                    : null,
+                                colorBlendMode: isFutureDay && !isSelected
+                                    ? BlendMode.modulate
+                                    : null,
                                 errorBuilder: (_, __, ___) => SizedBox(
-                                    height: scale.rs(30, min: 22, max: 30)),
+                                    height: scale.rs(40, min: 32, max: 40)),
                               ),
                           ],
                         ),
@@ -1955,6 +2323,34 @@ class ProfilePage extends StatelessWidget {
             );
           }
 
+          if (controller.isSelectedDateInFuture) {
+            return Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                vertical: scale.rs(10, min: 8, max: 10),
+                horizontal: scale.rs(10, min: 8, max: 10),
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFDA7B),
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                border: Border.all(
+                  color: const Color(0xFF757575),
+                  width: scale.rs(1.5, min: 1.2, max: 1.5),
+                ),
+              ),
+              child: Text(
+                "ไม่สามารถบันทึกล่วงหน้าได้ (บันทึกได้เฉพาะวันนี้และย้อนหลัง)",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: const Color(0xFF5D4037),
+                  fontSize: scale.rf(16, min: 13.5, max: 16),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          }
+
           return Column(
             children: [
               Row(
@@ -1981,53 +2377,18 @@ class ProfilePage extends StatelessWidget {
               ),
               SizedBox(height: scale.rs(30, min: 20, max: 30)),
               Wrap(
-                spacing: scale.rs(15, min: 10, max: 15),
-                runSpacing: scale.rs(20, min: 12, max: 20),
+                spacing: 15,
+                runSpacing: 20,
                 alignment: WrapAlignment.center,
                 children: controller.symptomsList.map((item) {
                   final isSelected = controller
                       .getSymptomsForSelectedDay()
                       .contains(item['name']);
-                  return GestureDetector(
+                  return _buildSymptomButton(
+                    name: item['name']!,
+                    imagePath: item['img']!,
+                    isSelected: isSelected,
                     onTap: () => controller.toggleSymptom(item['name']!),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: scale.rs(70, min: 56, max: 70),
-                          height: scale.rs(70, min: 56, max: 70),
-                          padding:
-                              EdgeInsets.all(scale.rs(10, min: 7, max: 10)),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFFA6E3F9)
-                                : const Color(0xFFFFDA7B)
-                                    .withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(
-                              scale.rs(15, min: 12, max: 15),
-                            ),
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFF4489D7)
-                                  : Colors.black12,
-                              width: scale.rs(1.5, min: 1.2, max: 1.5),
-                            ),
-                          ),
-                          child: Image.asset(
-                            item['img']!,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        SizedBox(height: scale.rs(8, min: 6, max: 8)),
-                        Text(
-                          item['name']!,
-                          style: TextStyle(
-                            fontSize: scale.rf(13, min: 11.5, max: 13),
-                            color: const Color(0xFF5D4037),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
                   );
                 }).toList(),
               ),
@@ -2085,32 +2446,7 @@ class ProfilePage extends StatelessWidget {
                 ),
               ),
             ),
-            Obx(() => DropdownButton<String>(
-                  value:
-                      controller.monthNames[controller.selectedMonth.value - 1],
-                  icon: Icon(
-                    Icons.arrow_drop_down,
-                    color: const Color(0xFF757575),
-                    size: scale.rs(24, min: 20, max: 24),
-                  ),
-                  underline: const SizedBox(),
-                  style: GoogleFonts.mitr(
-                    textStyle: TextStyle(
-                      color: const Color(0xFF757575),
-                      fontSize: scale.rf(16, min: 14, max: 16),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  onChanged: (val) => controller.changeMonth(val),
-                  items: controller.monthNames
-                      .map(
-                        (m) => DropdownMenuItem(
-                          value: m,
-                          child: Text(m, style: GoogleFonts.mitr()),
-                        ),
-                      )
-                      .toList(),
-                )),
+            _buildMonthDropdownButton(controller, scale),
           ],
         ),
         SizedBox(height: scale.rs(15, min: 12, max: 15)),
@@ -2175,7 +2511,11 @@ class ProfilePage extends StatelessWidget {
                               DateTime.now().month &&
                           controller.selectedYear.value == DateTime.now().year;
                       final isSelected = controller.selectedDate.value == day;
+                      final isFutureDay = controller.isFutureDay(day);
                       final hasRecord = controller.hasMaleHealthRecord(dayKey);
+                      final hasSymptoms =
+                          (controller.dailySymptoms[dayKey]?.isNotEmpty ??
+                              false);
 
                       Color bgColor = Colors.transparent;
                       Color textColor = const Color(0xFF4489D7);
@@ -2188,6 +2528,13 @@ class ProfilePage extends StatelessWidget {
                       } else if (isToday) {
                         bgColor = const Color(0xFFCCCCCC);
                         textColor = const Color(0xFF2C5282);
+                      }
+
+                      if (isFutureDay && !isSelected) {
+                        bgColor = bgColor.withValues(
+                          alpha: bgColor == Colors.transparent ? 0.0 : 0.35,
+                        );
+                        textColor = textColor.withValues(alpha: 0.4);
                       }
 
                       return GestureDetector(
@@ -2203,13 +2550,35 @@ class ProfilePage extends StatelessWidget {
                                 color: bgColor,
                                 shape: BoxShape.circle,
                               ),
-                              child: Text(
-                                "$day",
-                                style: TextStyle(
-                                  color: textColor,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: scale.rf(16, min: 13.5, max: 16),
-                                ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "$day",
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize:
+                                          scale.rf(16, min: 13.5, max: 16),
+                                      height: 1,
+                                    ),
+                                  ),
+                                  if (hasSymptoms) ...[
+                                    const SizedBox(height: 0),
+                                    Transform.translate(
+                                      offset: const Offset(0, -1.5),
+                                      child: Container(
+                                        width: scale.rs(16, min: 12, max: 16),
+                                        height: 2,
+                                        decoration: BoxDecoration(
+                                          color: textColor,
+                                          borderRadius:
+                                              BorderRadius.circular(99),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
                             if (whaleImage != null)
@@ -2217,11 +2586,17 @@ class ProfilePage extends StatelessWidget {
                             if (whaleImage != null)
                               Image.asset(
                                 whaleImage,
-                                width: scale.rs(30, min: 22, max: 30),
-                                height: scale.rs(30, min: 22, max: 30),
+                                width: scale.rs(32, min: 32, max: 40),
+                                height: scale.rs(32, min: 32, max: 40),
                                 fit: BoxFit.contain,
+                                color: isFutureDay && !isSelected
+                                    ? Colors.white.withValues(alpha: 0.55)
+                                    : null,
+                                colorBlendMode: isFutureDay && !isSelected
+                                    ? BlendMode.modulate
+                                    : null,
                                 errorBuilder: (_, __, ___) => SizedBox(
-                                    height: scale.rs(30, min: 22, max: 30)),
+                                    height: scale.rs(40, min: 32, max: 40)),
                               ),
                           ],
                         ),
@@ -2274,57 +2649,50 @@ class ProfilePage extends StatelessWidget {
             );
           }
 
+          if (controller.isSelectedDateInFuture) {
+            return Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                vertical: scale.rs(10, min: 8, max: 10),
+                horizontal: scale.rs(10, min: 8, max: 10),
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFDA7B),
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                border: Border.all(
+                  color: const Color(0xFF757575),
+                  width: scale.rs(1.5, min: 1.2, max: 1.5),
+                ),
+              ),
+              child: Text(
+                "ไม่สามารถบันทึกล่วงหน้าได้ (บันทึกได้เฉพาะวันนี้และย้อนหลัง)",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: const Color(0xFF5D4037),
+                  fontSize: scale.rf(16, min: 13.5, max: 16),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          }
+
           return Column(
             children: [
               Wrap(
-                spacing: scale.rs(15, min: 10, max: 15),
-                runSpacing: scale.rs(20, min: 12, max: 20),
+                spacing: 15,
+                runSpacing: 20,
                 alignment: WrapAlignment.center,
                 children: controller.maleSymptomsList.map((tag) {
                   final isSelected = controller
                       .getSymptomsForSelectedDay()
                       .contains(tag['name']);
 
-                  return GestureDetector(
+                  return _buildSymptomButton(
+                    name: tag['name']!,
+                    imagePath: tag['img']!,
+                    isSelected: isSelected,
                     onTap: () => controller.toggleSymptom(tag['name']!),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: scale.rs(70, min: 56, max: 70),
-                          height: scale.rs(70, min: 56, max: 70),
-                          padding:
-                              EdgeInsets.all(scale.rs(10, min: 7, max: 10)),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFFA6E3F9)
-                                : const Color(0xFFFFDA7B)
-                                    .withValues(alpha: 0.8),
-                            borderRadius: BorderRadius.circular(
-                              scale.rs(15, min: 12, max: 15),
-                            ),
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFF4489D7)
-                                  : Colors.black12,
-                              width: scale.rs(1.5, min: 1.2, max: 1.5),
-                            ),
-                          ),
-                          child: Image.asset(
-                            tag['img']!,
-                            fit: BoxFit.contain,
-                          ),
-                        ),
-                        SizedBox(height: scale.rs(8, min: 6, max: 8)),
-                        Text(
-                          tag['name']!,
-                          style: TextStyle(
-                            fontSize: scale.rf(13, min: 11.5, max: 13),
-                            color: const Color(0xFF5D4037),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
                   );
                 }).toList(),
               ),
@@ -2332,9 +2700,9 @@ class ProfilePage extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
-                  onPressed: () => controller.saveDailyData(),
+                  onPressed: () => _handleMaleSave(controller),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C5282),
+                    backgroundColor: const Color(0xFF20C2FF),
                     padding: EdgeInsets.symmetric(
                       horizontal: scale.rs(18, min: 14, max: 18),
                       vertical: scale.rs(10, min: 8, max: 10),
@@ -2401,6 +2769,102 @@ class ProfilePage extends StatelessWidget {
         ),
       );
     });
+  }
+
+  Widget _buildMonthDropdownButton(
+    ProfileController controller,
+    ResponsiveScale scale,
+  ) {
+    return Obx(() {
+      final selectedMonth =
+          controller.monthNames[controller.selectedMonth.value - 1];
+
+      return PopupMenuButton<String>(
+        onSelected: controller.changeMonth,
+        color: Colors.white,
+        elevation: 8,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        itemBuilder: (context) => controller.monthNames
+            .map(
+              (month) => PopupMenuItem<String>(
+                value: month,
+                child: Text(
+                  month,
+                  style: TextStyle(
+                    color: const Color(0xFF757575),
+                    fontSize: scale.rf(16, min: 14, max: 16),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              selectedMonth,
+              style: TextStyle(
+                color: const Color(0xFF757575),
+                fontSize: scale.rf(16, min: 14, max: 16),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 3),
+            Icon(
+              Icons.arrow_drop_down,
+              color: const Color(0xFF757575),
+              size: scale.rs(29, min: 25, max: 29),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildSymptomButton({
+    required String name,
+    required String imagePath,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 70,
+            height: 70,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? const Color(0xFFA6E3F9)
+                  : const Color(0xFFFFDA7B).withValues(alpha: 0.8),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(
+                color: isSelected ? const Color(0xFF4489D7) : Colors.black12,
+                width: 1.5,
+              ),
+            ),
+            child: Image.asset(
+              imagePath,
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            name,
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF5D4037),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

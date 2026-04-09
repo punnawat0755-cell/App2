@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:get/get.dart';
@@ -15,6 +16,8 @@ class DailyMoodPage extends StatefulWidget {
 }
 
 class _DailyMoodPageState extends State<DailyMoodPage> {
+  static const int _maxSelectedTags = 3;
+
   // ---------- UI mood options (5 levels) ----------
   static const List<_MoodOption> _moodOptions = [
     _MoodOption(
@@ -111,8 +114,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   int _selectedMoodIndex = 2;
   final List<String> _selectedTags = [];
 
-  int? _todayScore;
-
   final TextEditingController _noteCtrl = TextEditingController();
   final TextEditingController _healingCtrl = TextEditingController();
   String? _serverNote;
@@ -171,14 +172,14 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     if (!mounted) return;
     setState(() {
       _answeredToday = (savedDate == today);
-      _todayScore =
+      final todayScore =
           _answeredToday ? prefs.getInt(DailyMoodStatusService.scoreKey) : null;
       _editUsedToday =
           (prefs.getString(DailyMoodStatusService.editUsedDateKey) == today);
       _isEditMode = false;
-      if (_answeredToday && _todayScore != null) {
+      if (_answeredToday && todayScore != null) {
         final option = _moodOptions.firstWhere(
-          (m) => m.score == _todayScore,
+          (m) => m.score == todayScore,
           orElse: () => _moodOptions[2],
         );
         _selectedMoodIndex = _indexFromOption(option);
@@ -188,8 +189,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     });
   }
 
-  Future<void> _saveLocalToday(_MoodOption option,
-      {required bool markEditUsed}) async {
+  Future<void> _saveLocalToday(
+    _MoodOption option, {
+    required bool markEditUsed,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     final today = DailyMoodStatusService.todayAsKey();
 
@@ -204,7 +207,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
 
   Future<void> _clearDailyMoodCache({bool showSnackbar = true}) async {
     await DailyMoodStatusService.clearLocalCache();
-
     _noteCtrl.clear();
     _healingCtrl.clear();
     _selectedTags.clear();
@@ -212,6 +214,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     _serverHealingQuote = null;
 
     await _loadLocalStatus();
+
     if (!mounted) return;
 
     if (showSnackbar) {
@@ -234,28 +237,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
         ? Get.find<CoinService>()
         : Get.put(CoinService(), permanent: true);
     await coinService.loadCoins();
-  }
-
-  Future<void> _awardEncouragementCoinsIfNeeded() async {
-    if (!_isLoggedIn) return;
-
-    final healingQuote = _healingCtrl.text.trim();
-    if (healingQuote.isEmpty) return;
-
-    final userId = _sb.auth.currentUser?.id;
-    if (userId == null || userId.isEmpty) return;
-
-    final coinService = Get.isRegistered<CoinService>()
-        ? Get.find<CoinService>()
-        : Get.put(CoinService(), permanent: true);
-
-    final todayKey = DailyMoodStatusService.todayAsKey();
-    await coinService.awardCoins(
-      amount: 2,
-      reason: 'daily_mood_healing_quote',
-      dedupeKey: 'daily_mood_healing_quote:$userId:$todayKey',
-      refType: 'daily_mood',
-    );
   }
 
   // ---------- Supabase ----------
@@ -293,8 +274,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       if (!mounted) return;
       setState(() {
         _answeredToday = true;
-        _todayScore = option.score;
-        // _todayLabel = option.label;
 
         _serverNote = note;
         _serverHealingQuote = healingQuote;
@@ -341,51 +320,49 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     final canEditNow = _answeredToday && _isEditMode && !_editUsedToday;
 
     if (!isFirstAnswer && !canEditNow) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('กำลังบันทึก...'), duration: Duration(seconds: 1)),
-    );
-
-    // 1) Save to Supabase
-    if (_isLoggedIn) {
-      try {
-        await _saveToSupabase(
-          option,
-          note: _noteCtrl.text,
-          emotions: _selectedTags,
-          healingQuote: _healingCtrl.text,
-        );
-        await _awardEncouragementCoinsIfNeeded();
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('บันทึกไม่สำเร็จ (Supabase): $e')),
-        );
-        return;
-      }
+    if (_selectedTags.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('กรุณาเลือกความรู้สึกอย่างน้อย 1 ข้อก่อนส่งพลังใจ'),
+        ),
+      );
+      return;
     }
-
-    // 2) Save to local cache
-    await _saveLocalToday(option, markEditUsed: canEditNow);
-    await _refreshProfileCalendarIfNeeded();
-    await _refreshCoinsIfNeeded();
-
-    final message = canEditNow
-        ? 'แก้ไขคำตอบสำเร็จ: ${option.label} (${option.score}/100)'
-        : 'บันทึกอารมณ์วันนี้แล้ว: ${option.label} (${option.score}/100)';
-
-    if (!mounted) return;
-    if (Navigator.of(context).canPop()) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      Navigator.of(context).pop(message);
+    if (!_isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนบันทึก Daily Mood')),
+      );
       return;
     }
 
+    // ScaffoldMessenger.of(context).showSnackBar(
+    //   const SnackBar(
+    //       content: Text('กำลังบันทึก...'), duration: Duration(seconds: 1)),
+    // );
+
+    try {
+      await _saveToSupabase(
+        option,
+        note: _noteCtrl.text,
+        emotions: _selectedTags,
+        healingQuote: _healingCtrl.text,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('บันทึกไม่สำเร็จ (Supabase): $e')),
+      );
+      return;
+    }
+
+    await _saveLocalToday(option, markEditUsed: canEditNow);
+    await _refreshProfileCalendarIfNeeded();
+    await _refreshCoinsIfNeeded();
+    if (!mounted) return;
+
     setState(() {
       _answeredToday = true;
-      _todayScore = option.score;
-      // _todayLabel = option.label;
 
       _serverNote =
           _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
@@ -399,12 +376,11 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       _isEditMode = false;
     });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    Get.offAll(() => const BottomNavBar());
   }
 
   bool get _canLeavePage => _answeredToday;
+  bool get _hasSelectedMoodTags => _selectedTags.isNotEmpty;
 
   void _showLockedExitHint() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -536,9 +512,21 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               SizedBox(height: scale.rs(12, min: 8, max: 12)),
                               _buildTagRow(currentTags.sublist(4, 8),
                                   enabled: canSelectMood, scale: scale),
+                              if (canSelectMood && !_hasSelectedMoodTags) ...[
+                                SizedBox(
+                                  height: scale.rs(8, min: 6, max: 8),
+                                ),
+                                Text(
+                                  'กรุณาเลือกความรู้สึกอย่างน้อย 1 ข้อ',
+                                  style: TextStyle(
+                                    color: const Color(0xFF607D8B),
+                                    fontSize: scale.rf(12, min: 10.5, max: 12),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
-                          SizedBox(height: scale.rs(24, min: 16, max: 24)),
+                          SizedBox(height: scale.rs(30, min: 16, max: 54)),
                           Text(
                             'บันทึกเรื่องราวของวันนี้',
                             style: TextStyle(
@@ -561,7 +549,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               padding: EdgeInsets.only(
                                   left: scale.rs(4, min: 3, max: 4)),
                               child: Text(
-                                'ยังไม่ได้ล็อกอิน: จะบันทึกลงเครื่องเท่านั้น',
+                                'ยังไม่ได้ล็อกอิน: ไม่สามารถบันทึกข้อมูลได้',
                                 style: TextStyle(
                                   color: const Color(0xFF607D8B),
                                   fontSize: scale.rf(12, min: 10.5, max: 12),
@@ -617,15 +605,16 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                             height: 84,
                             scale: scale,
                           ),
-                          SizedBox(height: scale.rs(40, min: 24, max: 40)),
+                          SizedBox(height: scale.rs(40, min: 24, max: 120)),
                           Center(
                             child: SizedBox(
                               width: scale.rw(0.85, min: 220, max: 420),
                               height: scale.rs(55, min: 46, max: 55),
                               child: ElevatedButton(
-                                onPressed: canSelectMood
-                                    ? () => _submitMood(selectedOption)
-                                    : null,
+                                onPressed:
+                                    (canSelectMood && _hasSelectedMoodTags)
+                                        ? () => _submitMood(selectedOption)
+                                        : null,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFB5EFFF),
                                   disabledBackgroundColor:
@@ -644,7 +633,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Image.asset(
-                                      'assets/images/heart.png',
+                                      "assets/images/heartpulse.png",
                                       height: scale.rs(40, min: 32, max: 40),
                                       width: scale.rs(40, min: 32, max: 40),
                                     ),
@@ -664,7 +653,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               ),
                             ),
                           ),
-                          SizedBox(height: scale.rs(30, min: 20, max: 30)),
+                          // SizedBox(height: scale.rs(30, min: 20, max: 30)),
                         ],
                       ),
                     );
@@ -701,13 +690,13 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
             keyboardType: TextInputType.multiline,
             enabled: enabled,
             style: TextStyle(
-              color: mainBlue,
+              color: Color(0xFF4489D7),
               fontSize: scale.rf(16, min: 14, max: 16),
             ),
             decoration: InputDecoration(
               hintText: 'มาเริ่มการบันทึกกันเถอะ......',
               hintStyle: TextStyle(
-                color: Colors.black38,
+                color: Color(0xFF9FBCDB),
                 fontSize: scale.rf(14, min: 12, max: 14),
               ),
               border: InputBorder.none,
@@ -728,7 +717,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
               builder: (_, value, __) => Text(
                 '${value.text.length}/$maxLength',
                 style: TextStyle(
-                  color: mainBlue.withValues(alpha: 0.5),
+                  color: Color(0xFF9FBCDB),
                   fontSize: scale.rf(12, min: 10.5, max: 12),
                   fontWeight: FontWeight.bold,
                 ),
@@ -745,10 +734,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     required bool enabled,
     required ResponsiveScale scale,
   }) {
-    const mainBlue = Color(0xFF4A89D8);
-    const lightFillBlue = Color(0xFFE0F2FE);
-    const tagFillBlue = Color(0xFF93C5FD);
-
     return Row(
       children: rowTags.map((tag) {
         final isSelected = _selectedTags.contains(tag);
@@ -760,6 +745,11 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
             child: GestureDetector(
               onTap: enabled
                   ? () {
+                      if (!isSelected &&
+                          _selectedTags.length >= _maxSelectedTags) {
+                        return;
+                      }
+
                       setState(() {
                         if (isSelected) {
                           _selectedTags.remove(tag);
@@ -774,12 +764,12 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                 height: scale.rs(42, min: 34, max: 42),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  color: isSelected ? tagFillBlue : lightFillBlue,
+                  color: isSelected ? Color(0xFF8BE2FB) : Color(0xFFCEEFFE),
                   borderRadius: BorderRadius.circular(
                     scale.rs(25, min: 18, max: 25),
                   ),
                   border: Border.all(
-                    color: mainBlue,
+                    color: Color(0xFF4489D7),
                     width: scale.rs(1.2, min: 1, max: 1.2),
                   ),
                 ),
@@ -788,7 +778,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                   child: Text(
                     tag,
                     style: TextStyle(
-                      color: mainBlue,
+                      color: Color(0xFF4489D7),
                       fontWeight: FontWeight.bold,
                       fontSize: scale.rf(14, min: 12, max: 14),
                     ),
