@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'privacy_policy_page.dart';
@@ -173,27 +174,46 @@ class _LoginPageState extends State<LoginPage> {
   Widget _buildTextField({
     required TextEditingController controller,
     required String hintText,
-    required IconData icon,
+    required String iconAsset,
+    required ResponsiveScale scale,
     TextInputType? keyboardType,
     bool isPassword = false,
     Widget? suffixIcon,
   }) {
     return Container(
+      height: scale.rs(62, min: 56, max: 64),
       decoration: BoxDecoration(
         color: _fieldGrey,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(scale.rs(20, min: 18, max: 20)),
       ),
       child: TextField(
         controller: controller,
         obscureText: isPassword,
         keyboardType: keyboardType,
+        style: TextStyle(
+          fontSize: scale.rf(17, min: 15, max: 17),
+          color: const Color(0xFF5D5D5D),
+        ),
         decoration: InputDecoration(
           hintText: hintText,
-          hintStyle: const TextStyle(color: Colors.grey),
-          prefixIcon: Icon(icon, color: Colors.grey),
+          hintStyle: TextStyle(
+            color: Colors.grey,
+            fontSize: scale.rf(16, min: 14, max: 16),
+          ),
+          prefixIcon: Padding(
+            padding: EdgeInsets.all(scale.rs(14, min: 12, max: 14)),
+            child: Image.asset(
+              iconAsset,
+              width: scale.rs(24, min: 22, max: 28),
+              height: scale.rs(24, min: 22, max: 28),
+              fit: BoxFit.contain,
+            ),
+          ),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 15),
+          contentPadding: EdgeInsets.symmetric(
+            vertical: scale.rs(16, min: 14, max: 16),
+          ),
         ),
       ),
     );
@@ -204,121 +224,156 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Column(
-            children: [
-              const SizedBox(height: 60),
-              Image.asset(
-                'assets/images/logo.png',
-                width: 150,
-                height: 150,
-                fit: BoxFit.contain,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.flutter_dash,
-                  size: 80,
-                  color: _mainBlue,
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'เข้าสู่ระบบ',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: _mainBlue,
-                ),
-              ),
-              const SizedBox(height: 40),
-              _buildTextField(
-                controller: _emailController,
-                hintText: 'อีเมล',
-                icon: Icons.person,
-                keyboardType: TextInputType.emailAddress,
-              ),
-              const SizedBox(height: 20),
-              _buildTextField(
-                controller: _passwordController,
-                hintText: 'รหัสผ่าน',
-                icon: Icons.lock,
-                isPassword: _hidePw,
-                suffixIcon: IconButton(
-                  onPressed: () => setState(() => _hidePw = !_hidePw),
-                  icon: Icon(
-                    _hidePw ? Icons.visibility : Icons.visibility_off,
-                    color: Colors.grey,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
+            final horizontalPadding = constraints.maxWidth < 360
+                ? scale.rs(18, min: 16, max: 18)
+                : scale.rs(34, min: 24, max: 40);
+            final logoSize = scale.rs(160, min: 132, max: 180);
+
+            return Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 460),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: horizontalPadding,
+                    vertical: scale.rs(20, min: 16, max: 24),
                   ),
-                ),
-              ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _isLoading ? null : _forgotPassword,
-                  child: const Text(
-                    'ลืมรหัสผ่าน?',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 30),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _lightBlue,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    elevation: 0,
-                  ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : const Text(
-                          'เข้าสู่ระบบ',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
+                  child: Column(
+                    children: [
+                      SizedBox(height: scale.rs(80, min: 36, max: 100)),
+                      Transform.scale(
+                        scale: constraints.maxWidth < 360 ? 1.28 : 1.5,
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          width: logoSize,
+                          height: logoSize,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Icon(
+                            Icons.flutter_dash,
+                            size: logoSize,
+                            color: _mainBlue,
                           ),
                         ),
+                      ),
+                      SizedBox(height: scale.rs(24, min: 18, max: 26)),
+                      Text(
+                        'เข้าสู่ระบบ',
+                        style: TextStyle(
+                          fontSize: scale.rf(28, min: 23, max: 28),
+                          fontWeight: FontWeight.bold,
+                          color: _mainBlue,
+                        ),
+                      ),
+                      SizedBox(height: scale.rs(20, min: 16, max: 20)),
+                      _buildTextField(
+                        controller: _emailController,
+                        hintText: 'อีเมล',
+                        iconAsset: 'assets/images/Customer.png',
+                        keyboardType: TextInputType.emailAddress,
+                        scale: scale,
+                      ),
+                      SizedBox(height: scale.rs(18, min: 14, max: 18)),
+                      _buildTextField(
+                        controller: _passwordController,
+                        hintText: 'รหัสผ่าน',
+                        iconAsset: 'assets/images/lock.png',
+                        isPassword: _hidePw,
+                        scale: scale,
+                        suffixIcon: IconButton(
+                          onPressed: () => setState(() => _hidePw = !_hidePw),
+                          icon: Icon(
+                            _hidePw ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.grey,
+                            size: scale.rs(22, min: 20, max: 22),
+                          ),
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _isLoading ? null : _forgotPassword,
+                          child: Text(
+                            'ลืมรหัสผ่าน?',
+                            style: TextStyle(
+                              color: const Color(0xFF8D8D8D),
+                              fontSize: scale.rf(14, min: 12.5, max: 14),
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: scale.rs(20, min: 16, max: 22)),
+                      SizedBox(
+                        width: double.infinity,
+                        height: scale.rs(55, min: 50, max: 56),
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _login,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _lightBlue,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                scale.rs(20, min: 18, max: 20),
+                              ),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: _isLoading
+                              ? SizedBox(
+                                  width: scale.rs(20, min: 18, max: 20),
+                                  height: scale.rs(20, min: 18, max: 20),
+                                  child: const CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  'เข้าสู่ระบบ',
+                                  style: TextStyle(
+                                    fontSize: scale.rf(18, min: 16, max: 18),
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      SizedBox(height: scale.rs(130, min: 56, max: 180)),
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            'ยังไม่มีบัญชีใช่ไหม? ',
+                            style: TextStyle(
+                              color: Colors.grey,
+                              fontSize: scale.rf(16, min: 14, max: 16),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RegisterPage(),
+                              ),
+                            ),
+                            child: Text(
+                              'ลงทะเบียน',
+                              style: TextStyle(
+                                color: _lightBlue,
+                                fontWeight: FontWeight.w500,
+                                fontSize: scale.rf(16, min: 14, max: 16),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: scale.rs(20, min: 16, max: 20)),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 150),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'ยังไม่มีบัญชีใช่ไหม? ',
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                  GestureDetector(
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const RegisterPage()),
-                    ),
-                    child: const Text(
-                      'ลงทะเบียน',
-                      style: TextStyle(
-                        color: _lightBlue,
-                        fontWeight: FontWeight.w500,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
