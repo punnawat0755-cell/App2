@@ -13,6 +13,8 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  static const int _maxInitialPeriodDays = 14;
+
   final _usernameController = TextEditingController();
   final _birthdayController = TextEditingController();
   final _lastPeriodController = TextEditingController();
@@ -24,6 +26,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _hidePw = true;
 
   DateTime? _birthday;
+  DateTimeRange? _lastPeriodRange;
   String _sex = 'Female';
 
   static const _mainBlue = Color(0xFF4A89D8);
@@ -79,6 +82,35 @@ class _RegisterPageState extends State<RegisterPage> {
     return '$dd/$mm/$yy';
   }
 
+  DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+  int _periodRangeDays(DateTimeRange range) =>
+      _dateOnly(range.end).difference(_dateOnly(range.start)).inDays + 1;
+
+  Future<bool> _seedInitialPeriodToCalendar(DateTimeRange range) async {
+    final start = _dateOnly(range.start);
+    final end = _dateOnly(range.end);
+    final days = end.difference(start).inDays + 1;
+    if (days <= 0 || days > _maxInitialPeriodDays) return false;
+
+    for (var i = 0; i < days; i++) {
+      final day = start.add(Duration(days: i));
+      await supabase.rpc(
+        'save_calendar_health_log',
+        params: {
+          'p_log_date': _toIsoDate(day),
+          'p_is_menstruating': true,
+          'p_symptoms': <String>[],
+          'p_flow_level': null,
+          'p_pain_level': null,
+          'p_notes': null,
+        },
+      );
+    }
+
+    return true;
+  }
+
   Future<void> _pickBirthday() async {
     final now = DateTime.now();
     final initial = _birthday ?? DateTime(now.year - 18, now.month, now.day);
@@ -110,9 +142,20 @@ class _RegisterPageState extends State<RegisterPage> {
 
     if (pickedRange == null || !mounted) return;
 
+    final safeRange = DateTimeRange(
+      start: _dateOnly(pickedRange.start),
+      end: _dateOnly(pickedRange.end),
+    );
+    final dayCount = _periodRangeDays(safeRange);
+    if (dayCount > _maxInitialPeriodDays) {
+      _showError('ช่วงประจำเดือนต้องไม่เกิน $_maxInitialPeriodDays วัน');
+      return;
+    }
+
     setState(() {
+      _lastPeriodRange = safeRange;
       _lastPeriodController.text =
-          '${_formatShortDate(pickedRange.start)}-${_formatShortDate(pickedRange.end)}';
+          '${_formatShortDate(safeRange.start)}-${_formatShortDate(safeRange.end)}';
     });
   }
 
@@ -147,6 +190,8 @@ class _RegisterPageState extends State<RegisterPage> {
           gender = 'other';
       }
 
+      final selectedPeriodRange = gender == 'female' ? _lastPeriodRange : null;
+
       final res = await supabase.auth.signUp(
         email: email,
         password: password,
@@ -155,6 +200,11 @@ class _RegisterPageState extends State<RegisterPage> {
           'gender': gender,
           'birth_date': _toIsoDate(_birthday!),
           'phone': phone,
+          if (selectedPeriodRange != null)
+            'last_period_start_date': _toIsoDate(selectedPeriodRange.start),
+          if (selectedPeriodRange != null)
+            'last_period_end_date': _toIsoDate(selectedPeriodRange.end),
+          if (selectedPeriodRange != null) 'initial_period_seeded': false,
         },
       );
 
@@ -164,6 +214,23 @@ class _RegisterPageState extends State<RegisterPage> {
 
       final hasSession =
           res.session != null || supabase.auth.currentSession != null;
+      if (hasSession && selectedPeriodRange != null) {
+        final seeded = await _seedInitialPeriodToCalendar(selectedPeriodRange);
+        if (seeded) {
+          try {
+            await supabase.auth.updateUser(
+              UserAttributes(
+                data: {
+                  'last_period_start_date':
+                      _toIsoDate(selectedPeriodRange.start),
+                  'last_period_end_date': _toIsoDate(selectedPeriodRange.end),
+                  'initial_period_seeded': true,
+                },
+              ),
+            );
+          } catch (_) {}
+        }
+      }
       if (hasSession) {
         try {
           await supabase.auth.signOut();
@@ -248,7 +315,7 @@ class _RegisterPageState extends State<RegisterPage> {
         onTap: onTap,
         style: const TextStyle(
           fontSize: 16,
-          color: const Color(0xFF5D5D5D),
+          color: Color(0xFF5D5D5D),
         ),
         decoration: InputDecoration(
           hintText: hintText,
@@ -605,8 +672,6 @@ class _RangeMonthCalendar extends StatelessWidget {
   final bool isPickingEnd;
   final ValueChanged<DateTime> onMonthChanged;
   final ValueChanged<DateTime> onDayPicked;
-
-  static const _rangeFill = Color(0xFFC7E9FF);
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;

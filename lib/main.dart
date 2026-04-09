@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -25,47 +27,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await AppEnv.load();
-
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  final supabaseUrl = AppEnv.string(
-    'SUPABASE_URL',
-    compileTimeValue: const bool.hasEnvironment('SUPABASE_URL')
-        ? const String.fromEnvironment('SUPABASE_URL')
-        : null,
-  );
-  final supabaseAnonKey = AppEnv.string(
-    'SUPABASE_ANON_KEY',
-    compileTimeValue: const bool.hasEnvironment('SUPABASE_ANON_KEY')
-        ? const String.fromEnvironment('SUPABASE_ANON_KEY')
-        : null,
-  );
-
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    throw StateError(
-      'Missing Supabase config. Add SUPABASE_URL and SUPABASE_ANON_KEY to .env.',
-    );
-  }
-
-  await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
-  );
-
-  Get.put(CoinService(), permanent: true);
-
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  try {
-    await NotificationService.initialize();
-  } catch (e, st) {
-    debugPrint("Notification Init Error: $e");
-    debugPrint("Notification Init Stack: $st");
-  }
-
   runApp(const MyApp());
 }
 
@@ -95,7 +57,122 @@ class MyApp extends StatelessWidget {
         textTheme: GoogleFonts.mitrTextTheme(Theme.of(context).textTheme),
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
       ),
-      home: const AuthStateHandler(),
+      home: const AppBootstrapGate(),
+    );
+  }
+}
+
+class AppBootstrapGate extends StatefulWidget {
+  const AppBootstrapGate({super.key});
+
+  @override
+  State<AppBootstrapGate> createState() => _AppBootstrapGateState();
+}
+
+class _AppBootstrapGateState extends State<AppBootstrapGate> {
+  late Future<void> _bootstrapFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _bootstrapFuture = _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    await Future.wait([
+      AppEnv.load(),
+      Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      ),
+    ]);
+
+    final supabaseUrl = AppEnv.string(
+      'SUPABASE_URL',
+      compileTimeValue: const bool.hasEnvironment('SUPABASE_URL')
+          ? const String.fromEnvironment('SUPABASE_URL')
+          : null,
+    );
+    final supabaseAnonKey = AppEnv.string(
+      'SUPABASE_ANON_KEY',
+      compileTimeValue: const bool.hasEnvironment('SUPABASE_ANON_KEY')
+          ? const String.fromEnvironment('SUPABASE_ANON_KEY')
+          : null,
+    );
+
+    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      throw StateError(
+        'Missing Supabase config. Add SUPABASE_URL and SUPABASE_ANON_KEY to .env.',
+      );
+    }
+
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseAnonKey,
+    );
+
+    if (!Get.isRegistered<CoinService>()) {
+      Get.put(CoinService(), permanent: true);
+    }
+
+    unawaited(_initializeNotificationsInBackground());
+  }
+
+  Future<void> _initializeNotificationsInBackground() async {
+    try {
+      await NotificationService.initialize();
+    } catch (e, st) {
+      debugPrint("Notification Init Error: $e");
+      debugPrint("Notification Init Stack: $st");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _bootstrapFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const SplashScreenPage();
+        }
+
+        if (snapshot.hasError) {
+          return Scaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Initialization failed',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${snapshot.error}',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () {
+                        setState(() {
+                          _bootstrapFuture = _initializeApp();
+                        });
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        return const AuthStateHandler();
+      },
     );
   }
 }
@@ -127,11 +204,7 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
     return StreamBuilder<AuthState>(
       stream: _authStream,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SplashScreenPage();
-        }
-
-        final session = snapshot.data?.session;
+        final session = snapshot.data?.session ?? supabase.auth.currentSession;
 
         if (session != null) {
           final userId = session.user.id;

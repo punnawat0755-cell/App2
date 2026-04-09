@@ -14,6 +14,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  static const int _maxInitialPeriodDays = 14;
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -45,6 +47,129 @@ class _LoginPageState extends State<LoginPage> {
       return 'อีเมลนี้ถูกใช้งานแล้ว';
     }
     return message;
+  }
+
+  String _toIsoDate(DateTime d) {
+    final mm = d.month.toString().padLeft(2, '0');
+    final dd = d.day.toString().padLeft(2, '0');
+    return '${d.year}-$mm-$dd';
+  }
+
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  String? _readStringIgnoreCase(
+      Map<String, dynamic> source, List<String> keys) {
+    for (final key in keys) {
+      for (final entry in source.entries) {
+        if (entry.key.toLowerCase() != key.toLowerCase()) continue;
+        final value = entry.value?.toString().trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+    }
+    return null;
+  }
+
+  bool? _readBoolIgnoreCase(Map<String, dynamic> source, List<String> keys) {
+    for (final key in keys) {
+      for (final entry in source.entries) {
+        if (entry.key.toLowerCase() != key.toLowerCase()) continue;
+        final value = entry.value;
+        if (value is bool) return value;
+        final normalized = value?.toString().trim().toLowerCase();
+        if (normalized == 'true') return true;
+        if (normalized == 'false') return false;
+      }
+    }
+    return null;
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) return null;
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) return null;
+    return _dateOnly(parsed);
+  }
+
+  int _periodRangeDays(DateTimeRange range) =>
+      _dateOnly(range.end).difference(_dateOnly(range.start)).inDays + 1;
+
+  Future<bool> _seedInitialPeriodToCalendar(DateTimeRange range) async {
+    final start = _dateOnly(range.start);
+    final end = _dateOnly(range.end);
+    final days = end.difference(start).inDays + 1;
+    if (days <= 0 || days > _maxInitialPeriodDays) return false;
+
+    for (var i = 0; i < days; i++) {
+      final day = start.add(Duration(days: i));
+      await supabase.rpc(
+        'save_calendar_health_log',
+        params: {
+          'p_log_date': _toIsoDate(day),
+          'p_is_menstruating': true,
+          'p_symptoms': <String>[],
+          'p_flow_level': null,
+          'p_pain_level': null,
+          'p_notes': null,
+        },
+      );
+    }
+
+    return true;
+  }
+
+  Future<void> _syncInitialPeriodFromMetadataIfNeeded() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    final metadata = Map<String, dynamic>.from(
+      user.userMetadata ?? const <String, dynamic>{},
+    );
+    final gender = _readStringIgnoreCase(metadata, const ['gender', 'sex']);
+    if ((gender ?? '').trim().toLowerCase() != 'female') return;
+
+    final alreadySeeded = _readBoolIgnoreCase(
+          metadata,
+          const ['initial_period_seeded', 'initialPeriodSeeded'],
+        ) ??
+        false;
+    if (alreadySeeded) return;
+
+    final start = _parseDate(
+      _readStringIgnoreCase(
+        metadata,
+        const ['last_period_start_date', 'lastPeriodStartDate'],
+      ),
+    );
+    final end = _parseDate(
+      _readStringIgnoreCase(
+        metadata,
+        const ['last_period_end_date', 'lastPeriodEndDate'],
+      ),
+    );
+    if (start == null || end == null) return;
+
+    final safeRange = DateTimeRange(
+      start: start,
+      end: end.isBefore(start) ? start : end,
+    );
+    final dayCount = _periodRangeDays(safeRange);
+    if (dayCount <= 0 || dayCount > _maxInitialPeriodDays) return;
+
+    final seeded = await _seedInitialPeriodToCalendar(safeRange);
+    if (!seeded) return;
+
+    try {
+      await supabase.auth.updateUser(
+        UserAttributes(
+          data: {
+            'last_period_start_date': _toIsoDate(safeRange.start),
+            'last_period_end_date': _toIsoDate(safeRange.end),
+            'initial_period_seeded': true,
+          },
+        ),
+      );
+    } catch (_) {}
   }
 
   Future<void> _handlePostLogin() async {
@@ -127,6 +252,8 @@ class _LoginPageState extends State<LoginPage> {
       try {
         await supabase.rpc('touch_last_login');
       } catch (_) {}
+
+      await _syncInitialPeriodFromMetadataIfNeeded();
 
       await _handlePostLogin();
     } on AuthException catch (e) {
@@ -212,8 +339,7 @@ class _LoginPageState extends State<LoginPage> {
               fit: BoxFit.contain,
             ),
           ),
-          suffixIcon:
-              suffixIcon ??
+          suffixIcon: suffixIcon ??
               (reserveSuffixSpace
                   ? SizedBox(
                       width: scale.rs(48, min: 44, max: 48),

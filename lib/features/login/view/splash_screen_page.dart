@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 
 class SplashScreenPage extends StatelessWidget {
@@ -30,7 +31,7 @@ class SplashScreenPage extends StatelessWidget {
                   bottom: bottomSpacing,
                   child: Text(
                     'HOW ARE YOU',
-                    style: TextStyle(
+                    style: GoogleFonts.mitr(
                       fontSize: scale.rf(28, min: 24, max: 28),
                       fontWeight: FontWeight.bold,
                       color: const Color(0xFF4489D7),
