@@ -19,7 +19,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _oldPasswordController = TextEditingController();
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
   late final ProfileAvatarController _avatarController;
 
@@ -27,6 +30,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   bool _isSaving = false;
   bool _didChangeProfile = false;
   String? _activeField;
+  bool _showOldPassword = false;
+  bool _showNewPassword = false;
+  bool _showConfirmPassword = false;
 
   String _username = 'แมวน้ำ';
   String _gender = 'female';
@@ -48,7 +54,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     _nameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _passwordController.dispose();
+    _oldPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -96,7 +104,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _nameController.text = _username;
         _emailController.text = _email;
         _phoneController.text = _phone;
-        _passwordController.clear();
         _isLoading = false;
       });
     } catch (error) {
@@ -176,13 +183,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _phone = _phoneController.text.trim();
         break;
       case 'password':
-        final value = _passwordController.text.trim();
-        if (value.length < 6) {
-          _showError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
-          return;
-        }
-        nextPassword = value;
-        break;
+        return;
     }
 
     setState(() => _isSaving = true);
@@ -220,7 +221,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() {
         _didChangeProfile = true;
         _activeField = null;
-        _passwordController.clear();
       });
 
       Get.snackbar(
@@ -326,8 +326,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 style: GoogleFonts.mitr(
                                   textStyle: TextStyle(
                                     color: const Color(0xFF4489D7),
-                                    fontSize: scale.rf(20, min: 17, max: 20),
-                                    fontWeight: FontWeight.w600,
+                                    fontSize: scale.rf(18, min: 17, max: 20),
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
                               ),
@@ -454,10 +454,77 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _emailController.text = _email;
       } else if (field == 'phone') {
         _phoneController.text = _phone;
-      } else if (field == 'password') {
-        _passwordController.clear();
       }
     });
+  }
+
+  void _resetPasswordForm() {
+    _oldPasswordController.clear();
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+    _showOldPassword = false;
+    _showNewPassword = false;
+    _showConfirmPassword = false;
+  }
+
+  Future<void> _savePasswordChange(StateSetter setModalState) async {
+    final user = _supabase.auth.currentUser;
+    if (user == null || _isSaving) {
+      return;
+    }
+
+    final oldPassword = _oldPasswordController.text.trim();
+    final newPassword = _newPasswordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (oldPassword.isEmpty || newPassword.isEmpty || confirmPassword.isEmpty) {
+      _showError('กรุณากรอกข้อมูลให้ครบ');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      _showError('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');
+      return;
+    }
+
+    if (newPassword != confirmPassword) {
+      _showError('รหัสผ่านใหม่และยืนยันรหัสผ่านไม่ตรงกัน');
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    setModalState(() {});
+
+    try {
+      await _supabase.auth.signInWithPassword(
+        email: _email,
+        password: oldPassword,
+      );
+
+      await _supabase.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+
+      if (!mounted) {
+        return;
+      }
+
+      _didChangeProfile = true;
+      _resetPasswordForm();
+      Navigator.of(context).pop();
+      Get.snackbar(
+        'เปลี่ยนรหัสผ่านแล้ว',
+        'ข้อมูลส่วนตัวถูกอัปเดตเรียบร้อย',
+        snackPosition: SnackPosition.BOTTOM,
+        duration: const Duration(seconds: 2),
+      );
+    } catch (error) {
+      _showError('$error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   void _showError(String message) {
@@ -465,6 +532,136 @@ class _EditProfilePageState extends State<EditProfilePage> {
       'บันทึกไม่สำเร็จ',
       message,
       snackPosition: SnackPosition.BOTTOM,
+    );
+  }
+
+  Future<void> _showPasswordPanel() async {
+    _resetPasswordForm();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final scale = ResponsiveScale.fromWidth(
+              MediaQuery.sizeOf(context).width,
+            );
+
+            return SafeArea(
+              top: false,
+              child: Container(
+                padding: EdgeInsets.fromLTRB(
+                  scale.rs(24, min: 18, max: 24),
+                  scale.rs(12, min: 10, max: 12),
+                  scale.rs(24, min: 18, max: 24),
+                  scale.rs(16, min: 12, max: 18),
+                ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: scale.rs(45, min: 40, max: 45),
+                        height: scale.rs(5, min: 4, max: 5),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: scale.rs(18, min: 14, max: 18)),
+                    Text(
+                      'แก้ไขรหัสผ่าน',
+                      style: GoogleFonts.mitr(
+                        textStyle: TextStyle(
+                          color: const Color(0xFF4489D7),
+                          fontSize: scale.rf(20, min: 18, max: 20),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: scale.rs(16, min: 12, max: 16)),
+                    _buildPasswordField(
+                      scale: scale,
+                      label: 'กรุณาใส่รหัสเดิม',
+                      controller: _oldPasswordController,
+                      isVisible: _showOldPassword,
+                      onToggle: () => setModalState(
+                        () => _showOldPassword = !_showOldPassword,
+                      ),
+                    ),
+                    SizedBox(height: scale.rs(12, min: 10, max: 12)),
+                    _buildPasswordField(
+                      scale: scale,
+                      label: 'กรุณาใส่รหัสใหม่',
+                      controller: _newPasswordController,
+                      isVisible: _showNewPassword,
+                      onToggle: () => setModalState(
+                        () => _showNewPassword = !_showNewPassword,
+                      ),
+                    ),
+                    SizedBox(height: scale.rs(12, min: 10, max: 12)),
+                    _buildPasswordField(
+                      scale: scale,
+                      label: 'กรุณายืนยันรหัส',
+                      controller: _confirmPasswordController,
+                      isVisible: _showConfirmPassword,
+                      onToggle: () => setModalState(
+                        () => _showConfirmPassword = !_showConfirmPassword,
+                      ),
+                    ),
+                    SizedBox(height: scale.rs(24, min: 20, max: 28)),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isSaving
+                            ? null
+                            : () => _savePasswordChange(setModalState),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF20C2FF),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            vertical: scale.rs(14, min: 12, max: 14),
+                          ),
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : Text(
+                                'บันทึก',
+                                style: GoogleFonts.mitr(
+                                  textStyle: TextStyle(
+                                    fontSize: scale.rf(16, min: 15, max: 16),
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -485,14 +682,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leadingWidth: appScale.rs(44, min: 38, max: 44),
-          titleSpacing: 0,
-          leading: IconButton(
-            onPressed: () => Get.back(result: _didChangeProfile),
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              color: const Color(0xFF7E7E7E),
-              size: appScale.rs(24, min: 20, max: 24),
+          leadingWidth: appScale.rs(45, min: 40, max: 45),
+          titleSpacing: 2,
+          leading: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Get.back(result: _didChangeProfile),
+            child: Padding(
+              padding: EdgeInsets.only(left: appScale.rs(5, min: 8, max: 10)),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Image.asset(
+                  'assets/images/back.png',
+                  width: appScale.rs(25, min: 21, max: 25),
+                  height: appScale.rs(25, min: 21, max: 25),
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
           ),
           title: Text(
@@ -500,7 +705,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             style: GoogleFonts.mitr(
               textStyle: TextStyle(
                 color: const Color(0xFF4B88D8),
-                fontSize: appScale.rf(24, min: 20, max: 24),
+                fontSize: appScale.rf(22, min: 19, max: 22),
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -514,63 +719,64 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     final scale =
                         ResponsiveScale.fromWidth(constraints.maxWidth);
                     final horizontalPadding = constraints.maxWidth < 360
-                        ? scale.rs(16, min: 14, max: 18)
-                        : scale.rs(28, min: 20, max: 28);
-                    final avatarRadius = scale.rs(100, min: 72, max: 100);
-                    final actionSize = scale.rs(52, min: 40, max: 52);
-                    final titleSize = scale.rf(28, min: 22, max: 28);
+                        ? scale.rs(18, min: 14, max: 22)
+                        : scale.rs(30, min: 24, max: 30);
+                    // final avatarRadius = scale.rs(85, min: 62, max: 75);
+                    // final editIconSize = scale.rs(28, min: 22, max: 28);
+
+                    final double avatarRadius = 85.0;
                     final editIconSize = scale.rs(28, min: 22, max: 28);
 
-                    return Center(
+                    return Align(
+                      alignment: Alignment.topCenter,
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: 560),
                         child: SingleChildScrollView(
                           padding: EdgeInsets.fromLTRB(
                             horizontalPadding,
-                            scale.rs(8, min: 6, max: 8),
+                            scale.rs(10, min: 8, max: 12), // ลดระยะขอบบนลง
                             horizontalPadding,
-                            scale.rs(40, min: 24, max: 40),
+                            scale.rs(28, min: 22, max: 28),
                           ),
                           child: Column(
                             children: [
-                              SizedBox(height: scale.rs(18, min: 12, max: 18)),
+                              SizedBox(height: scale.rs(16, min: 20, max: 30)),
                               Obx(
                                 () => Stack(
                                   clipBehavior: Clip.none,
                                   children: [
-                                    CircleAvatar(
-                                      radius: avatarRadius,
-                                      backgroundColor: Colors.grey.shade200,
-                                      backgroundImage:
-                                          _avatarController.avatarImageProvider,
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.08,
+                                            ),
+                                            blurRadius:
+                                                scale.rs(10, min: 8, max: 10),
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: CircleAvatar(
+                                        radius: avatarRadius,
+                                        // backgroundColor: Colors.grey.shade200,
+                                        backgroundImage: _avatarController
+                                            .avatarImageProvider,
+                                      ),
                                     ),
                                     Positioned(
-                                      right: 0,
-                                      bottom: scale.rs(8, min: 4, max: 8),
+                                      right: 7,
+                                      bottom: scale.rs(0, min: 4, max: 8),
                                       child: GestureDetector(
                                         onTap: _showAvatarPicker,
-                                        child: Container(
-                                          width: actionSize,
-                                          height: actionSize,
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFFE0E0E0),
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black
-                                                    .withValues(alpha: 0.12),
-                                                blurRadius:
-                                                    scale.rs(8, min: 6, max: 8),
-                                                offset: const Offset(0, 3),
-                                              ),
-                                            ],
-                                          ),
-                                          child: Icon(
-                                            Icons.sync_alt_rounded,
-                                            color: const Color(0xFF8A8A8A),
-                                            size:
-                                                scale.rs(28, min: 21, max: 28),
-                                          ),
+                                        child: Image.asset(
+                                          'assets/images/loop.png',
+                                          width: scale.rs(40, min: 40, max: 52),
+                                          height:
+                                              scale.rs(40, min: 40, max: 52),
+                                          fit: BoxFit.contain,
                                         ),
                                       ),
                                     ),
@@ -591,8 +797,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                         style: GoogleFonts.mitr(
                                           textStyle: TextStyle(
                                             color: const Color(0xFF4B88D8),
-                                            fontSize: titleSize,
-                                            fontWeight: FontWeight.w600,
+                                            fontSize:
+                                                scale.rf(22, min: 18, max: 22),
+                                            fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                         decoration: const InputDecoration(
@@ -607,8 +814,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                       style: GoogleFonts.mitr(
                                         textStyle: TextStyle(
                                           color: const Color(0xFF4B88D8),
-                                          fontSize: titleSize,
-                                          fontWeight: FontWeight.w600,
+                                          fontSize:
+                                              scale.rf(22, min: 18, max: 22),
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ),
@@ -644,11 +852,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     children: [
                                       _buildGenderChip('male', 'ชาย', scale),
                                       _buildGenderChip('female', 'หญิง', scale),
-                                      _buildGenderChip(
-                                        'other',
-                                        'LGBTQ+',
-                                        scale,
-                                      ),
                                     ],
                                   ),
                                 ),
@@ -668,30 +871,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
                               _buildInfoCard(
                                 scale: scale,
                                 label: 'รหัส :',
-                                value: _activeField == 'password'
-                                    ? null
-                                    : (_passwordController.text.trim().isEmpty
-                                        ? '******'
-                                        : _passwordController.text.trim()),
+                                value: '******',
                                 fieldKey: 'password',
                                 icon: Icons.edit,
-                                editor: TextField(
-                                  controller: _passwordController,
-                                  autofocus: true,
-                                  obscureText: true,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.allow(
-                                      RegExp(
-                                          r'[a-zA-Z0-9!@#\$%\^&\*\(\)_\+\-=]'),
-                                    ),
-                                  ],
-                                  style: _cardTextStyle(scale),
-                                  decoration: const InputDecoration(
-                                    border: InputBorder.none,
-                                    isDense: true,
-                                    hintText: 'กรอกรหัสผ่านใหม่',
-                                  ),
-                                ),
+                                onIconTap: _showPasswordPanel,
                               ),
                               SizedBox(height: scale.rs(18, min: 12, max: 18)),
                               _buildInfoCard(
@@ -740,34 +923,28 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 SizedBox(
                                   height: scale.rs(30, min: 20, max: 30),
                                 ),
-                                Align(
-                                  alignment: Alignment.centerRight,
+                                SizedBox(
+                                  width: double.infinity,
                                   child: ElevatedButton(
                                     onPressed:
                                         _isSaving ? null : _saveActiveField,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2D4983),
+                                      backgroundColor: const Color(0xFF20C2FF),
                                       foregroundColor: Colors.white,
                                       elevation: 0,
                                       padding: EdgeInsets.symmetric(
-                                        horizontal:
-                                            scale.rs(28, min: 20, max: 28),
-                                        vertical: scale.rs(10, min: 8, max: 10),
+                                        vertical:
+                                            scale.rs(14, min: 12, max: 14),
                                       ),
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(
-                                          scale.rs(22, min: 18, max: 22),
-                                        ),
+                                        borderRadius: BorderRadius.circular(30),
                                       ),
                                     ),
                                     child: _isSaving
-                                        ? SizedBox(
-                                            width:
-                                                scale.rs(18, min: 14, max: 18),
-                                            height:
-                                                scale.rs(18, min: 14, max: 18),
-                                            child:
-                                                const CircularProgressIndicator(
+                                        ? const SizedBox(
+                                            width: 18,
+                                            height: 18,
+                                            child: CircularProgressIndicator(
                                               strokeWidth: 2.2,
                                               color: Colors.white,
                                             ),
@@ -776,9 +953,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                             'บันทึก',
                                             style: GoogleFonts.mitr(
                                               textStyle: TextStyle(
-                                                fontSize: scale.rf(18,
-                                                    min: 15, max: 18),
-                                                fontWeight: FontWeight.w500,
+                                                fontSize: scale.rf(16,
+                                                    min: 15, max: 16),
+                                                fontWeight: FontWeight.w700,
                                               ),
                                             ),
                                           ),
@@ -814,17 +991,17 @@ class _EditProfilePageState extends State<EditProfilePage> {
         minHeight: scale.rs(78, min: 64, max: 78),
       ),
       padding: EdgeInsets.symmetric(
-        horizontal: scale.rs(18, min: 12, max: 18),
-        vertical: scale.rs(18, min: 12, max: 18),
+        horizontal: scale.rs(20, min: 16, max: 20),
+        vertical: scale.rs(16, min: 14, max: 16),
       ),
       decoration: BoxDecoration(
-        color: const Color(0xFFBFE8FF),
-        borderRadius: BorderRadius.circular(scale.rs(26, min: 18, max: 26)),
+        color: const Color(0xFFCEEFFE),
+        borderRadius: BorderRadius.circular(scale.rs(20, min: 18, max: 20)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.14),
-            blurRadius: scale.rs(8, min: 6, max: 8),
-            offset: Offset(0, scale.rs(4, min: 2, max: 4)),
+            blurRadius: scale.rs(4, min: 3, max: 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -836,7 +1013,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
               textStyle: TextStyle(
                 color: const Color(0xFF4B88D8),
                 fontSize: scale.rf(18, min: 15, max: 18),
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -854,7 +1031,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             child: Icon(
               icon,
               color: const Color(0xFF8A8A8A),
-              size: scale.rs(34, min: 25, max: 34),
+              size: scale.rs(24, min: 22, max: 24),
             ),
           ),
         ],
@@ -873,7 +1050,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           vertical: scale.rs(9, min: 6, max: 9),
         ),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF8ED5FF) : Colors.white,
+          color: isSelected ? const Color(0xFFB5EFFF) : Colors.white,
           borderRadius: BorderRadius.circular(scale.rs(22, min: 16, max: 22)),
           border: Border.all(
             color:
@@ -888,8 +1065,60 @@ class _EditProfilePageState extends State<EditProfilePage> {
             textStyle: TextStyle(
               color: const Color(0xFF8A8A8A),
               fontSize: scale.rf(15, min: 13, max: 15),
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w700,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField({
+    required ResponsiveScale scale,
+    required String label,
+    required TextEditingController controller,
+    required bool isVisible,
+    required VoidCallback onToggle,
+  }) {
+    return TextField(
+      controller: controller,
+      obscureText: !isVisible,
+      inputFormatters: [
+        FilteringTextInputFormatter.allow(
+          RegExp(r'[a-zA-Z0-9!@#\$%\^&\*\(\)_\+\-=]'),
+        ),
+      ],
+      style: GoogleFonts.mitr(
+        textStyle: TextStyle(
+          color: const Color(0xFF4B88D8),
+          fontSize: scale.rf(16, min: 14, max: 16),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      decoration: InputDecoration(
+        hintText: label,
+        hintStyle: GoogleFonts.mitr(
+          textStyle: TextStyle(
+            color: const Color(0xFF9AA9B5),
+            fontSize: scale.rf(15, min: 13, max: 15),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        filled: true,
+        fillColor: const Color(0xFFF3F8FC),
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: scale.rs(16, min: 14, max: 16),
+          vertical: scale.rs(14, min: 12, max: 14),
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(18),
+          borderSide: BorderSide.none,
+        ),
+        suffixIcon: IconButton(
+          onPressed: onToggle,
+          icon: Icon(
+            isVisible ? Icons.visibility_off : Icons.visibility,
+            color: const Color(0xFF8A8A8A),
           ),
         ),
       ),

@@ -2398,7 +2398,7 @@ class ProfilePage extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: () => _handleMenstrualSave(controller),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C5282),
+                    backgroundColor: const Color(0xFF20C2FF),
                     padding: EdgeInsets.symmetric(
                       horizontal: scale.rs(18, min: 14, max: 18),
                       vertical: scale.rs(10, min: 8, max: 10),
