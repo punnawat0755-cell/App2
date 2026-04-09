@@ -39,12 +39,6 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  void _showSuccess(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text), backgroundColor: Colors.green),
-    );
-  }
-
   String _prettyAuthMessage(String message) {
     final m = message.toLowerCase();
 
@@ -238,8 +232,6 @@ class _RegisterPageState extends State<RegisterPage> {
       }
 
       if (!mounted) return;
-
-      _showSuccess('สมัครสำเร็จ! ถ้าเปิดยืนยันอีเมล ให้ไปกดยืนยันก่อนล็อกอิน');
 
       Navigator.pushReplacement(
         context,

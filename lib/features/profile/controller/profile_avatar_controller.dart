@@ -48,12 +48,6 @@ class ProfileAvatarController extends GetxController {
         'id': user.id,
         'avatarurl': normalizedAvatar,
       });
-      Get.snackbar(
-        'เปลี่ยนรูปโปรไฟล์แล้ว',
-        'ระบบบันทึกรูปใหม่เรียบร้อย',
-        snackPosition: SnackPosition.BOTTOM,
-        duration: const Duration(seconds: 2),
-      );
       return true;
     } catch (error) {
       avatarUrl.value = previousAvatar;
