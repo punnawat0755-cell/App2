@@ -177,23 +177,7 @@ class ChatSelectionController extends GetxController {
     }
 
     final shouldStartQuiz = await Get.dialog<bool>(
-      AlertDialog(
-        title: const Text('ทำแบบประเมินก่อนให้คำปรึกษา'),
-        content: const Text(
-          'วันนี้คุณยังไม่ผ่านแบบประเมินสำหรับผู้ให้คำปรึกษา\n'
-          'คุณสามารถทำแบบประเมินเพิ่มได้อีก 1 ครั้ง',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(result: false),
-            child: const Text('ยกเลิก'),
-          ),
-          FilledButton(
-            onPressed: () => Get.back(result: true),
-            child: const Text('เริ่มทำแบบประเมิน'),
-          ),
-        ],
-      ),
+      const _ListenerQuizRetryDialog(),
       barrierDismissible: false,
     );
     if (shouldStartQuiz != true) {
@@ -237,6 +221,264 @@ class ChatSelectionController extends GetxController {
     }
 
     return _switchToListenerModeAndValidate();
+  }
+}
+
+class _ListenerQuizRetryDialog extends StatelessWidget {
+  const _ListenerQuizRetryDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    const primaryBlue = Color(0xFF4489D7);
+    const deepBlue = Color(0xFF2D5E94);
+    const softBlue = Color(0xFFECF5FF);
+
+    return Dialog(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 360;
+          final titleSize = isCompact ? 14.2 : 15.8;
+          final bodySize = isCompact ? 13.5 : 14.5;
+          final badgeSize = isCompact ? 12.0 : 13.0;
+          final cancelSize = isCompact ? 14.0 : 15.0;
+          final ctaSize = isCompact ? 14.8 : 15.8;
+          final leadingSize = isCompact ? 46.0 : 52.0;
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                right: 18,
+                top: -12,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _cuteDot(
+                      color: const Color(0xFFD6EBFF),
+                      icon: Icons.favorite_rounded,
+                      iconColor: const Color(0xFF5EA1E6),
+                    ),
+                    const SizedBox(width: 8),
+                    _cuteDot(
+                      color: const Color(0xFFE8F4FF),
+                      icon: Icons.auto_awesome_rounded,
+                      iconColor: const Color(0xFF77B1EC),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30),
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFF9FCFF),
+                      Color(0xFFEFF6FF),
+                    ],
+                  ),
+                  border: Border.all(
+                    color: const Color(0xFFD8E9FF),
+                    width: 1.2,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: withAlpha(primaryBlue, 0.22),
+                      blurRadius: 28,
+                      offset: const Offset(0, 16),
+                    ),
+                  ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: leadingSize,
+                            height: leadingSize,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCEBFF),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: withAlpha(primaryBlue, 0.35),
+                              ),
+                            ),
+                            child: Icon(
+                              Icons.fact_check_rounded,
+                              color: primaryBlue,
+                              size: isCompact ? 24 : 28,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'ทำแบบประเมินก่อนให้คำปรึกษา',
+                              style: TextStyle(
+                                color: const Color(0xFF1D2433),
+                                fontSize: titleSize,
+                                fontWeight: FontWeight.w800,
+                                height: 1.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(
+                                'วันนี้คุณยังไม่ผ่านแบบประเมินสำหรับผู้ให้คำปรึกษา',
+                                maxLines: 1,
+                                style: TextStyle(
+                                  color: const Color(0xFF314158),
+                                  fontSize: bodySize,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'คุณสามารถทำแบบประเมินเพิ่มได้อีก 1 ครั้ง',
+                              style: TextStyle(
+                                color: const Color(0xFF314158),
+                                fontSize: bodySize,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCEEFF),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.autorenew_rounded,
+                              color: primaryBlue,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 7),
+                            Text(
+                              'วันนี้เหลือสิทธิ์อีก 1 ครั้ง',
+                              style: TextStyle(
+                                color: deepBlue,
+                                fontWeight: FontWeight.w700,
+                                fontSize: badgeSize,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () => Get.back(result: false),
+                            style: TextButton.styleFrom(
+                              backgroundColor: softBlue,
+                              foregroundColor: deepBlue,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 11,
+                              ),
+                              textStyle: TextStyle(
+                                fontSize: cancelSize,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            child: const Text('ยกเลิก'),
+                          ),
+                          const SizedBox(width: 10),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              minWidth: isCompact ? 172 : 186,
+                              maxWidth: isCompact ? 198 : 222,
+                            ),
+                            child: FilledButton.icon(
+                              onPressed: () => Get.back(result: true),
+                              icon:
+                                  const Icon(Icons.play_arrow_rounded, size: 18),
+                              label: const Text('เริ่มทำแบบประเมิน'),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: const Color(0xFF5A9FE0),
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                minimumSize:
+                                    Size(0, isCompact ? 46 : 50),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 11,
+                                ),
+                                textStyle: TextStyle(
+                                  fontSize: ctaSize,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _cuteDot({
+    required Color color,
+    required IconData icon,
+    required Color iconColor,
+  }) {
+    return Container(
+      width: 24,
+      height: 24,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        border: Border.all(color: withAlpha(iconColor, 0.3)),
+      ),
+      child: Icon(
+        icon,
+        size: 13,
+        color: iconColor,
+      ),
+    );
   }
 }
 
