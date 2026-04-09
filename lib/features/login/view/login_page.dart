@@ -179,6 +179,7 @@ class _LoginPageState extends State<LoginPage> {
     TextInputType? keyboardType,
     bool isPassword = false,
     Widget? suffixIcon,
+    double? iconSize,
   }) {
     return Container(
       height: scale.rs(62, min: 56, max: 64),
@@ -190,28 +191,30 @@ class _LoginPageState extends State<LoginPage> {
         controller: controller,
         obscureText: isPassword,
         keyboardType: keyboardType,
+        textAlignVertical: TextAlignVertical.center,
         style: TextStyle(
-          fontSize: scale.rf(17, min: 15, max: 17),
+          fontSize: scale.rf(18, min: 15, max: 17),
           color: const Color(0xFF5D5D5D),
         ),
         decoration: InputDecoration(
           hintText: hintText,
           hintStyle: TextStyle(
-            color: Colors.grey,
+            color: const Color(0xFFBDBDBD),
             fontSize: scale.rf(16, min: 14, max: 16),
           ),
           prefixIcon: Padding(
             padding: EdgeInsets.all(scale.rs(14, min: 12, max: 14)),
             child: Image.asset(
               iconAsset,
-              width: scale.rs(24, min: 22, max: 28),
-              height: scale.rs(24, min: 22, max: 28),
+              width: iconSize ?? scale.rs(30, min: 22, max: 28),
+              height: iconSize ?? scale.rs(30, min: 22, max: 28),
               fit: BoxFit.contain,
             ),
           ),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
           contentPadding: EdgeInsets.symmetric(
+            horizontal: scale.rs(4, min: 2, max: 6),
             vertical: scale.rs(16, min: 14, max: 16),
           ),
         ),
@@ -279,6 +282,7 @@ class _LoginPageState extends State<LoginPage> {
                         controller: _passwordController,
                         hintText: 'รหัสผ่าน',
                         iconAsset: 'assets/images/lock.png',
+                        iconSize: scale.rs(36, min: 26, max: 34),
                         isPassword: _hidePw,
                         scale: scale,
                         suffixIcon: IconButton(
