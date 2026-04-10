@@ -9,6 +9,7 @@ import 'package:flutter_application_1/features/home/service/daily_mood_status_se
 import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
 import 'package:flutter_application_1/features/home/view/home_page.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
+import 'package:flutter_application_1/features/home/view/encouragement_page.dart';
 import 'package:flutter_application_1/features/chat/view/chat_view.dart';
 import 'package:flutter_application_1/features/pet/view/pet_view.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
@@ -104,29 +105,39 @@ class _BottomNavBarState extends State<BottomNavBar>
     }
   }
 
-  Future<void> _openDailyMoodIfNeeded() async {
+  Future<bool> _openDailyMoodIfNeeded() async {
     if (!mounted || _checkingDailyMood || _dailyMoodPageOpen) {
-      return;
+      return false;
     }
 
     _checkingDailyMood = true;
     try {
       final answeredToday = await DailyMoodStatusService.hasAnsweredToday();
       if (!mounted || answeredToday) {
-        return;
+        return true;
       }
 
       _dailyMoodPageOpen = true;
       final message = await Get.to<String>(() => const DailyMoodPage());
       _dailyMoodPageOpen = false;
 
-      if (!mounted || message == null || message.isEmpty) {
-        return;
+      if (!mounted) {
+        return false;
+      }
+
+      if (message == DailyMoodPage.openEncouragementResult) {
+        await Get.to<void>(() => const EncouragementPage());
+        return false;
+      }
+
+      if (message == null || message.isEmpty) {
+        return true;
       }
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message)),
       );
+      return true;
     } finally {
       _checkingDailyMood = false;
       _dailyMoodPageOpen = false;
@@ -174,8 +185,8 @@ class _BottomNavBarState extends State<BottomNavBar>
 
     _runningEntryFlow = true;
     try {
-      await _openDailyMoodIfNeeded();
-      if (!mounted) {
+      final shouldContinueToRoleSelection = await _openDailyMoodIfNeeded();
+      if (!mounted || !shouldContinueToRoleSelection) {
         return;
       }
 

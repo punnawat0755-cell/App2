@@ -3,7 +3,6 @@ import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/app_snackbar.dart';
-import 'package:flutter_application_1/features/home/view/encouragement_page.dart';
 import 'package:flutter_application_1/features/role_logic/view/pages/role_selection_page.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -13,6 +12,7 @@ import 'package:flutter_application_1/features/home/service/daily_mood_status_se
 
 class DailyMoodPage extends StatefulWidget {
   const DailyMoodPage({super.key});
+  static const String openEncouragementResult = '__open_encouragement__';
 
   @override
   State<DailyMoodPage> createState() => _DailyMoodPageState();
@@ -370,7 +370,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     });
 
     if (_shouldOpenEncouragement(option)) {
-      Get.offAll(() => const EncouragementPage());
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(DailyMoodPage.openEncouragementResult);
       return;
     }
 

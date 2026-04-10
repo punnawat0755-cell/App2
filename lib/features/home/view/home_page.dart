@@ -17,6 +17,7 @@ import 'package:flutter_application_1/features/home/service/home_video_repositor
 import 'package:flutter_application_1/features/home/service/video_upload_prepare_service.dart';
 import 'package:flutter_application_1/features/home/service/daily_mission_streak_service.dart';
 import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
+import 'package:flutter_application_1/features/home/view/encouragement_page.dart';
 import 'package:flutter_application_1/features/home/view/play_video_page.dart';
 import 'package:flutter_application_1/features/home/view/video_preview_controller_factory.dart';
 import 'package:flutter_application_1/features/home/view/video_capture_page.dart';
@@ -514,7 +515,20 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _openDailyMission() async {
     final message = await Get.to<String>(() => const DailyMoodPage());
-    if (!mounted || message == null || message.isEmpty) {
+    if (!mounted) {
+      return;
+    }
+
+    if (message == DailyMoodPage.openEncouragementResult) {
+      await Get.to<void>(() => const EncouragementPage());
+      if (!mounted) {
+        return;
+      }
+      await _loadMissionDays();
+      return;
+    }
+
+    if (message == null || message.isEmpty) {
       return;
     }
 
