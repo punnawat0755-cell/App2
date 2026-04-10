@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:video_player/video_player.dart';
 
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
@@ -27,9 +29,15 @@ import 'package:flutter_application_1/features/home/view/widgets/home_widgets.da
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/setting/view/setting_page.dart';
+import 'package:flutter_application_1/period_panel_bottom_sheet.dart';
 
 class HomePage extends StatefulWidget {
-  const HomePage({super.key});
+  const HomePage({
+    super.key,
+    this.allowPeriodPrompt = false,
+  });
+
+  final bool allowPeriodPrompt;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -37,6 +45,9 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   static const int _defaultMissionDays = 138;
+  static const int _maxInitialPeriodDays = 14;
+  static const String _periodPromptDateKeyPrefix =
+      'home_period_prompt_last_date_';
 
   int _currentBannerIndex = 0;
   late final PageController _pageController;
@@ -56,6 +67,8 @@ class _HomePageState extends State<HomePage> {
   bool _isNameLoading = true;
   bool _isMissionDaysLoading = true;
   bool _isUploadingClip = false;
+  bool _isCheckingPeriodPrompt = false;
+  bool _hasCheckedPeriodPrompt = false;
   String _displayName = 'ผู้ใช้';
   String _lastWarmupSignature = '';
   int _missionDays = _defaultMissionDays;
@@ -69,6 +82,11 @@ class _HomePageState extends State<HomePage> {
     _videoClipsStream = _createVideoClipsStream();
     _loadUsername();
     _loadMissionDays();
+    if (widget.allowPeriodPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_maybeShowPeriodPromptOnHome());
+      });
+    }
 
     _timer = Timer.periodic(const Duration(seconds: 6), (_) {
       if (_currentBannerIndex < 2) {
@@ -92,6 +110,16 @@ class _HomePageState extends State<HomePage> {
     _timer?.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.allowPeriodPrompt && !oldWidget.allowPeriodPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_maybeShowPeriodPromptOnHome());
+      });
+    }
   }
 
   Future<void> _loadUsername() async {
@@ -154,6 +182,238 @@ class _HomePageState extends State<HomePage> {
       _missionDays = streakDays > 0 ? streakDays : 0;
       _isMissionDaysLoading = false;
     });
+  }
+
+  String _toIsoDate(DateTime value) {
+    final normalized = _dateOnly(value);
+    final month = normalized.month.toString().padLeft(2, '0');
+    final day = normalized.day.toString().padLeft(2, '0');
+    return '${normalized.year}-$month-$day';
+  }
+
+  DateTime _dateOnly(DateTime value) =>
+      DateTime(value.year, value.month, value.day);
+
+  String _todayAsKey() => _toIsoDate(DateTime.now());
+
+  int _periodRangeDays(DateTimeRange range) {
+    final start = _dateOnly(range.start);
+    final end = _dateOnly(range.end);
+    return end.difference(start).inDays + 1;
+  }
+
+  String _periodPromptDateKey(String userId) =>
+      '$_periodPromptDateKeyPrefix$userId';
+
+  String? _readStringIgnoreCase(
+    Map<String, dynamic> source,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      for (final entry in source.entries) {
+        if (entry.key.toLowerCase() != key.toLowerCase()) {
+          continue;
+        }
+        final value = entry.value?.toString().trim();
+        if (value != null && value.isNotEmpty) {
+          return value;
+        }
+      }
+    }
+    return null;
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    final parsed = DateTime.tryParse(value.toString());
+    if (parsed == null) {
+      return null;
+    }
+    return _dateOnly(parsed);
+  }
+
+  String _normalizeGender(String? value) {
+    final normalized = value?.trim().toLowerCase() ?? '';
+    if (normalized == 'female' || normalized == 'หญิง') {
+      return 'female';
+    }
+    if (normalized == 'male' || normalized == 'ชาย') {
+      return 'male';
+    }
+    return 'other';
+  }
+
+  Future<bool> _seedInitialPeriodToCalendar(DateTimeRange range) async {
+    final safeRange = DateTimeRange(
+      start: _dateOnly(range.start),
+      end: _dateOnly(range.end),
+    );
+    final days = _periodRangeDays(safeRange);
+    if (days <= 0 || days > _maxInitialPeriodDays) {
+      return false;
+    }
+
+    for (var i = 0; i < days; i++) {
+      final day = safeRange.start.add(Duration(days: i));
+      await supabase.rpc(
+        'save_calendar_health_log',
+        params: {
+          'p_log_date': _toIsoDate(day),
+          'p_is_menstruating': true,
+          'p_symptoms': <String>[],
+          'p_flow_level': null,
+          'p_pain_level': null,
+          'p_notes': null,
+        },
+      );
+    }
+
+    return true;
+  }
+
+  Future<void> _savePeriodRangeToAccount(
+    DateTime startDate,
+    DateTime endDate,
+  ) async {
+    final start = _dateOnly(startDate);
+    final end = _dateOnly(endDate);
+    final safeRange = DateTimeRange(
+      start: start,
+      end: end.isBefore(start) ? start : end,
+    );
+
+    final dayCount = _periodRangeDays(safeRange);
+    if (dayCount <= 0 || dayCount > _maxInitialPeriodDays) {
+      throw Exception(
+        'ช่วงประจำเดือนต้องไม่เกิน $_maxInitialPeriodDays วัน',
+      );
+    }
+
+    final seeded = await _seedInitialPeriodToCalendar(safeRange);
+    if (!seeded) {
+      throw Exception('ไม่สามารถบันทึกข้อมูลประจำเดือนได้');
+    }
+
+    await supabase.auth.updateUser(
+      UserAttributes(
+        data: {
+          'last_period_start_date': _toIsoDate(safeRange.start),
+          'last_period_end_date': _toIsoDate(safeRange.end),
+          'initial_period_seeded': true,
+        },
+      ),
+    );
+  }
+
+  Future<bool> _shouldShowPeriodPromptToday() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      return false;
+    }
+
+    final metadata = Map<String, dynamic>.from(
+      user.userMetadata ?? const <String, dynamic>{},
+    );
+    var gender = _normalizeGender(
+      _readStringIgnoreCase(metadata, const ['gender', 'sex']),
+    );
+    if (gender != 'female') {
+      try {
+        final row = await supabase
+            .from('profiles')
+            .select('gender')
+            .eq('id', user.id)
+            .maybeSingle();
+        gender = _normalizeGender(
+          _readStringIgnoreCase(
+            Map<String, dynamic>.from(row ?? const <String, dynamic>{}),
+            const ['gender', 'sex'],
+          ),
+        );
+      } catch (_) {}
+    }
+
+    if (gender != 'female') {
+      return false;
+    }
+
+    final hasStartDate = _parseDate(
+          _readStringIgnoreCase(
+            metadata,
+            const ['last_period_start_date', 'lastPeriodStartDate'],
+          ),
+        ) !=
+        null;
+    final hasEndDate = _parseDate(
+          _readStringIgnoreCase(
+            metadata,
+            const ['last_period_end_date', 'lastPeriodEndDate'],
+          ),
+        ) !=
+        null;
+    if (hasStartDate && hasEndDate) {
+      return false;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    final lastShownDate = prefs.getString(_periodPromptDateKey(user.id));
+    return lastShownDate != _todayAsKey();
+  }
+
+  Future<void> _markPeriodPromptShownToday(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_periodPromptDateKey(userId), _todayAsKey());
+  }
+
+  Future<void> _maybeShowPeriodPromptOnHome() async {
+    if (!widget.allowPeriodPrompt) {
+      return;
+    }
+    if (_isCheckingPeriodPrompt || _hasCheckedPeriodPrompt) {
+      return;
+    }
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) {
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+      if (mounted) {
+        unawaited(_maybeShowPeriodPromptOnHome());
+      }
+      return;
+    }
+    _isCheckingPeriodPrompt = true;
+    try {
+      final shouldShow = await _shouldShowPeriodPromptToday();
+      if (!mounted) {
+        return;
+      }
+
+      _hasCheckedPeriodPrompt = true;
+      if (!shouldShow) {
+        return;
+      }
+
+      final userId = supabase.auth.currentUser?.id;
+      if (userId == null) {
+        return;
+      }
+
+      await _markPeriodPromptShownToday(userId);
+      final periodRangeController = TextEditingController();
+      try {
+        await showPeriodPanel(
+          periodRangeController: periodRangeController,
+          onSavedRange: _savePeriodRangeToAccount,
+        );
+      } finally {
+        periodRangeController.dispose();
+      }
+    } catch (error) {
+      debugPrint('period prompt check error: $error');
+    } finally {
+      _isCheckingPeriodPrompt = false;
+    }
   }
 
   void _openVideoClip(List<HomeVideoClip> clips, int initialIndex) {

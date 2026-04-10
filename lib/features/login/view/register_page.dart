@@ -163,13 +163,28 @@ class _RegisterPageState extends State<RegisterPage> {
       final phone = _phoneController.text.trim();
       final password = _passwordController.text.trim();
 
-      if (username.isEmpty || email.isEmpty || password.isEmpty) {
-        throw const AuthException(
-          'กรุณากรอกข้อมูลให้ครบ (Name, Email, Password)',
-        );
+      final missingRequiredFields = <String>[];
+      if (username.isEmpty) {
+        missingRequiredFields.add('ชื่อผู้ใช้งาน');
       }
       if (_birthday == null) {
-        throw const AuthException('กรุณาเลือกวันเกิด');
+        missingRequiredFields.add('วันเกิด');
+      }
+      if (_sex.trim().isEmpty) {
+        missingRequiredFields.add('เพศ');
+      }
+      if (email.isEmpty) {
+        missingRequiredFields.add('อีเมล');
+      }
+      if (password.isEmpty) {
+        missingRequiredFields.add('รหัสผ่าน');
+      }
+
+      if (missingRequiredFields.isNotEmpty) {
+        throw AuthException(
+          'กรุณากรอกข้อมูลที่จำเป็นให้ครบ: '
+          '${missingRequiredFields.join(', ')}',
+        );
       }
 
       String gender;
@@ -401,7 +416,7 @@ class _RegisterPageState extends State<RegisterPage> {
                 ],
               ),
               const SizedBox(height: 15),
-              _buildInputLabel('อีเมล'),
+              _buildInputLabel('อีเมล', isRequired: true),
               _buildTextField(
                 controller: _emailController,
                 hintText: '',

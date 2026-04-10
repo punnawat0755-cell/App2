@@ -37,6 +37,7 @@ class _BottomNavBarState extends State<BottomNavBar>
   bool _roleSelectionPageOpen = false;
   bool _checkingDailyMood = false;
   bool _dailyMoodPageOpen = false;
+  bool _allowHomePeriodPrompt = false;
 
   @override
   void initState() {
@@ -184,6 +185,9 @@ class _BottomNavBarState extends State<BottomNavBar>
     }
 
     _runningEntryFlow = true;
+    if (_allowHomePeriodPrompt && mounted) {
+      setState(() => _allowHomePeriodPrompt = false);
+    }
     try {
       final shouldContinueToRoleSelection = await _openDailyMoodIfNeeded();
       if (!mounted || !shouldContinueToRoleSelection) {
@@ -193,6 +197,9 @@ class _BottomNavBarState extends State<BottomNavBar>
       await _openRoleSelectionIfNeeded();
     } finally {
       _runningEntryFlow = false;
+      if (mounted && !_allowHomePeriodPrompt) {
+        setState(() => _allowHomePeriodPrompt = true);
+      }
     }
   }
 
@@ -205,7 +212,9 @@ class _BottomNavBarState extends State<BottomNavBar>
       body: IndexedStack(
         index: _page,
         children: [
-          const HomePage(),
+          HomePage(
+            allowPeriodPrompt: _page == 0 && _allowHomePeriodPrompt,
+          ),
           const FeedPage(),
           const ChatSelectionPage(),
           PetPage(isActive: _page == 3),

@@ -55,6 +55,7 @@ class ProfileController extends GetxController {
   var selectedDate = 0.obs;
 
   var isLoading = false.obs;
+  var isSavingDailyData = false.obs;
   var predictionText = "".obs;
   var predictionConfidence = "".obs; // [ใหม่] 'high' หรือ 'low'
   var avgCycleLength = 0.obs; // [ใหม่] รอบเฉลี่ยจริง
@@ -80,6 +81,8 @@ class ProfileController extends GetxController {
   var currentFlowLevel = Rxn<String>(); // [ใหม่]
   var currentPainLevel = Rxn<int>(); // [ใหม่]
   var currentNotes = "".obs; // [ใหม่]
+  final Map<String, Future<bool>> _inFlightPeriodPredictionRequests =
+      <String, Future<bool>>{};
 
   final TextEditingController notesController =
       TextEditingController(); // [ใหม่]
@@ -468,7 +471,7 @@ class ProfileController extends GetxController {
     }
 
     if (_n8nPeriodWebhook.trim().isNotEmpty) {
-      final ok = await _fetchPeriodPredictionFromN8n(userId);
+      final ok = await _fetchPeriodPredictionFromN8nDeduped(userId);
       if (ok) {
         _reconcilePredictedDaysWithRecordedStatus();
         return;
@@ -483,6 +486,20 @@ class ProfileController extends GetxController {
 
     await _fetchPeriodPredictionFromSupabaseRpc();
     _reconcilePredictedDaysWithRecordedStatus();
+  }
+
+  Future<bool> _fetchPeriodPredictionFromN8nDeduped(String userId) {
+    final requestKey = '$userId:${selectedYear.value}-${selectedMonth.value}';
+    final inFlightRequest = _inFlightPeriodPredictionRequests[requestKey];
+    if (inFlightRequest != null) {
+      return inFlightRequest;
+    }
+
+    final requestFuture = _fetchPeriodPredictionFromN8n(userId);
+    _inFlightPeriodPredictionRequests[requestKey] = requestFuture;
+    return requestFuture.whenComplete(() {
+      _inFlightPeriodPredictionRequests.remove(requestKey);
+    });
   }
 
   Future<bool> _fetchPeriodPredictionFromN8n(String userId) async {
@@ -1313,6 +1330,10 @@ class ProfileController extends GetxController {
   }
 
   Future<bool> saveDailyData({bool showSuccessSnackbar = true}) async {
+    if (isSavingDailyData.value) {
+      return false;
+    }
+
     if (selectedDate.value == 0) {
       Get.snackbar(
         "แจ้งเตือน",
@@ -1346,6 +1367,7 @@ class ProfileController extends GetxController {
       return false;
     }
 
+    isSavingDailyData.value = true;
     try {
       final hasExplicitPeriodStatus = dailyPeriodStatus.containsKey(dateKey);
       final bool? isPeriod =
@@ -1407,6 +1429,8 @@ class ProfileController extends GetxController {
       Get.snackbar("เกิดข้อผิดพลาด", "ไม่สามารถบันทึกข้อมูลได้: $e",
           backgroundColor: Colors.redAccent, colorText: Colors.white);
       return false;
+    } finally {
+      isSavingDailyData.value = false;
     }
   }
 
@@ -1694,6 +1718,8 @@ class ProfilePage extends StatelessWidget {
   }
 
   Future<void> _handleMenstrualSave(ProfileController controller) async {
+    if (controller.isSavingDailyData.value) return;
+
     final selectedSections = _selectedPeriodCareSections(controller);
     final selectedSymptoms = controller.getSymptomsForSelectedDay();
     final shouldShowPeriodCareDialog =
@@ -1722,6 +1748,8 @@ class ProfilePage extends StatelessWidget {
   }
 
   Future<void> _handleMaleSave(ProfileController controller) async {
+    if (controller.isSavingDailyData.value) return;
+
     if (controller.selectedDate.value == 0) {
       Get.snackbar(
         "แจ้งเตือน",
@@ -2351,6 +2379,7 @@ class ProfilePage extends StatelessWidget {
             );
           }
 
+          final isSaving = controller.isSavingDailyData.value;
           return Column(
             children: [
               Row(
@@ -2396,7 +2425,8 @@ class ProfilePage extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
-                  onPressed: () => _handleMenstrualSave(controller),
+                  onPressed:
+                      isSaving ? null : () => _handleMenstrualSave(controller),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20C2FF),
                     padding: EdgeInsets.symmetric(
@@ -2408,14 +2438,24 @@ class ProfilePage extends StatelessWidget {
                           BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
                     ),
                   ),
-                  child: Text(
-                    "บันทึก",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: scale.rf(14, min: 12.5, max: 14),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: isSaving
+                      ? SizedBox(
+                          width: scale.rs(16, min: 14, max: 16),
+                          height: scale.rs(16, min: 14, max: 16),
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          "บันทึก",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: scale.rf(14, min: 12.5, max: 14),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -2677,6 +2717,7 @@ class ProfilePage extends StatelessWidget {
             );
           }
 
+          final isSaving = controller.isSavingDailyData.value;
           return Column(
             children: [
               Wrap(
@@ -2700,7 +2741,8 @@ class ProfilePage extends StatelessWidget {
               Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
-                  onPressed: () => _handleMaleSave(controller),
+                  onPressed:
+                      isSaving ? null : () => _handleMaleSave(controller),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF20C2FF),
                     padding: EdgeInsets.symmetric(
@@ -2712,14 +2754,24 @@ class ProfilePage extends StatelessWidget {
                           BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
                     ),
                   ),
-                  child: Text(
-                    "บันทึก",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: scale.rf(14, min: 12.5, max: 14),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  child: isSaving
+                      ? SizedBox(
+                          width: scale.rs(16, min: 14, max: 16),
+                          height: scale.rs(16, min: 14, max: 16),
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : Text(
+                          "บันทึก",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: scale.rf(14, min: 12.5, max: 14),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                 ),
               ),
             ],
