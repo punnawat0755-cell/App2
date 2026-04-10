@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:flutter_application_1/core/supabase/supabase_client.dart';
@@ -15,6 +14,7 @@ class RegisterPage extends StatefulWidget {
 class _RegisterPageState extends State<RegisterPage> {
   final _usernameController = TextEditingController();
   final _birthdayController = TextEditingController();
+  final _lastPeriodController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -25,7 +25,10 @@ class _RegisterPageState extends State<RegisterPage> {
   DateTime? _birthday;
   String _sex = 'Female';
 
-  // ---------- helpers ----------
+  static const _mainBlue = Color(0xFF4A89D8);
+  static const _lightBlue = Color(0xFF64BFFF);
+  static const _fieldGrey = Color(0xFFF3F3F3);
+
   void _showError(String text) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text), backgroundColor: Colors.red),
@@ -55,12 +58,24 @@ class _RegisterPageState extends State<RegisterPage> {
     }
     return message;
   }
-  // ----------------------------
 
   String _toIsoDate(DateTime d) {
     final mm = d.month.toString().padLeft(2, '0');
     final dd = d.day.toString().padLeft(2, '0');
-    return '${d.year}-$mm-$dd'; // YYYY-MM-DD
+    return '${d.year}-$mm-$dd';
+  }
+
+  String _formatDate(DateTime d) {
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    return '$dd/$mm/${d.year}';
+  }
+
+  String _formatShortDate(DateTime d) {
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final yy = (d.year % 100).toString().padLeft(2, '0');
+    return '$dd/$mm/$yy';
   }
 
   Future<void> _pickBirthday() async {
@@ -74,14 +89,31 @@ class _RegisterPageState extends State<RegisterPage> {
       lastDate: now,
     );
 
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
 
     setState(() {
       _birthday = picked;
-      // แสดงแบบ dd/MM/yyyy ในช่อง (อ่านง่าย)
-      final dd = picked.day.toString().padLeft(2, '0');
-      final mm = picked.month.toString().padLeft(2, '0');
-      _birthdayController.text = '$dd/$mm/${picked.year}';
+      _birthdayController.text = _formatDate(picked);
+    });
+  }
+
+  Future<void> _pickLastPeriodRange() async {
+    final now = DateTime.now();
+    final pickedRange = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(1900),
+      lastDate: now,
+      initialDateRange: DateTimeRange(
+        start: now.subtract(const Duration(days: 5)),
+        end: now,
+      ),
+    );
+
+    if (pickedRange == null || !mounted) return;
+
+    setState(() {
+      _lastPeriodController.text =
+          '${_formatShortDate(pickedRange.start)}-${_formatShortDate(pickedRange.end)}';
     });
   }
 
@@ -97,13 +129,13 @@ class _RegisterPageState extends State<RegisterPage> {
 
       if (username.isEmpty || email.isEmpty || password.isEmpty) {
         throw const AuthException(
-            'กรุณากรอกข้อมูลให้ครบ (Name, Email, Password)');
+          'กรุณากรอกข้อมูลให้ครบ (Name, Email, Password)',
+        );
       }
       if (_birthday == null) {
         throw const AuthException('กรุณาเลือกวันเกิด');
       }
 
-      // map เพศให้สอดคล้องกับ DB
       String gender;
       switch (_sex) {
         case 'Male':
@@ -121,9 +153,8 @@ class _RegisterPageState extends State<RegisterPage> {
         password: password,
         data: {
           'username': username,
-          // ชื่อต้องตรงกับ DB trigger
           'gender': gender,
-          'birth_date': _toIsoDate(_birthday!), // YYYY-MM-DD
+          'birth_date': _toIsoDate(_birthday!),
           'phone': phone,
         },
       );
@@ -132,16 +163,12 @@ class _RegisterPageState extends State<RegisterPage> {
         throw const AuthException('สมัครไม่สำเร็จ กรุณาลองใหม่');
       }
 
-      // Prevent auto-login after sign up. Daily flow should start only after
-      // an explicit login from LoginPage.
       final hasSession =
           res.session != null || supabase.auth.currentSession != null;
       if (hasSession) {
         try {
           await supabase.auth.signOut();
-        } catch (_) {
-          // Ignore if there is no active session to clear.
-        }
+        } catch (_) {}
       }
 
       if (!mounted) return;
@@ -167,16 +194,12 @@ class _RegisterPageState extends State<RegisterPage> {
   void dispose() {
     _usernameController.dispose();
     _birthdayController.dispose();
+    _lastPeriodController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
-
-  // ---------- UI ----------
-  static const _mainBlue = Color(0xFF4A89D8);
-  static const _lightBlue = Color(0xFF64BFFF);
-  static const _fieldGrey = Color(0xFFF3F3F3);
 
   Widget _buildInputLabel(String label, {bool isRequired = false}) {
     return Padding(
@@ -188,7 +211,7 @@ class _RegisterPageState extends State<RegisterPage> {
             text: label,
             style: const TextStyle(
               color: Colors.grey,
-              fontSize: 16,
+              fontSize: 18,
               fontWeight: FontWeight.bold,
             ),
             children: [
@@ -206,13 +229,12 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Widget _buildTextField({
     required TextEditingController controller,
-    required String hint,
-    TextInputType? keyboardType,
-    IconData? suffixIcon,
-    Widget? suffix,
+    required String hintText,
+    bool isPassword = false,
     bool readOnly = false,
-    bool obscure = false,
+    TextInputType? keyboardType,
     VoidCallback? onTap,
+    Widget? suffix,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -221,86 +243,52 @@ class _RegisterPageState extends State<RegisterPage> {
       ),
       child: TextField(
         controller: controller,
-        keyboardType: keyboardType,
+        obscureText: isPassword,
         readOnly: readOnly,
-        obscureText: obscure,
+        keyboardType: keyboardType,
         onTap: onTap,
+        style: const TextStyle(fontSize: 16),
         decoration: InputDecoration(
-          hintText: hint,
+          hintText: hintText,
           hintStyle: const TextStyle(color: Colors.black54),
-          suffixIcon: suffix ??
-              (suffixIcon != null
-                  ? Icon(suffixIcon, color: Colors.grey)
-                  : null),
+          suffixIcon: suffix,
           border: InputBorder.none,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: 15,
+          ),
         ),
       ),
     );
   }
 
-  Widget _sexButton(String value) {
-    final selected = _sex == value;
+  Widget _buildGenderButton(String label) {
+    final isSelected = _sex == label;
 
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _sex = value),
+        onTap: () => setState(() => _sex = label),
         child: Container(
           height: 44,
-          alignment: Alignment.center,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFC7E9FF) : Colors.white,
+            color: isSelected ? const Color(0xFFC7E9FF) : Colors.white,
             borderRadius: BorderRadius.circular(15),
             border: Border.all(
-              color: selected ? _lightBlue : Colors.grey.shade400,
+              color: isSelected ? _lightBlue : Colors.grey.shade400,
               width: 1.5,
             ),
           ),
-          child: Text(
-            value,
-            style: TextStyle(
-              color: selected ? _mainBlue : Colors.grey,
-              fontWeight: FontWeight.bold,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? _mainBlue : Colors.grey,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _primaryButton({
-    required String text,
-    required VoidCallback? onPressed,
-    required bool loading,
-  }) {
-    final scale = context.responsive;
-    return SizedBox(
-      height: scale.rs(55, min: 50, max: 56),
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _lightBlue,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          elevation: 0,
-        ),
-        child: loading
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(color: Colors.white),
-              )
-            : Text(
-                text,
-                style: TextStyle(
-                  fontSize: scale.rf(20, min: 17.5, max: 20.5),
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
       ),
     );
   }
@@ -310,125 +298,147 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
-            final horizontalPadding = constraints.maxWidth < 360 ? 18.0 : 28.0;
-
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: horizontalPadding,
-                    vertical: 20,
-                  ),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 10),
-                      Text(
-                        'สร้างบัญชีใหม่',
-                        style: TextStyle(
-                          fontSize: scale.rf(28, min: 24, max: 28),
-                          fontWeight: FontWeight.bold,
-                          color: _mainBlue,
-                        ),
-                      ),
-                      const SizedBox(height: 30),
-                      _buildInputLabel('ชื่อผู้ใช้งาน', isRequired: true),
-                      _buildTextField(
-                          controller: _usernameController, hint: 'แมวน้ำ'),
-                      _buildInputLabel('วันเกิด', isRequired: true),
-                      _buildTextField(
-                        controller: _birthdayController,
-                        hint: '17/12/2004',
-                        readOnly: true,
-                        onTap: _pickBirthday,
-                        suffixIcon: Icons.calendar_today_outlined,
-                        suffix: IconButton(
-                          onPressed: _pickBirthday,
-                          icon: const Icon(
-                            Icons.calendar_today_outlined,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      _buildInputLabel('เพศ', isRequired: true),
-                      Row(
-                        children: [
-                          _sexButton('Male'),
-                          const SizedBox(width: 10),
-                          _sexButton('Female'),
-                          const SizedBox(width: 10),
-                          _sexButton('None'),
-                        ],
-                      ),
-                      _buildInputLabel('อีเมล'),
-                      _buildTextField(
-                        controller: _emailController,
-                        hint: '',
-                        keyboardType: TextInputType.emailAddress,
-                      ),
-                      _buildInputLabel('เบอร์โทรศัพท์'),
-                      _buildTextField(
-                        controller: _phoneController,
-                        hint: '',
-                        keyboardType: TextInputType.phone,
-                      ),
-                      _buildInputLabel('รหัสผ่าน', isRequired: true),
-                      _buildTextField(
-                        controller: _passwordController,
-                        hint: '',
-                        obscure: _hidePw,
-                        suffix: IconButton(
-                          onPressed: () => setState(() => _hidePw = !_hidePw),
-                          icon: Icon(
-                            _hidePw ? Icons.visibility : Icons.visibility_off,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 40),
-                      _primaryButton(
-                        text: 'ลงทะเบียน',
-                        onPressed: _isLoading ? null : _register,
-                        loading: _isLoading,
-                      ),
-                      const SizedBox(height: 20),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text(
-                            'มีบัญชีอยู่แล้ว? ',
-                            style: TextStyle(color: Colors.grey, fontSize: 14),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const LoginPage(),
-                              ),
-                            ),
-                            child: const Text(
-                              'เข้าสู่ระบบ',
-                              style: TextStyle(
-                                color: _lightBlue,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                                decoration: TextDecoration.underline,
-                                decorationColor: _lightBlue,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-                    ],
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              const Text(
+                'สร้างบัญชีใหม่',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  color: _mainBlue,
+                ),
+              ),
+              const SizedBox(height: 30),
+              _buildInputLabel('ชื่อผู้ใช้งาน', isRequired: true),
+              _buildTextField(
+                controller: _usernameController,
+                hintText: 'แมวน้ำ',
+              ),
+              _buildInputLabel('วันเกิด', isRequired: true),
+              _buildTextField(
+                controller: _birthdayController,
+                hintText: '17/12/2004',
+                readOnly: true,
+                onTap: _pickBirthday,
+                suffix: IconButton(
+                  onPressed: _pickBirthday,
+                  icon: const Icon(
+                    Icons.calendar_today_outlined,
+                    color: Colors.grey,
                   ),
                 ),
               ),
-            );
-          },
+              _buildInputLabel('เพศ', isRequired: true),
+              Row(
+                children: [
+                  _buildGenderButton('Male'),
+                  _buildGenderButton('Female'),
+                ],
+              ),
+              const SizedBox(height: 15),
+              _buildInputLabel('อีเมล'),
+              _buildTextField(
+                controller: _emailController,
+                hintText: '',
+                keyboardType: TextInputType.emailAddress,
+              ),
+              _buildInputLabel('เบอร์โทรศัพท์'),
+              _buildTextField(
+                controller: _phoneController,
+                hintText: '',
+                keyboardType: TextInputType.phone,
+              ),
+              _buildInputLabel('รหัสผ่าน', isRequired: true),
+              _buildTextField(
+                controller: _passwordController,
+                hintText: '',
+                isPassword: _hidePw,
+                suffix: IconButton(
+                  onPressed: () => setState(() => _hidePw = !_hidePw),
+                  icon: Icon(
+                    _hidePw ? Icons.visibility : Icons.visibility_off,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+              if (_sex == 'Female') ...[
+                _buildInputLabel('ประจำเดือนครั้งล่าสุด'),
+                _buildTextField(
+                  controller: _lastPeriodController,
+                  hintText: 'dd/mm/yyyy - dd/mm/yyyy',
+                  readOnly: true,
+                  onTap: _pickLastPeriodRange,
+                  suffix: IconButton(
+                    onPressed: _pickLastPeriodRange,
+                    icon: const Icon(
+                      Icons.calendar_today_outlined,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 40),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _register,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _lightBlue,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Text(
+                          'ลงทะเบียน',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'มีบัญชีอยู่แล้ว? ',
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                    ),
+                    child: const Text(
+                      'เข้าสู่ระบบ',
+                      style: TextStyle(
+                        color: _lightBlue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );

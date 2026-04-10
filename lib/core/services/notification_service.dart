@@ -31,7 +31,7 @@ class NotificationService {
       return;
     }
 
-    const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidInit = AndroidInitializationSettings('ic_stat_notify');
     const iosInit = DarwinInitializationSettings();
     const initSettings = InitializationSettings(
       android: androidInit,
@@ -230,6 +230,7 @@ class NotificationService {
           'chat_high_importance',
           'Chat Notifications',
           channelDescription: 'Notifications for incoming chat messages',
+          icon: 'ic_stat_notify',
           importance: Importance.high,
           priority: Priority.high,
         ),
