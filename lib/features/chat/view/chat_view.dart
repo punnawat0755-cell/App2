@@ -4,11 +4,13 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/firebase_chat_identity_service.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/role_logic/view/pages/role_quiz_page.dart';
 import 'package:flutter_application_1/features/role_logic/view/pages/role_selection_page.dart';
 import 'package:get/get.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/features/chat/view/chat_confirm_dialog.dart';
@@ -23,6 +25,24 @@ Color withAlpha(Color color, double opacity) {
 }
 
 class ChatSelectionController extends GetxController {
+  final RxBool isCounselingEnabled = true.obs;
+  StreamSubscription<AuthState>? _authStateSubscription;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _authStateSubscription = supabase.auth.onAuthStateChange.listen((_) {
+      unawaited(refreshCounselingAvailability());
+    });
+    unawaited(refreshCounselingAvailability());
+  }
+
+  @override
+  void onClose() {
+    _authStateSubscription?.cancel();
+    super.onClose();
+  }
+
   void goToStartChat() {
     unawaited(_openChatEntry(MatchRole.seeker));
   }
@@ -32,7 +52,9 @@ class ChatSelectionController extends GetxController {
   }
 
   Future<void> _openChatEntry(MatchRole role) async {
-    if (!await _ensureChatGate(role)) {
+    final canOpenEntry = await _ensureChatGate(role);
+    await refreshCounselingAvailability();
+    if (!canOpenEntry) {
       return;
     }
 
@@ -52,23 +74,25 @@ class ChatSelectionController extends GetxController {
         await chatService.getActiveRandomChatSession(user.uid);
 
     if (activeSession != null) {
-      Get.to(
+      await Get.to(
         () => PauseChatPage(
           currentUserId: user.uid,
           initialSession: activeSession,
         ),
         binding: UserChatBinding(),
       );
+      await refreshCounselingAvailability();
       return;
     }
 
-    Get.to(
+    await Get.to(
       () => WaitingChatPage(
         currentUserId: user.uid,
         role: role,
       ),
       binding: UserChatBinding(),
     );
+    await refreshCounselingAvailability();
   }
 
   Future<bool> _ensureChatGate(MatchRole role) async {
@@ -86,408 +110,131 @@ class ChatSelectionController extends GetxController {
     final currentMode = (gateState['current_mode']?.toString() ?? '').trim();
     final canChatAsListener = gateState['can_chat_as_listener'] == true;
     final assessmentPassed = gateState['assessment_passed'] == true;
-
-    if (!hasRoleToday) {
-      final message = await Get.to<String>(() => const RoleSelectionPage());
-      if (message != null && message.isNotEmpty) {
-        Get.snackbar(
-          'อัปเดตบทบาทแล้ว',
-          message,
-          snackPosition: SnackPosition.BOTTOM,
-        );
-      }
-
-      final refreshedGateState =
-          await UserModeStatusService.getMyChatGateState();
-      if (refreshedGateState == null ||
-          refreshedGateState['has_role_today'] != true) {
-        return false;
-      }
-
-      if (role == MatchRole.listener) {
-        return refreshedGateState['can_chat_as_listener'] == true;
-      }
-
-      return true;
-    }
+    final assessmentDoneToday = gateState['assessment_done_today'] == true;
 
     if (role != MatchRole.listener) {
+      if (!hasRoleToday) {
+        await Get.to<String>(() => const RoleSelectionPage());
+
+        final refreshedGateState =
+            await UserModeStatusService.getMyChatGateState();
+        return refreshedGateState != null &&
+            refreshedGateState['has_role_today'] == true;
+      }
       return true;
     }
 
-    if (currentMode != 'listener') {
-      if (assessmentPassed) {
-        return _switchToListenerModeAndValidate();
-      }
-      return _tryUnlockListenerWithOneTimeQuiz();
-    }
-
-    if (!assessmentPassed || !canChatAsListener) {
-      if (!assessmentPassed) {
-        return _tryUnlockListenerWithOneTimeQuiz();
-      }
-      Get.snackbar(
-        'ยังไม่พร้อมให้คำปรึกษา',
-        'กรุณาลองใหม่อีกครั้งในภายหลัง',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+    if (!assessmentDoneToday) {
+      await _openListenerQuizFromChatEntry();
       return false;
     }
 
-    return true;
+    if (!assessmentPassed) {
+      return false;
+    }
+
+    if (currentMode == 'listener' && canChatAsListener) {
+      return true;
+    }
+
+    return _switchToListenerModeAndValidate();
+  }
+
+  Future<void> refreshCounselingAvailability() async {
+    final gateState = await UserModeStatusService.getMyChatGateState();
+    if (gateState == null) {
+      isCounselingEnabled.value = true;
+      return;
+    }
+    isCounselingEnabled.value = _canTapCounseling(gateState);
+  }
+
+  bool _canTapCounseling(Map<String, dynamic> gateState) {
+    final assessmentDoneToday = gateState['assessment_done_today'] == true;
+    if (!assessmentDoneToday) {
+      return true;
+    }
+    return gateState['assessment_passed'] == true;
+  }
+
+  bool _canStartCounselingChat(Map<String, dynamic> gateState) {
+    final currentMode = (gateState['current_mode']?.toString() ?? '').trim();
+    final canChatAsListener = gateState['can_chat_as_listener'] == true;
+    final assessmentPassed = gateState['assessment_passed'] == true;
+    return currentMode == 'listener' && canChatAsListener && assessmentPassed;
+  }
+
+  Future<void> _openListenerQuizFromChatEntry() async {
+    final result = await Get.to<RoleQuizSelectionResult>(
+      () => const RoleQuizPage(),
+    );
+    if (result == null || result.assessmentUnavailable) {
+      return;
+    }
+
+    if (result.errorMessage != null && result.errorMessage!.isNotEmpty) {
+      return;
+    }
+
+    final nextMode = result.isPass ? 'listener' : 'seeker';
+    try {
+      await UserModeStatusService.saveCurrentMode(nextMode);
+    } catch (_) {}
   }
 
   Future<bool> _switchToListenerModeAndValidate() async {
     try {
       await UserModeStatusService.saveCurrentMode('listener');
-    } catch (e) {
-      Get.snackbar(
-        'สลับโหมดไม่สำเร็จ',
-        e.toString(),
-        snackPosition: SnackPosition.BOTTOM,
-      );
+    } catch (_) {
       return false;
     }
 
     final refreshedGateState = await UserModeStatusService.getMyChatGateState();
-    final canChatAsListener =
-        refreshedGateState?['can_chat_as_listener'] == true;
-    if (!canChatAsListener) {
-      Get.snackbar(
-        'ยังไม่พร้อมให้คำปรึกษา',
-        'กรุณาลองใหม่อีกครั้ง',
-        snackPosition: SnackPosition.BOTTOM,
-      );
+    if (refreshedGateState == null) {
       return false;
     }
-
-    return true;
-  }
-
-  Future<bool> _tryUnlockListenerWithOneTimeQuiz() async {
-    final canRetryToday =
-        await UserModeStatusService.canTakeListenerQuizRetryToday();
-    if (!canRetryToday) {
-      Get.snackbar(
-        'ใช้สิทธิ์ครบแล้ว',
-        'วันนี้คุณใช้โอกาสทำแบบประเมินเพิ่มครบ 1 ครั้งแล้ว',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return false;
-    }
-
-    final shouldStartQuiz = await Get.dialog<bool>(
-      const _ListenerQuizRetryDialog(),
-      barrierDismissible: false,
-    );
-    if (shouldStartQuiz != true) {
-      return false;
-    }
-
-    final result = await Get.to<RoleQuizSelectionResult>(
-      () => const RoleQuizPage(),
-    );
-    if (result == null) {
-      return false;
-    }
-
-    if (result.assessmentUnavailable) {
-      Get.snackbar(
-        'ยังไม่สามารถทำแบบประเมินได้',
-        'ขณะนี้ยังไม่มีแบบประเมินที่เปิดใช้งาน',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return false;
-    }
-
-    if (result.errorMessage != null && result.errorMessage!.isNotEmpty) {
-      Get.snackbar(
-        'บันทึกผลไม่สำเร็จ',
-        result.errorMessage!,
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return false;
-    }
-
-    await UserModeStatusService.markListenerQuizRetryUsedToday();
-
-    if (!result.isPass) {
-      Get.snackbar(
-        'ยังไม่ผ่านแบบประเมิน',
-        'วันนี้คุณยังไม่พร้อมสำหรับบทบาทผู้ให้คำปรึกษา',
-        snackPosition: SnackPosition.BOTTOM,
-      );
-      return false;
-    }
-
-    return _switchToListenerModeAndValidate();
+    return _canStartCounselingChat(refreshedGateState);
   }
 }
 
-class _ListenerQuizRetryDialog extends StatelessWidget {
-  const _ListenerQuizRetryDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    const primaryBlue = Color(0xFF4489D7);
-    const deepBlue = Color(0xFF2D5E94);
-    const softBlue = Color(0xFFECF5FF);
-
-    return Dialog(
-      elevation: 0,
-      backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isCompact = constraints.maxWidth < 360;
-          final titleSize = isCompact ? 14.2 : 15.8;
-          final bodySize = isCompact ? 13.5 : 14.5;
-          final badgeSize = isCompact ? 12.0 : 13.0;
-          final cancelSize = isCompact ? 14.0 : 15.0;
-          final ctaSize = isCompact ? 14.8 : 15.8;
-          final leadingSize = isCompact ? 46.0 : 52.0;
-
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                right: 18,
-                top: -12,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _cuteDot(
-                      color: const Color(0xFFD6EBFF),
-                      icon: Icons.favorite_rounded,
-                      iconColor: const Color(0xFF5EA1E6),
-                    ),
-                    const SizedBox(width: 8),
-                    _cuteDot(
-                      color: const Color(0xFFE8F4FF),
-                      icon: Icons.auto_awesome_rounded,
-                      iconColor: const Color(0xFF77B1EC),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFF9FCFF),
-                      Color(0xFFEFF6FF),
-                    ],
-                  ),
-                  border: Border.all(
-                    color: const Color(0xFFD8E9FF),
-                    width: 1.2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: withAlpha(primaryBlue, 0.22),
-                      blurRadius: 28,
-                      offset: const Offset(0, 16),
-                    ),
-                  ],
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: leadingSize,
-                            height: leadingSize,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFDCEBFF),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: withAlpha(primaryBlue, 0.35),
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.fact_check_rounded,
-                              color: primaryBlue,
-                              size: isCompact ? 24 : 28,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'ทำแบบประเมินก่อนให้คำปรึกษา',
-                              style: TextStyle(
-                                color: const Color(0xFF1D2433),
-                                fontSize: titleSize,
-                                fontWeight: FontWeight.w800,
-                                height: 1.3,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                'วันนี้คุณยังไม่ผ่านแบบประเมินสำหรับผู้ให้คำปรึกษา',
-                                maxLines: 1,
-                                style: TextStyle(
-                                  color: const Color(0xFF314158),
-                                  fontSize: bodySize,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.4,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'คุณสามารถทำแบบประเมินเพิ่มได้อีก 1 ครั้ง',
-                              style: TextStyle(
-                                color: const Color(0xFF314158),
-                                fontSize: bodySize,
-                                fontWeight: FontWeight.w600,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 9,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCEEFF),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.autorenew_rounded,
-                              color: primaryBlue,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 7),
-                            Text(
-                              'วันนี้เหลือสิทธิ์อีก 1 ครั้ง',
-                              style: TextStyle(
-                                color: deepBlue,
-                                fontWeight: FontWeight.w700,
-                                fontSize: badgeSize,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      Row(
-                        children: [
-                          TextButton(
-                            onPressed: () => Get.back(result: false),
-                            style: TextButton.styleFrom(
-                              backgroundColor: softBlue,
-                              foregroundColor: deepBlue,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 11,
-                              ),
-                              textStyle: TextStyle(
-                                fontSize: cancelSize,
-                                fontWeight: FontWeight.w700,
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                            ),
-                            child: const Text('ยกเลิก'),
-                          ),
-                          const SizedBox(width: 10),
-                          ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minWidth: isCompact ? 172 : 186,
-                              maxWidth: isCompact ? 198 : 222,
-                            ),
-                            child: FilledButton.icon(
-                              onPressed: () => Get.back(result: true),
-                              icon:
-                                  const Icon(Icons.play_arrow_rounded, size: 18),
-                              label: const Text('เริ่มทำแบบประเมิน'),
-                              style: FilledButton.styleFrom(
-                                backgroundColor: const Color(0xFF5A9FE0),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                minimumSize:
-                                    Size(0, isCompact ? 46 : 50),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 11,
-                                ),
-                                textStyle: TextStyle(
-                                  fontSize: ctaSize,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(24),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _cuteDot({
-    required Color color,
-    required IconData icon,
-    required Color iconColor,
-  }) {
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: withAlpha(iconColor, 0.3)),
-      ),
-      child: Icon(
-        icon,
-        size: 13,
-        color: iconColor,
-      ),
-    );
-  }
-}
-
-class ChatSelectionPage extends StatelessWidget {
+class ChatSelectionPage extends StatefulWidget {
   const ChatSelectionPage({super.key});
 
   @override
+  State<ChatSelectionPage> createState() => _ChatSelectionPageState();
+}
+
+class _ChatSelectionPageState extends State<ChatSelectionPage>
+    with WidgetsBindingObserver {
+  late final ChatSelectionController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    controller = Get.isRegistered<ChatSelectionController>()
+        ? Get.find<ChatSelectionController>()
+        : Get.put(ChatSelectionController());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(controller.refreshCounselingAvailability());
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(controller.refreshCounselingAvailability());
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = Get.put(ChatSelectionController());
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFFFFF),
@@ -530,39 +277,52 @@ class ChatSelectionPage extends StatelessWidget {
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                HalfCircleButton(
-                                  title: 'เริ่มแชท',
-                                  imagePath: 'assets/images/sad.png',
-                                  backgroundColor: const Color(0xFFAEDEF4),
-                                  textColor: const Color(0xFF4489D7),
-                                  isLeft: true,
-                                  onTap: controller.goToStartChat,
-                                  imagePadding: EdgeInsets.only(
-                                    top: scale.rs(10, min: 6, max: 10),
-                                    bottom: scale.rs(25, min: 16, max: 25),
-                                    left: scale.rs(20, min: 10, max: 20),
-                                  ),
-                                  imageScale: scale.isCompact ? 0.82 : 0.92,
-                                  textPadding: EdgeInsets.only(
-                                    left: scale.rs(55, min: 30, max: 55),
+                                Expanded(
+                                  child: HalfCircleButton(
+                                    title: 'เริ่มแชท',
+                                    imagePath: 'assets/images/sad.png',
+                                    backgroundColor: const Color(0xFFAEDEF4),
+                                    textColor: const Color(0xFF4489D7),
+                                    isLeft: true,
+                                    onTap: controller.goToStartChat,
+                                    imagePadding: EdgeInsets.only(
+                                      left: scale.rs(20, min: 10, max: 20),
+                                    ),
+                                    imageShiftX: scale.rs(8, min: 6, max: 10),
+                                    imageScale: scale.isCompact ? 0.79 : 0.89,
+                                    textPadding: EdgeInsets.only(
+                                      left: scale.rs(55, min: 30, max: 55),
+                                    ),
                                   ),
                                 ),
                                 SizedBox(width: scale.rs(9, min: 6, max: 10)),
-                                HalfCircleButton(
-                                  title: 'ให้คำปรึกษา',
-                                  imagePath: 'assets/images/fine.png',
-                                  backgroundColor: const Color(0xFFFDE6A8),
-                                  textColor: const Color(0xFF8D6E63),
-                                  isLeft: false,
-                                  onTap: controller.goToCounseling,
-                                  imagePadding: EdgeInsets.only(
-                                    bottom: scale.rs(3, min: 1, max: 3),
-                                    right: scale.rs(8, min: 4, max: 8),
-                                  ),
-                                  imageScale: scale.isCompact ? 0.7 : 0.8,
-                                  textPadding: EdgeInsets.only(
-                                    right: scale.rs(50, min: 28, max: 50),
-                                  ),
+                                Expanded(
+                                  child: Obx(() {
+                                    final canTapCounseling =
+                                        controller.isCounselingEnabled.value;
+                                    return HalfCircleButton(
+                                      title: 'ให้คำปรึกษา',
+                                      imagePath: 'assets/images/fine.png',
+                                      backgroundColor: const Color(0xFFFDE6A8),
+                                      textColor: const Color(0xFF8D6E63),
+                                      isLeft: false,
+                                      onTap: canTapCounseling
+                                          ? controller.goToCounseling
+                                          : null,
+                                      enabled: canTapCounseling,
+                                      imagePadding: EdgeInsets.only(
+                                        top: scale.rs(10, min: 6, max: 10),
+                                        right: scale.rs(8, min: 4, max: 8),
+                                      ),
+                                      imageShiftX:
+                                          -scale.rs(10, min: 8, max: 12),
+                                      imageShiftY: scale.rs(8, min: 6, max: 10),
+                                      imageScale: scale.isCompact ? 0.73 : 0.83,
+                                      textPadding: EdgeInsets.only(
+                                        right: scale.rs(50, min: 28, max: 50),
+                                      ),
+                                    );
+                                  }),
                                 ),
                               ],
                             ),
@@ -622,10 +382,13 @@ class HalfCircleButton extends StatelessWidget {
   final Color backgroundColor;
   final Color textColor;
   final bool isLeft;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final EdgeInsetsGeometry? imagePadding;
+  final double imageShiftX;
+  final double imageShiftY;
   final double imageScale;
   final EdgeInsetsGeometry? textPadding;
+  final bool enabled;
 
   const HalfCircleButton({
     super.key,
@@ -636,80 +399,96 @@ class HalfCircleButton extends StatelessWidget {
     required this.isLeft,
     required this.onTap,
     this.imagePadding,
+    this.imageShiftX = 0,
+    this.imageShiftY = 0,
     this.imageScale = 1.0,
     this.textPadding,
+    this.enabled = true,
   });
 
   @override
   Widget build(BuildContext context) {
     final scale = context.responsive;
     const double radius = 2000;
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          clipBehavior: Clip.hardEdge,
-          decoration: BoxDecoration(
-            color: backgroundColor,
-            borderRadius: isLeft
-                ? const BorderRadius.only(
-                    topLeft: Radius.circular(radius),
-                    bottomLeft: Radius.circular(radius),
-                  )
-                : const BorderRadius.only(
-                    topRight: Radius.circular(radius),
-                    bottomRight: Radius.circular(radius),
-                  ),
-            boxShadow: [
-              BoxShadow(
-                color: withAlpha(Colors.black, 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                bottom: scale.rs(50, min: 32, max: 54),
-                child: Padding(
-                  padding: imagePadding ??
-                      EdgeInsets.all(scale.rs(15, min: 10, max: 15)),
-                  child: Transform.scale(
-                    scale: imageScale,
-                    child: Image.asset(
-                      imagePath,
-                      fit: BoxFit.contain,
-                      alignment: Alignment.bottomCenter,
-                      errorBuilder: (context, error, stackTrace) => Icon(
-                        isLeft
-                            ? Icons.sentiment_dissatisfied
-                            : Icons.sentiment_satisfied_alt,
-                        size: scale.rs(80, min: 56, max: 82),
-                        color: withAlpha(Colors.white, 0.5),
+    final titleFontSize = scale.rf(18, min: 14, max: 18.5);
+    final titleBottom = scale.rs(28, min: 18, max: 32);
+    final imageToTitleGap = scale.rs(12, min: 8, max: 14);
+    final estimatedTitleHeight = titleFontSize * 1.2;
+    final imageBottomInset = titleBottom + estimatedTitleHeight + imageToTitleGap;
+
+    return IgnorePointer(
+      ignoring: !enabled,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.5,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            clipBehavior: Clip.hardEdge,
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: isLeft
+                  ? const BorderRadius.only(
+                      topLeft: Radius.circular(radius),
+                      bottomLeft: Radius.circular(radius),
+                    )
+                  : const BorderRadius.only(
+                      topRight: Radius.circular(radius),
+                      bottomRight: Radius.circular(radius),
+                    ),
+              boxShadow: [
+                BoxShadow(
+                  color: withAlpha(Colors.black, 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  bottom: imageBottomInset,
+                  child: Padding(
+                    padding: imagePadding ??
+                        EdgeInsets.all(scale.rs(15, min: 10, max: 15)),
+                    child: Transform.translate(
+                      offset: Offset(imageShiftX, imageShiftY),
+                      child: Transform.scale(
+                        scale: imageScale,
+                        child: Image.asset(
+                          imagePath,
+                          fit: BoxFit.contain,
+                          alignment: Alignment.bottomCenter,
+                          errorBuilder: (context, error, stackTrace) => Icon(
+                            isLeft
+                                ? Icons.sentiment_dissatisfied
+                                : Icons.sentiment_satisfied_alt,
+                            size: scale.rs(80, min: 56, max: 82),
+                            color: withAlpha(Colors.white, 0.5),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-              Positioned(
-                bottom: scale.rs(35, min: 22, max: 38),
-                left: 0,
-                right: 0,
-                child: Padding(
-                  padding: textPadding ?? EdgeInsets.zero,
-                  child: Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: scale.rf(18, min: 14, max: 18.5),
-                      fontWeight: FontWeight.bold,
+                Positioned(
+                  bottom: titleBottom,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: textPadding ?? EdgeInsets.zero,
+                    child: Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: textColor,
+                        fontSize: titleFontSize,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
