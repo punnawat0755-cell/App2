@@ -37,7 +37,7 @@ void main() {
     });
 
     test(
-        'feedPet levels up and starts refill timer when last free food is used',
+        'feedPet levels up when energy reaches 100 and starts refill timer',
         () async {
       final service = _FakePetService(
         PetState.initial().copyWith(
@@ -56,7 +56,7 @@ void main() {
       final afterCall = DateTime.now();
 
       expect(result.level, 2);
-      expect(result.exp, 5);
+      expect(result.exp, 25);
       expect(result.energyPercent, 100);
       expect(result.foodCount, 0);
       expect(result.nextFoodReadyAt, isNotNull);
@@ -74,7 +74,7 @@ void main() {
       );
     });
 
-    test('feedWithCoin grants larger exp reward and can level up', () async {
+    test('feedWithCoin levels up only when energy reaches 100', () async {
       final service = _FakePetService(
         PetState.initial().copyWith(
           level: 2,
@@ -87,8 +87,25 @@ void main() {
       final result = await repository.feedWithCoin();
 
       expect(result.level, 3);
-      expect(result.exp, 10);
+      expect(result.exp, 38);
       expect(result.energyPercent, 100);
+    });
+
+    test('feedWithCoin does not level up if energy is below 100', () async {
+      final service = _FakePetService(
+        PetState.initial().copyWith(
+          level: 3,
+          exp: 99,
+          energyPercent: 80,
+        ),
+      );
+      final repository = PetRepository(service: service);
+
+      final result = await repository.feedWithCoin();
+
+      expect(result.level, 3);
+      expect(result.exp, 117);
+      expect(result.energyPercent, 90);
     });
 
     test('addOwnedItem keeps owned items unique and sorted', () async {

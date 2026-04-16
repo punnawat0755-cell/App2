@@ -183,58 +183,6 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
                     ),
                   ),
                   SizedBox(height: scale.rs(5, min: 3, max: 5)),
-                  Obx(
-                    () => Container(
-                      width: energyBarWidth,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: scale.rs(12, min: 10, max: 12),
-                        vertical: scale.rs(6, min: 5, max: 6),
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'EXP',
-                                style: TextStyle(
-                                  color: const Color(0xFF2C5E92),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: scale.rf(12, min: 10.5, max: 12),
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${controller.exp.value}/${controller.expRequiredForNextLevel}',
-                                style: TextStyle(
-                                  color: const Color(0xFF5D4037),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: scale.rf(11, min: 10, max: 11),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: scale.rs(5, min: 4, max: 5)),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: LinearProgressIndicator(
-                              minHeight: scale.rs(8, min: 6, max: 8),
-                              value: controller.expProgress,
-                              backgroundColor: const Color(0xFFD8ECFA),
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFF4489D7),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: scale.rs(5, min: 3, max: 5)),
                   Container(
                     width: energyBarWidth,
                     height: boxHeight,
@@ -400,25 +348,6 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
               ),
             ),
             SizedBox(height: scale.rs(8, min: 6, max: 8)),
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: scale.rs(14, min: 10, max: 14),
-                vertical: scale.rs(8, min: 6, max: 8),
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                'EXP ${controller.exp.value}/${controller.expRequiredForNextLevel}',
-                style: TextStyle(
-                  color: const Color(0xFF2C5E92),
-                  fontWeight: FontWeight.w800,
-                  fontSize: scale.rf(13, min: 11, max: 13),
-                ),
-              ),
-            ),
-            SizedBox(height: scale.rs(8, min: 6, max: 8)),
             if (equippedItem != null)
               Container(
                 padding: EdgeInsets.symmetric(
@@ -440,15 +369,6 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
                     fontWeight: FontWeight.w800,
                     fontSize: scale.rf(13, min: 11, max: 13),
                   ),
-                ),
-              )
-            else
-              Text(
-                'ยังไม่ได้ใส่ไอเท็ม',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.95),
-                  fontWeight: FontWeight.w700,
-                  fontSize: scale.rf(14, min: 12, max: 14),
                 ),
               ),
           ],

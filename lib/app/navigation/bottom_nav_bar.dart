@@ -217,7 +217,7 @@ class _BottomNavBarState extends State<BottomNavBar>
           ),
           const FeedPage(),
           const ChatSelectionPage(),
-          PetPage(isActive: _page == 3),
+          const PetPage(),
           const ProfilePage(),
         ],
       ),

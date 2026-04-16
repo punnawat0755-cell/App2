@@ -19,27 +19,31 @@ class PetRepository {
     }
 
     final nextFoodCount = current.foodCount - 1;
-    final nextState = _applyExpGain(
-      current.copyWith(
-        foodCount: nextFoodCount,
-        energyPercent: (current.energyPercent + 5).clamp(0, 100),
-        nextFoodReadyAt:
-            nextFoodCount == 0 ? DateTime.now().add(refillDuration) : null,
-        clearNextFoodReadyAt: nextFoodCount > 0,
-      ),
-      _freeFeedExpReward,
+    final fedState = current.copyWith(
+      foodCount: nextFoodCount,
+      energyPercent: (current.energyPercent + 5).clamp(0, 100),
+      nextFoodReadyAt:
+          nextFoodCount == 0 ? DateTime.now().add(refillDuration) : null,
+      clearNextFoodReadyAt: nextFoodCount > 0,
+    );
+    final nextState = _applyLevelProgress(
+      previousState: current,
+      currentState: fedState,
+      gainedExp: _freeFeedExpReward,
     );
     return _service.saveState(nextState);
   }
 
   Future<PetState> feedWithCoin() async {
     final current = await _service.loadState();
+    final fedState = current.copyWith(
+      energyPercent: (current.energyPercent + 10).clamp(0, 100),
+    );
     return _service.saveState(
-      _applyExpGain(
-        current.copyWith(
-          energyPercent: (current.energyPercent + 10).clamp(0, 100),
-        ),
-        _coinFeedExpReward,
+      _applyLevelProgress(
+        previousState: current,
+        currentState: fedState,
+        gainedExp: _coinFeedExpReward,
       ),
     );
   }
@@ -81,29 +85,19 @@ class PetRepository {
     );
   }
 
-  PetState _applyExpGain(PetState state, int gainedExp) {
-    if (gainedExp <= 0) {
-      return state;
-    }
+  PetState _applyLevelProgress({
+    required PetState previousState,
+    required PetState currentState,
+    required int gainedExp,
+  }) {
+    final safeCurrentLevel = currentState.level < 1 ? 1 : currentState.level;
+    final nextExp = currentState.exp + (gainedExp > 0 ? gainedExp : 0);
+    final didReachFullEnergy = previousState.energyPercent < 100 &&
+        currentState.energyPercent >= 100;
 
-    var nextLevel = state.level < 1 ? 1 : state.level;
-    var nextExp = state.exp + gainedExp;
-    var expToNextLevel = _expRequiredForLevel(nextLevel);
-
-    while (nextExp >= expToNextLevel) {
-      nextExp -= expToNextLevel;
-      nextLevel += 1;
-      expToNextLevel = _expRequiredForLevel(nextLevel);
-    }
-
-    return state.copyWith(
-      level: nextLevel,
+    return currentState.copyWith(
+      level: didReachFullEnergy ? safeCurrentLevel + 1 : safeCurrentLevel,
       exp: nextExp,
     );
-  }
-
-  int _expRequiredForLevel(int level) {
-    final safeLevel = level < 1 ? 1 : level;
-    return 20 + ((safeLevel - 1) * 8);
   }
 }
