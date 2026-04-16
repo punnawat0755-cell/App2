@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/core/services/firebase_chat_identity_service.dart';
 import 'package:get/get.dart';
 import 'package:flutter_application_1/core/services/entry_flow_guard.dart';
+import 'package:flutter_application_1/core/supabase/supabase_client.dart';
 import 'package:flutter_application_1/features/feed/view/feed_view.dart';
 import 'package:flutter_application_1/features/home/service/daily_mood_status_service.dart';
 import 'package:flutter_application_1/features/home/service/user_mode_status_service.dart';
@@ -12,6 +15,7 @@ import 'package:flutter_application_1/features/home/view/daily_mood_page.dart';
 import 'package:flutter_application_1/features/home/view/encouragement_page.dart';
 import 'package:flutter_application_1/features/chat/view/chat_view.dart';
 import 'package:flutter_application_1/features/pet/view/pet_view.dart';
+import 'package:flutter_application_1/features/login/view/login_page.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
 import 'package:flutter_application_1/features/profile/view/profile_view.dart';
 import 'package:flutter_application_1/features/chat_user/bindings/chat_binding.dart';
@@ -44,8 +48,8 @@ class _BottomNavBarState extends State<BottomNavBar>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _warmUpPageDependencies();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _openRequiredDailyFlowIfNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _openRequiredDailyFlowIfNeeded();
     });
   }
 
@@ -68,12 +72,26 @@ class _BottomNavBarState extends State<BottomNavBar>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
         !EntryFlowGuard.shouldIgnoreResume) {
-      _openRequiredDailyFlowIfNeeded();
+      unawaited(_openRequiredDailyFlowIfNeeded());
     }
   }
 
+  Future<bool> _ensureAuthenticatedOrRedirect() async {
+    if (supabase.auth.currentUser != null) {
+      return true;
+    }
+
+    if (!mounted) {
+      return false;
+    }
+
+    await Get.offAll<void>(() => const LoginPage());
+    return false;
+  }
+
   Future<void> _openPausedChatIfNeeded() async {
-    if (_checkingPausedChat) {
+    final isAuthenticated = await _ensureAuthenticatedOrRedirect();
+    if (!isAuthenticated || _checkingPausedChat) {
       return;
     }
 
@@ -107,7 +125,11 @@ class _BottomNavBarState extends State<BottomNavBar>
   }
 
   Future<bool> _openDailyMoodIfNeeded() async {
-    if (!mounted || _checkingDailyMood || _dailyMoodPageOpen) {
+    final isAuthenticated = await _ensureAuthenticatedOrRedirect();
+    if (!isAuthenticated ||
+        !mounted ||
+        _checkingDailyMood ||
+        _dailyMoodPageOpen) {
       return false;
     }
 
@@ -150,7 +172,11 @@ class _BottomNavBarState extends State<BottomNavBar>
       return;
     }
 
-    if (!mounted || _checkingRoleMode || _roleSelectionPageOpen) {
+    final isAuthenticated = await _ensureAuthenticatedOrRedirect();
+    if (!isAuthenticated ||
+        !mounted ||
+        _checkingRoleMode ||
+        _roleSelectionPageOpen) {
       return;
     }
 
@@ -180,7 +206,8 @@ class _BottomNavBarState extends State<BottomNavBar>
   }
 
   Future<void> _openRequiredDailyFlowIfNeeded() async {
-    if (!mounted || _runningEntryFlow) {
+    final isAuthenticated = await _ensureAuthenticatedOrRedirect();
+    if (!isAuthenticated || !mounted || _runningEntryFlow) {
       return;
     }
 

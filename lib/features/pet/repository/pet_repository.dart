@@ -21,7 +21,7 @@ class PetRepository {
     final nextFoodCount = current.foodCount - 1;
     final fedState = current.copyWith(
       foodCount: nextFoodCount,
-      energyPercent: (current.energyPercent + 5).clamp(0, 100),
+      energyPercent: current.energyPercent + 5,
       nextFoodReadyAt:
           nextFoodCount == 0 ? DateTime.now().add(refillDuration) : null,
       clearNextFoodReadyAt: nextFoodCount > 0,
@@ -37,7 +37,7 @@ class PetRepository {
   Future<PetState> feedWithCoin() async {
     final current = await _service.loadState();
     final fedState = current.copyWith(
-      energyPercent: (current.energyPercent + 10).clamp(0, 100),
+      energyPercent: current.energyPercent + 10,
     );
     return _service.saveState(
       _applyLevelProgress(
@@ -71,6 +71,17 @@ class PetRepository {
     );
   }
 
+  Future<PetState> unequipItem() async {
+    final current = await _service.loadState();
+    if (current.equippedItemId == null) {
+      return current;
+    }
+
+    return _service.saveState(
+      current.copyWith(clearEquippedItemId: true),
+    );
+  }
+
   Future<PetState> markFoodRefillReady() async {
     final current = await _service.loadState();
     if (current.foodCount > 0) {
@@ -92,11 +103,20 @@ class PetRepository {
   }) {
     final safeCurrentLevel = currentState.level < 1 ? 1 : currentState.level;
     final nextExp = currentState.exp + (gainedExp > 0 ? gainedExp : 0);
-    final didReachFullEnergy = previousState.energyPercent < 100 &&
-        currentState.energyPercent >= 100;
+    final normalizedPreviousEnergy = previousState.energyPercent < 0
+        ? 0
+        : previousState.energyPercent;
+    final normalizedCurrentEnergy = currentState.energyPercent < 0
+        ? 0
+        : currentState.energyPercent;
+    final addedEnergy = normalizedCurrentEnergy - normalizedPreviousEnergy;
+    final totalEnergy = normalizedPreviousEnergy + (addedEnergy < 0 ? 0 : addedEnergy);
+    final levelGain = totalEnergy ~/ 100;
+    final remainingEnergy = totalEnergy % 100;
 
     return currentState.copyWith(
-      level: didReachFullEnergy ? safeCurrentLevel + 1 : safeCurrentLevel,
+      level: safeCurrentLevel + levelGain,
+      energyPercent: remainingEnergy,
       exp: nextExp,
     );
   }

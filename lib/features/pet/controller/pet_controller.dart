@@ -11,6 +11,7 @@ import 'package:get/get.dart';
 
 class Pet extends GetxController {
   static const Duration _freeFoodCooldown = Duration(hours: 6);
+  static const Duration _fedMoodDuration = Duration(seconds: 10);
 
   late final CoinService _coinService;
   late final PetRepository _petRepository;
@@ -34,6 +35,8 @@ class Pet extends GetxController {
   final remainingTime = '00:00:00'.obs;
   final isTimerRunning = false.obs;
   Timer? _timer;
+  Timer? _fedMoodTimer;
+  final _temporaryMoodAssetPath = RxnString();
 
   bool get isAnyActionRunning =>
       isLoading.value ||
@@ -65,12 +68,11 @@ class Pet extends GetxController {
   }
 
   String get petMoodAssetPath {
-    final energy = energyPercent.value;
-    if (energy >= 80) return 'assets/images/whale_happy.png';
-    if (energy >= 60) return 'assets/images/whale_love.png';
-    if (energy >= 35) return 'assets/images/whale_impassible.png';
-    if (energy >= 15) return 'assets/images/whale_sad.png';
-    return 'assets/images/whale_cry.png';
+    final temporaryPath = _temporaryMoodAssetPath.value;
+    if (temporaryPath != null) {
+      return temporaryPath;
+    }
+    return 'assets/images/whale_impassible.png';
   }
 
   @override
@@ -93,6 +95,7 @@ class Pet extends GetxController {
   @override
   void onClose() {
     _timer?.cancel();
+    _fedMoodTimer?.cancel();
     super.onClose();
   }
 
@@ -244,6 +247,35 @@ class Pet extends GetxController {
     }
   }
 
+  Future<bool> unequipItem() async {
+    if (isEquipping.value || isLoading.value || isRefreshing.value) {
+      return false;
+    }
+    if (equippedItemId.value == null) {
+      return true;
+    }
+
+    isEquipping.value = true;
+    try {
+      final nextState = await _petRepository.unequipItem();
+      _applyState(nextState);
+      return true;
+    } catch (error) {
+      Get.log('Pet.unequipItem error: $error');
+      Get.snackbar(
+        'ถอดไอเท็มไม่สำเร็จ',
+        '$error',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(10),
+      );
+      return false;
+    } finally {
+      isEquipping.value = false;
+    }
+  }
+
   Future<void> feedPet() async {
     if (isFeedingFree.value || isAnyActionRunning) {
       return;
@@ -268,6 +300,7 @@ class Pet extends GetxController {
       final leveledUp = nextState.level > level.value;
       _applyState(nextState);
       _resumeTimerIfNeeded(nextState);
+      _showFedMoodTemporarily();
 
       Get.snackbar(
         leveledUp ? 'เลเวลอัป!' : 'งั่มๆ!',
@@ -327,6 +360,7 @@ class Pet extends GetxController {
       final nextState = await _petRepository.feedWithCoin();
       final leveledUp = nextState.level > level.value;
       _applyState(nextState);
+      _showFedMoodTemporarily();
 
       Get.snackbar(
         leveledUp ? 'เลเวลอัป!' : 'อร่อยจัง!',
@@ -368,6 +402,14 @@ class Pet extends GetxController {
     } catch (error) {
       Get.log('Pet._refundCoinsSafely error: $error');
     }
+  }
+
+  void _showFedMoodTemporarily() {
+    _fedMoodTimer?.cancel();
+    _temporaryMoodAssetPath.value = 'assets/images/whale_love.png';
+    _fedMoodTimer = Timer(_fedMoodDuration, () {
+      _temporaryMoodAssetPath.value = null;
+    });
   }
 
   void _startTimer(int seconds) {

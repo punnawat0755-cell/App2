@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
+import 'package:flutter_application_1/core/services/auth_session_marker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'privacy_policy_page.dart';
@@ -253,6 +254,7 @@ class _LoginPageState extends State<LoginPage> {
         await supabase.rpc('touch_last_login');
       } catch (_) {}
 
+      await AuthSessionMarker.markExplicitLoginCompleted();
       await _syncInitialPeriodFromMetadataIfNeeded();
 
       await _handlePostLogin();

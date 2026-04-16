@@ -57,7 +57,7 @@ void main() {
 
       expect(result.level, 2);
       expect(result.exp, 25);
-      expect(result.energyPercent, 100);
+      expect(result.energyPercent, 1);
       expect(result.foodCount, 0);
       expect(result.nextFoodReadyAt, isNotNull);
       expect(
@@ -88,7 +88,7 @@ void main() {
 
       expect(result.level, 3);
       expect(result.exp, 38);
-      expect(result.energyPercent, 100);
+      expect(result.energyPercent, 1);
     });
 
     test('feedWithCoin does not level up if energy is below 100', () async {
@@ -140,6 +140,20 @@ void main() {
         () => repository.equipItem(9),
         throwsA(isA<StateError>()),
       );
+    });
+
+    test('unequipItem clears equipped item when one is equipped', () async {
+      final service = _FakePetService(
+        PetState.initial().copyWith(
+          ownedItems: [2, 5],
+          equippedItemId: 5,
+        ),
+      );
+      final repository = PetRepository(service: service);
+
+      final result = await repository.unequipItem();
+
+      expect(result.equippedItemId, isNull);
     });
 
     test('markFoodRefillReady restores one free food and clears timer',

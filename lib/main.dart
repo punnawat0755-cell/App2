@@ -8,6 +8,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/config/app_env.dart';
+import 'core/services/auth_session_marker.dart';
 import 'core/services/coin_service.dart';
 import 'firebase_options.dart';
 import 'core/services/notification_service.dart';
@@ -110,6 +111,9 @@ class _AppBootstrapGateState extends State<AppBootstrapGate> {
       anonKey: supabaseAnonKey,
     );
 
+    await _validatePersistedSession();
+    await _ensureProfileForAuthenticatedUser();
+
     if (!Get.isRegistered<CoinService>()) {
       Get.put(CoinService(), permanent: true);
     }
@@ -123,6 +127,51 @@ class _AppBootstrapGateState extends State<AppBootstrapGate> {
     } catch (e, st) {
       debugPrint("Notification Init Error: $e");
       debugPrint("Notification Init Stack: $st");
+    }
+  }
+
+  Future<void> _validatePersistedSession() async {
+    final session = supabase.auth.currentSession;
+    if (session == null) {
+      return;
+    }
+
+    final canReuseSession = await AuthSessionMarker.canReusePersistedSession();
+    if (!canReuseSession) {
+      debugPrint(
+        'Persisted session found without explicit login marker. Signing out.',
+      );
+      await supabase.auth.signOut();
+      return;
+    }
+
+    try {
+      await supabase.auth.getUser();
+    } catch (error) {
+      debugPrint('Invalid persisted session. Signing out: $error');
+      await supabase.auth.signOut();
+      await AuthSessionMarker.clearExplicitLoginMarker();
+    }
+  }
+
+  Future<void> _ensureProfileForAuthenticatedUser() async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      return;
+    }
+
+    try {
+      await supabase.rpc('ensure_my_profile');
+      return;
+    } catch (_) {}
+
+    try {
+      await supabase.from('profiles').upsert({
+        'id': currentUser.id,
+        'coins': 0,
+      });
+    } catch (error) {
+      debugPrint('Unable to ensure profile row: $error');
     }
   }
 
@@ -205,9 +254,11 @@ class _AuthStateHandlerState extends State<AuthStateHandler> {
       stream: _authStream,
       builder: (context, snapshot) {
         final session = snapshot.data?.session ?? supabase.auth.currentSession;
+        final currentUser = supabase.auth.currentUser;
+        final isAuthenticated = session != null && currentUser != null;
 
-        if (session != null) {
-          final userId = session.user.id;
+        if (isAuthenticated) {
+          final userId = currentUser.id;
           if (_pdpaAcceptedFuture == null || _pdpaCheckedUserId != userId) {
             _pdpaCheckedUserId = userId;
             _pdpaAcceptedFuture = _loadPdpaAccepted(userId);
