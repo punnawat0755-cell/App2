@@ -280,6 +280,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            /*
             Container(
               padding: EdgeInsets.symmetric(
                 horizontal: scale.rs(18, min: 14, max: 18),
@@ -306,6 +307,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
               ),
             ),
             SizedBox(height: scale.rs(16, min: 12, max: 16)),
+            */
             SizedBox(
               width: scale.rs(260, min: 210, max: 260),
               height: scale.rs(230, min: 180, max: 230),
