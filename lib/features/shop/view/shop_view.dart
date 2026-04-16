@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
-import 'package:flutter_application_1/features/pet/view/pet_view.dart';
+import 'package:flutter_application_1/features/pet/controller/pet_controller.dart';
 import 'package:flutter_application_1/features/shop/data/mock/shop_items_mock.dart';
 import 'package:flutter_application_1/features/shop/model/shop_item.dart';
 import 'package:get/get.dart';
@@ -10,20 +10,12 @@ class ShopPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // -------------------------------------------------------------
-    // เรียก Controller
-    // -------------------------------------------------------------
-    Pet controller;
-    try {
-      controller = Get.find<Pet>();
-    } catch (e) {
-      controller = Get.put(Pet());
-    }
-
+    final controller =
+        Get.isRegistered<Pet>() ? Get.find<Pet>() : Get.put(Pet());
     final List<ShopItem> shopItems = shopItemsMock;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFE6F7FF),
       body: SafeArea(
         top: false,
         bottom: false,
@@ -38,6 +30,7 @@ class ShopPage extends StatelessWidget {
             final crossAxisSpacing = isCompact
                 ? scale.rs(10, min: 8, max: 10)
                 : scale.rs(15, min: 10, max: 15);
+            final childAspectRatio = isCompact ? 0.68 : 0.84;
 
             return Center(
               child: ConstrainedBox(
@@ -45,9 +38,6 @@ class ShopPage extends StatelessWidget {
                 child: SingleChildScrollView(
                   child: Column(
                     children: [
-                      // -------------------------------------------------------
-                      // 1. Banner
-                      // -------------------------------------------------------
                       Image.asset(
                         'assets/images/shop1.png',
                         width: double.infinity,
@@ -58,16 +48,13 @@ class ShopPage extends StatelessWidget {
                           color: const Color(0xFF8D6E63),
                           child: const Center(
                             child: Text(
-                              "BANNER IMAGE",
+                              'BANNER IMAGE',
                               style: TextStyle(color: Colors.white),
                             ),
                           ),
                         ),
                       ),
                       SizedBox(height: scale.rs(20, min: 14, max: 20)),
-                      // -------------------------------------------------------
-                      // 2. Header
-                      // -------------------------------------------------------
                       Container(
                         margin: EdgeInsets.symmetric(
                           horizontal: horizontalPadding,
@@ -101,7 +88,7 @@ class ShopPage extends StatelessWidget {
                                   ],
                                 ),
                                 child: const Text(
-                                  "Fish Shop",
+                                  'Fish Shop',
                                   style: TextStyle(
                                     color: Color(0xFF4489D7),
                                     fontWeight: FontWeight.bold,
@@ -114,7 +101,12 @@ class ShopPage extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 InkWell(
-                                  onTap: () => Get.back(),
+                                  onTap: () async {
+                                    await controller.refreshState(silent: true);
+                                    if (context.mounted) {
+                                      Get.back();
+                                    }
+                                  },
                                   child: Image.asset(
                                     'assets/images/back.png',
                                     width: scale.rs(25, min: 20, max: 25),
@@ -124,7 +116,9 @@ class ShopPage extends StatelessWidget {
                                 ),
                                 Transform.translate(
                                   offset: Offset(
-                                      0, -scale.rs(15, min: 10, max: 15)),
+                                    0,
+                                    -scale.rs(15, min: 10, max: 15),
+                                  ),
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 10,
@@ -140,14 +134,17 @@ class ShopPage extends StatelessWidget {
                                         Image.asset(
                                           'assets/images/coin2.png',
                                           width: scale.rs(20, min: 16, max: 20),
-                                          height:
-                                              scale.rs(20, min: 16, max: 20),
+                                          height: scale.rs(
+                                            20,
+                                            min: 16,
+                                            max: 20,
+                                          ),
                                           fit: BoxFit.contain,
                                         ),
                                         const SizedBox(width: 5),
                                         Obx(
                                           () => Text(
-                                            "${controller.coins}",
+                                            '${controller.coins}',
                                             style: const TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.bold,
@@ -164,9 +161,6 @@ class ShopPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // -------------------------------------------------------
-                      // 3. Grid สินค้า
-                      // -------------------------------------------------------
                       Padding(
                         padding: EdgeInsets.fromLTRB(
                           horizontalPadding,
@@ -181,7 +175,7 @@ class ShopPage extends StatelessWidget {
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: crossAxisCount,
-                            childAspectRatio: 0.90,
+                            childAspectRatio: childAspectRatio,
                             crossAxisSpacing: crossAxisSpacing,
                             mainAxisSpacing: scale.rs(10, min: 8, max: 10),
                           ),
@@ -197,9 +191,6 @@ class ShopPage extends StatelessWidget {
                         ),
                       ),
                       SizedBox(height: scale.rs(2, min: 1, max: 2)),
-                      // -------------------------------------------------------
-                      // 4. Footer Image
-                      // -------------------------------------------------------
                       Image.asset(
                         'assets/images/shop2.png',
                         width: double.infinity,
@@ -220,7 +211,6 @@ class ShopPage extends StatelessWidget {
     );
   }
 
-  // Widget ย่อย: การ์ดสินค้าแต่ละชิ้น (เพิ่ม Logic การซื้อ)
   Widget _buildShopItemCard(
     int index,
     ShopItem item,
@@ -233,133 +223,185 @@ class ShopPage extends StatelessWidget {
         borderRadius: BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
         children: [
-          // รูปสินค้า
-          Container(
-            height: scale.rs(75, min: 60, max: 75),
-            width: double.infinity,
-            alignment: Alignment.center,
-            padding: EdgeInsets.all(scale.rs(10, min: 8, max: 10)),
-            child: Image.asset(
-              item.imagePath,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) =>
-                  const Icon(Icons.image_not_supported, color: Colors.grey),
+          SizedBox(height: scale.rs(8, min: 6, max: 8)),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              alignment: Alignment.center,
+              padding: EdgeInsets.all(scale.rs(10, min: 8, max: 10)),
+              child: Image.asset(
+                item.imagePath,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) =>
+                    const Icon(Icons.image_not_supported, color: Colors.grey),
+              ),
             ),
           ),
-
-          // ปุ่มกด (Logic เช็คสถานะ Owned/Buy)
+          Padding(
+            padding: EdgeInsets.symmetric(
+              horizontal: scale.rs(8, min: 6, max: 8),
+            ),
+            child: Text(
+              item.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: const Color(0xFF2C5E92),
+                fontWeight: FontWeight.w700,
+                fontSize: scale.rf(12, min: 10.5, max: 12),
+              ),
+            ),
+          ),
+          SizedBox(height: scale.rs(6, min: 4, max: 6)),
           Obx(() {
-            // เช็คว่าเคยซื้อไปยัง (ต้องเพิ่ม ownedItems ใน controller ก่อนนะ)
-            bool isOwned = false;
-            try {
-              isOwned = controller.ownedItems.contains(index);
-            } catch (e) {
-              // กัน error กรณีลืมเพิ่มตัวแปร
-            }
+            final isOwned = controller.isOwnedItem(index);
+            final isEquipped = controller.isEquippedItem(index);
+            final isBusy = controller.isPurchasingItem(index) ||
+                (controller.isEquipping.value && isEquipped);
+            final canTap = !isBusy &&
+                !controller.isLoading.value &&
+                !controller.isRefreshing.value &&
+                !controller.isFeedingCoin.value &&
+                !controller.isFeedingFree.value;
 
             if (isOwned) {
-              // --- [กรณี 1: ซื้อแล้ว] แสดงปุ่ม "ใช้เลย" ---
-              return GestureDetector(
-                onTap: () async {
-                  Get.snackbar(
-                    "สวมใส่สำเร็จ",
-                    "เปลี่ยนไอเท็มเรียบร้อย!",
-                    backgroundColor: Colors.blueAccent,
-                    colorText: Colors.white,
-                    duration: const Duration(seconds: 1),
-                  );
-                  // ใส่ Logic การเปลี่ยนชุดตรงนี้ได้เลย
-                },
-                child: Container(
-                  margin: EdgeInsets.only(bottom: scale.rs(5, min: 3, max: 5)),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: scale.rs(12, min: 8, max: 12),
-                    vertical: scale.rs(4, min: 2, max: 4),
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFD54F), // สีเหลืองอ่อน (ใช้เลย)
-                    borderRadius:
-                        BorderRadius.circular(scale.rs(25, min: 18, max: 25)),
-                  ),
-                  child: Text(
-                    "ใช้เลย",
-                    style: TextStyle(
-                      color: const Color(0xFF5D4037),
-                      fontWeight: FontWeight.bold,
-                      fontSize: scale.rf(12, min: 10.5, max: 12),
+              return IgnorePointer(
+                ignoring: !canTap,
+                child: Opacity(
+                  opacity: canTap ? 1 : 0.7,
+                  child: GestureDetector(
+                    onTap: () async {
+                      final equipped = await controller.equipItem(index);
+                      if (equipped) {
+                        Get.snackbar(
+                          'สวมใส่สำเร็จ',
+                          'ตอนนี้กำลังใช้ ${item.name}',
+                          backgroundColor: Colors.blueAccent,
+                          colorText: Colors.white,
+                          duration: const Duration(seconds: 1),
+                        );
+                      }
+                    },
+                    child: Container(
+                      constraints: BoxConstraints(
+                        minHeight: scale.rs(28, min: 26, max: 30),
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: scale.rs(12, min: 8, max: 12),
+                        vertical: scale.rs(4, min: 2, max: 4),
+                      ),
+                      decoration: BoxDecoration(
+                        color: isEquipped
+                            ? const Color(0xFF4489D7)
+                            : const Color(0xFFFFD54F),
+                        borderRadius: BorderRadius.circular(
+                          scale.rs(25, min: 18, max: 25),
+                        ),
+                      ),
+                      child: isBusy
+                          ? SizedBox(
+                              width: scale.rs(18, min: 16, max: 18),
+                              height: scale.rs(18, min: 16, max: 18),
+                              child: const CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Text(
+                              isEquipped ? 'กำลังใช้' : 'ใช้เลย',
+                              style: TextStyle(
+                                color: isEquipped
+                                    ? Colors.white
+                                    : const Color(0xFF5D4037),
+                                fontWeight: FontWeight.bold,
+                                fontSize: scale.rf(12, min: 10.5, max: 12),
+                              ),
+                            ),
                     ),
                   ),
                 ),
               );
-            } else {
-              // --- [กรณี 2: ยังไม่ซื้อ] แสดงราคาและกดซื้อได้ ---
-              return GestureDetector(
-                onTap: () async {
-                  final price = item.price;
-                  final didSpend = await controller.spendCoins(price);
-                  if (didSpend) {
-                    // เงินพอ: หักเงิน + เพิ่มเข้าของที่มี
-                    try {
-                      controller.ownedItems.add(index);
-                    } catch (e) {
-                      debugPrint(
-                        "Error: Please add 'ownedItems' to Pet Controller",
+            }
+
+            return IgnorePointer(
+              ignoring: !canTap,
+              child: Opacity(
+                opacity: canTap ? 1 : 0.7,
+                child: GestureDetector(
+                  onTap: () async {
+                    final didSpend = await controller.purchaseItem(
+                      index,
+                      item.price,
+                    );
+                    if (didSpend) {
+                      Get.snackbar(
+                        'สำเร็จ',
+                        'ซื้อ ${item.name} เรียบร้อย!',
+                        backgroundColor: Colors.green,
+                        colorText: Colors.white,
+                        duration: const Duration(seconds: 1),
+                      );
+                    } else if (!controller.isPurchasingItem(index)) {
+                      Get.snackbar(
+                        'เหรียญไม่พอ',
+                        'ไปเก็บเหรียญเพิ่มก่อนนะ',
+                        backgroundColor: Colors.redAccent,
+                        colorText: Colors.white,
                       );
                     }
-                    Get.snackbar(
-                      "สำเร็จ",
-                      "ซื้อของเรียบร้อย!",
-                      backgroundColor: Colors.green,
-                      colorText: Colors.white,
-                      duration: const Duration(seconds: 1),
-                    );
-                  } else {
-                    // เงินไม่พอ
-                    Get.snackbar(
-                      "เหรียญไม่พอ",
-                      "ไปเก็บเหรียญเพิ่มก่อนนะ",
-                      backgroundColor: Colors.redAccent,
-                      colorText: Colors.white,
-                    );
-                  }
-                },
-                child: Container(
-                  margin: EdgeInsets.only(bottom: scale.rs(5, min: 3, max: 5)),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: scale.rs(8, min: 6, max: 8),
-                    vertical: scale.rs(2, min: 1, max: 2),
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFA600), // สีส้ม (ราคา)
-                    borderRadius:
-                        BorderRadius.circular(scale.rs(25, min: 18, max: 25)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        'assets/images/coin2.png',
-                        width: scale.rs(22, min: 18, max: 22),
-                        height: scale.rs(22, min: 18, max: 22),
-                        fit: BoxFit.contain,
+                  },
+                  child: Container(
+                    constraints: BoxConstraints(
+                      minHeight: scale.rs(28, min: 26, max: 30),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: scale.rs(8, min: 6, max: 8),
+                      vertical: scale.rs(2, min: 1, max: 2),
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFA600),
+                      borderRadius: BorderRadius.circular(
+                        scale.rs(25, min: 18, max: 25),
                       ),
-                      SizedBox(width: scale.rs(5, min: 3, max: 5)),
-                      Text(
-                        '${item.price}',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: scale.rf(14, min: 12, max: 14),
-                        ),
-                      ),
-                    ],
+                    ),
+                    child: isBusy
+                        ? SizedBox(
+                            width: scale.rs(22, min: 18, max: 22),
+                            height: scale.rs(22, min: 18, max: 22),
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2.2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                'assets/images/coin2.png',
+                                width: scale.rs(22, min: 18, max: 22),
+                                height: scale.rs(22, min: 18, max: 22),
+                                fit: BoxFit.contain,
+                              ),
+                              SizedBox(width: scale.rs(5, min: 3, max: 5)),
+                              Text(
+                                '${item.price}',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: scale.rf(14, min: 12, max: 14),
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
                 ),
-              );
-            }
+              ),
+            );
           }),
+          SizedBox(height: scale.rs(8, min: 6, max: 8)),
         ],
       ),
     );

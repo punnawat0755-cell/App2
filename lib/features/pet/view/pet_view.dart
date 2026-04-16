@@ -2,190 +2,46 @@ import 'dart:async';
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
+import 'package:flutter_application_1/features/pet/controller/pet_controller.dart';
+import 'package:flutter_application_1/features/shop/view/shop_view.dart';
 import 'package:get/get.dart';
 
-import 'package:flutter_application_1/core/services/coin_service.dart';
-import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
-import 'package:flutter_application_1/features/shop/view/shop_view.dart';
-
-// ==========================================
-// 1. Class Pet (Logic Controller) - แก้ไขแล้ว
-// ==========================================
-class Pet extends GetxController {
-  late final CoinService _coinService;
-  var ownedItems = <int>[].obs;
-
-  // --- ตัวแปรทั่วไป ---
-  RxInt get coins => _coinService.coins;
-  var level = 1.obs;
-  var energyPercent = 50.obs; // ค่าพลังงานเริ่มต้น
-  var username = "Seal".obs;
-
-  // --- ตัวแปรระบบอาหาร (ปลาซ้าย) ---
-  var foodCount = 3.obs;
-  var remainingTime = "00:00:00".obs;
-  var isTimerRunning = false.obs;
-  Timer? _timer;
-
-  @override
-  void onInit() {
-    super.onInit();
-    _coinService = Get.isRegistered<CoinService>()
-        ? Get.find<CoinService>()
-        : Get.put(CoinService(), permanent: true);
-  }
-
-  @override
-  void onClose() {
-    _timer?.cancel();
-    super.onClose();
-  }
-
-  // -----------------------------------------------------------------------
-  // ฟังก์ชัน 1: ปลาซ้าย (ใช้จำนวนตัว / ฟรี / รอเวลา)
-  // -----------------------------------------------------------------------
-  void feedPet() {
-    // 1. เช็คว่ามีของไหม
-    if (foodCount.value <= 0) {
-      Get.snackbar(
-        "อาหารหมด!",
-        "ต้องรอเวลาให้ปลาว่ายมาเติมก่อนนะ (เหลือเวลา ${remainingTime.value})",
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-        margin: const EdgeInsets.all(10),
-      );
-      return;
-    }
-
-    // 2. หักจำนวนปลา
-    foodCount.value--;
-
-    // ---------------------------------------------------
-    // [เพิ่มใหม่] เพิ่มพลังงาน 5%
-    // ---------------------------------------------------
-    energyPercent.value += 5;
-    if (energyPercent.value > 100) {
-      energyPercent.value = 100; // ตันที่ 100
-    }
-    // ---------------------------------------------------
-
-    Get.snackbar(
-      "งั่มๆ!",
-      "น้องกินปลาเล็กแล้ว (+5 Energy)",
-      backgroundColor: Colors.green,
-      colorText: Colors.white,
-      snackPosition: SnackPosition.TOP,
-      duration: const Duration(seconds: 1),
-      margin: const EdgeInsets.all(10),
-    );
-
-    // 3. เริ่มจับเวลาถ้าของหมด
-    if (foodCount.value == 0) {
-      _startTimer(6 * 60 * 60);
-    }
-  }
-
-  // -----------------------------------------------------------------------
-  // ฟังก์ชัน 2: ปลาตัวกลาง (ใช้เหรียญ)
-  // -----------------------------------------------------------------------
-  Future<void> feedWithCoin(int cost) async {
-    final didSpend = await _coinService.spendCoins(cost);
-    if (didSpend) {
-      // หักเหรียญ
-
-      energyPercent.value += 10;
-
-      if (energyPercent.value > 100) {
-        energyPercent.value = 100; // ตันที่ 100 เหมือนเดิม
-      }
-
-      Get.snackbar(
-        "อร่อยจัง!",
-        "เปย์น้องด้วยปลาใหญ่! (+10 Energy)", // อย่าลืมแก้ข้อความตรงนี้ด้วยนะครับ
-        backgroundColor: Colors.amber,
-        colorText: Colors.black,
-        snackPosition: SnackPosition.TOP,
-        duration: const Duration(milliseconds: 800),
-        margin: const EdgeInsets.all(10),
-      );
-    } else {
-      Get.snackbar(
-        "เหรียญไม่พอ",
-        "ต้องใช้ $cost coins เพื่อให้อาหารนี้นะ",
-        backgroundColor: Colors.redAccent,
-        colorText: Colors.white,
-        snackPosition: SnackPosition.TOP,
-        margin: const EdgeInsets.all(10),
-      );
-    }
-  }
-
-  Future<bool> spendCoins(int cost) => _coinService.spendCoins(cost);
-
-  // --- Logic การนับเวลา ---
-  void _startTimer(int seconds) {
-    _timer?.cancel();
-    isTimerRunning.value = true;
-
-    var duration = Duration(seconds: seconds);
-    remainingTime.value = _printDuration(duration);
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (duration.inSeconds > 0) {
-        duration = duration - const Duration(seconds: 1);
-        remainingTime.value = _printDuration(duration);
-      } else {
-        timer.cancel();
-        isTimerRunning.value = false;
-
-        foodCount.value++;
-        remainingTime.value = "00:00:00";
-
-        Get.snackbar(
-          "ปลามาแล้ว!",
-          "ได้รับปลาฟรี 1 ตัวจากการรอ",
-          backgroundColor: Colors.blueAccent,
-          colorText: Colors.white,
-        );
-      }
-    });
-  }
-
-  String _printDuration(Duration duration) {
-    String twoDigits(int n) => n.toString().padLeft(2, "0");
-    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
-    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
-    return "${twoDigits(duration.inHours)}:$twoDigitMinutes:$twoDigitSeconds";
-  }
-}
-
-// ==========================================
-// 2. ส่วนหน้าจอ (UI View)
-// ==========================================
 class PetPage extends StatefulWidget {
-  const PetPage({
-    super.key,
-    required this.isActive,
-  });
-
-  final bool isActive;
+  const PetPage({super.key});
 
   @override
   State<PetPage> createState() => _PetPageState();
 }
 
-class _PetPageState extends State<PetPage> {
+class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
   late final Pet controller;
   late final AudioPlayer _audioPlayer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     controller = Get.isRegistered<Pet>() ? Get.find<Pet>() : Get.put(Pet());
     _audioPlayer = AudioPlayer();
-    if (widget.isActive) {
-      unawaited(_startLoopSound());
+    unawaited(_startLoopSound());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.refreshState(silent: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_audioPlayer.stop());
+    _audioPlayer.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      controller.refreshState(silent: true);
     }
   }
 
@@ -193,43 +49,9 @@ class _PetPageState extends State<PetPage> {
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.play(AssetSource('Sound/howareyou.mp3'));
-      if (!mounted || !widget.isActive) {
-        await _audioPlayer.stop();
-      }
     } catch (e) {
       debugPrint('Failed to play looping pet sound: $e');
     }
-  }
-
-  Future<void> _stopLoopSound() async {
-    try {
-      await _audioPlayer.stop();
-    } catch (e) {
-      debugPrint('Failed to stop looping pet sound: $e');
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant PetPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    if (widget.isActive == oldWidget.isActive) {
-      return;
-    }
-
-    if (widget.isActive) {
-      unawaited(_startLoopSound());
-      return;
-    }
-
-    unawaited(_stopLoopSound());
-  }
-
-  @override
-  void dispose() {
-    unawaited(_stopLoopSound());
-    _audioPlayer.dispose();
-    super.dispose();
   }
 
   @override
@@ -237,7 +59,6 @@ class _PetPageState extends State<PetPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // Background
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -246,7 +67,6 @@ class _PetPageState extends State<PetPage> {
               ),
             ),
           ),
-          // Content
           SafeArea(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -255,22 +75,31 @@ class _PetPageState extends State<PetPage> {
                 return Column(
                   children: [
                     _buildTopBar(controller, screenWidth, scale),
-                    const Spacer(),
-                    const Spacer(),
+                    Expanded(child: _buildPetHero(controller, scale)),
                     _buildBottomDock(controller, screenWidth, scale),
                   ],
                 );
               },
             ),
           ),
+          Obx(() {
+            if (!controller.isLoading.value) {
+              return const SizedBox.shrink();
+            }
+
+            return Container(
+              color: Colors.white.withValues(alpha: 0.18),
+              alignment: Alignment.center,
+              child: const CircularProgressIndicator(
+                color: Color(0xFF4489D7),
+              ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  // -----------------------------------------------------------
-  // Widget: Top Bar
-  // -----------------------------------------------------------
   Widget _buildTopBar(
     Pet controller,
     double screenWidth,
@@ -290,8 +119,6 @@ class _PetPageState extends State<PetPage> {
       child: Column(
         children: [
           SizedBox(height: scale.rs(20, min: 14, max: 20)),
-
-          // Row 2: Stats
           Wrap(
             alignment: WrapAlignment.center,
             spacing: isCompact
@@ -300,7 +127,6 @@ class _PetPageState extends State<PetPage> {
             runSpacing: scale.rs(8, min: 6, max: 8),
             crossAxisAlignment: WrapCrossAlignment.end,
             children: [
-              // Coin
               Container(
                 height: boxHeight,
                 padding: EdgeInsets.fromLTRB(
@@ -332,7 +158,7 @@ class _PetPageState extends State<PetPage> {
                     SizedBox(width: scale.rs(9, min: 6, max: 9)),
                     Obx(
                       () => Text(
-                        "${controller.coins}",
+                        '${controller.coins}',
                         style: TextStyle(
                           fontWeight: FontWeight.w900,
                           fontSize: scale.rf(18, min: 15, max: 18),
@@ -343,16 +169,69 @@ class _PetPageState extends State<PetPage> {
                   ],
                 ),
               ),
-              // Level & Energy
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    "เลเวล 1",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: scale.rf(18, min: 15, max: 18),
+                  Obx(
+                    () => Text(
+                      'เลเวล ${controller.level.value}',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: scale.rf(18, min: 15, max: 18),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: scale.rs(5, min: 3, max: 5)),
+                  Obx(
+                    () => Container(
+                      width: energyBarWidth,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: scale.rs(12, min: 10, max: 12),
+                        vertical: scale.rs(6, min: 5, max: 6),
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'EXP',
+                                style: TextStyle(
+                                  color: const Color(0xFF2C5E92),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: scale.rf(12, min: 10.5, max: 12),
+                                ),
+                              ),
+                              const Spacer(),
+                              Text(
+                                '${controller.exp.value}/${controller.expRequiredForNextLevel}',
+                                style: TextStyle(
+                                  color: const Color(0xFF5D4037),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: scale.rf(11, min: 10, max: 11),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: scale.rs(5, min: 4, max: 5)),
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(999),
+                            child: LinearProgressIndicator(
+                              minHeight: scale.rs(8, min: 6, max: 8),
+                              value: controller.expProgress,
+                              backgroundColor: const Color(0xFFD8ECFA),
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                Color(0xFF4489D7),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   SizedBox(height: scale.rs(5, min: 3, max: 5)),
@@ -391,12 +270,17 @@ class _PetPageState extends State<PetPage> {
                             final maxW = energyBarWidth;
                             const left = 15.0;
                             const right = 9.0;
-                            double currentW = (maxW - left - right) *
+                            final currentW = (maxW - left - right) *
                                 (controller.energyPercent.value / 100);
                             return Container(
                               width: currentW,
                               height: double.infinity,
-                              margin: EdgeInsets.fromLTRB(left, 8.0, 0.0, 8.0),
+                              margin: const EdgeInsets.fromLTRB(
+                                left,
+                                8.0,
+                                0.0,
+                                8.0,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFFFD146),
                                 borderRadius: BorderRadius.circular(30),
@@ -420,7 +304,7 @@ class _PetPageState extends State<PetPage> {
                           alignment: Alignment.center,
                           child: Obx(
                             () => Text(
-                              " ${controller.energyPercent.value} %",
+                              ' ${controller.energyPercent.value} %',
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: const Color(0xFF634917),
@@ -441,9 +325,138 @@ class _PetPageState extends State<PetPage> {
     );
   }
 
-  // -----------------------------------------------------------
-  // Widget: Bottom Dock
-  // -----------------------------------------------------------
+  Widget _buildPetHero(Pet controller, ResponsiveScale scale) {
+    return Center(
+      child: Obx(() {
+        final equippedItem = controller.equippedItem;
+        return Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: scale.rs(18, min: 14, max: 18),
+                vertical: scale.rs(8, min: 6, max: 8),
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(999),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Text(
+                controller.username.value,
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: scale.rf(18, min: 15, max: 18),
+                  color: const Color(0xFF2C5E92),
+                ),
+              ),
+            ),
+            SizedBox(height: scale.rs(16, min: 12, max: 16)),
+            SizedBox(
+              width: scale.rs(260, min: 210, max: 260),
+              height: scale.rs(230, min: 180, max: 230),
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.28),
+                            Colors.white.withValues(alpha: 0.08),
+                          ],
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Image.asset(
+                    controller.petMoodAssetPath,
+                    width: scale.rs(210, min: 170, max: 210),
+                    height: scale.rs(210, min: 170, max: 210),
+                    fit: BoxFit.contain,
+                  ),
+                  if (equippedItem != null)
+                    Positioned(
+                      top: scale.rs(22, min: 18, max: 22),
+                      child: Image.asset(
+                        equippedItem.imagePath,
+                        width: scale.rs(78, min: 62, max: 78),
+                        height: scale.rs(78, min: 62, max: 78),
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            SizedBox(height: scale.rs(8, min: 6, max: 8)),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: scale.rs(14, min: 10, max: 14),
+                vertical: scale.rs(8, min: 6, max: 8),
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.92),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'EXP ${controller.exp.value}/${controller.expRequiredForNextLevel}',
+                style: TextStyle(
+                  color: const Color(0xFF2C5E92),
+                  fontWeight: FontWeight.w800,
+                  fontSize: scale.rf(13, min: 11, max: 13),
+                ),
+              ),
+            ),
+            SizedBox(height: scale.rs(8, min: 6, max: 8)),
+            if (equippedItem != null)
+              Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: scale.rs(14, min: 10, max: 14),
+                  vertical: scale.rs(8, min: 6, max: 8),
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF3C4),
+                  borderRadius: BorderRadius.circular(999),
+                  border: Border.all(
+                    color: const Color(0xFFFFD146),
+                    width: 1.4,
+                  ),
+                ),
+                child: Text(
+                  'กำลังใส่ ${equippedItem.name}',
+                  style: TextStyle(
+                    color: const Color(0xFF8A6100),
+                    fontWeight: FontWeight.w800,
+                    fontSize: scale.rf(13, min: 11, max: 13),
+                  ),
+                ),
+              )
+            else
+              Text(
+                'ยังไม่ได้ใส่ไอเท็ม',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.95),
+                  fontWeight: FontWeight.w700,
+                  fontSize: scale.rf(14, min: 12, max: 14),
+                ),
+              ),
+          ],
+        );
+      }),
+    );
+  }
+
   Widget _buildBottomDock(
     Pet controller,
     double screenWidth,
@@ -464,16 +477,14 @@ class _PetPageState extends State<PetPage> {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // 1. ปุ่มซ้าย (Fish 1 - ใช้จำนวนตัว)
           Obx(() {
-            bool isOutOfFood = controller.foodCount.value == 0;
-
+            final isOutOfFood = controller.foodCount.value == 0;
             return _buildItemCard(
               imagePath: 'assets/images/fish1.png',
               customImageSize: scale.rs(90, min: 72, max: 90),
               customImageBottom: scale.rs(10, min: 6, max: 10),
               labelWidget: Text(
-                isOutOfFood ? controller.remainingTime.value : "00:00:00",
+                isOutOfFood ? controller.remainingTime.value : '00:00:00',
                 style: TextStyle(
                   color: isOutOfFood ? Colors.grey : const Color(0xFF1565C0),
                   fontWeight: FontWeight.w900,
@@ -485,188 +496,220 @@ class _PetPageState extends State<PetPage> {
               badgeCount: controller.foodCount.value,
               cardWidth: cardWidth,
               scale: scale,
-              onTap: () => controller.feedPet(),
+              isDisabled: controller.isAnyActionRunning,
+              isBusy: controller.isFeedingFree.value,
+              onTap: controller.feedPet,
             );
           }),
-
-          // 2. ปุ่มกลาง (Fish 2 - ใช้เหรียญ)
-          _buildItemCard(
-            imagePath: 'assets/images/fish2.png',
-            customImageSize: scale.rs(100, min: 80, max: 100),
-            isBig: true,
-            customImageBottom: -scale.rs(9, min: 6, max: 9),
-            topBadgeWidget: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: scale.rs(9, min: 7, max: 9),
-                vertical: scale.rs(6, min: 4, max: 6),
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    radius: scale.rs(8, min: 6, max: 8),
-                    backgroundColor: const Color(0xFFFFC107),
-                    child: Image.asset(
-                      'assets/images/coin2.png',
-                      width: scale.rs(16, min: 12, max: 16),
-                      height: scale.rs(16, min: 12, max: 16),
-                    ),
+          Obx(
+            () => _buildItemCard(
+              imagePath: 'assets/images/fish2.png',
+              customImageSize: scale.rs(100, min: 80, max: 100),
+              customImageBottom: -scale.rs(9, min: 6, max: 9),
+              topBadgeWidget: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: scale.rs(9, min: 7, max: 9),
+                  vertical: scale.rs(6, min: 4, max: 6),
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(
+                    scale.rs(20, min: 16, max: 20),
                   ),
-                  SizedBox(width: scale.rs(5, min: 3, max: 5)),
-                  Text(
-                    "2 coin",
-                    style: TextStyle(
-                      color: const Color(0xFFFFC107),
-                      fontWeight: FontWeight.bold,
-                      fontSize: scale.rf(14, min: 12, max: 14),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: scale.rs(8, min: 6, max: 8),
+                      backgroundColor: const Color(0xFFFFC107),
+                      child: Image.asset(
+                        'assets/images/coin2.png',
+                        width: scale.rs(16, min: 12, max: 16),
+                        height: scale.rs(16, min: 12, max: 16),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            // [แก้ไข] เรียกใช้ feedWithCoin(2) แทน buyFood
-            cardWidth: cardWidth,
-            scale: scale,
-            onTap: () => controller.feedWithCoin(2),
-          ),
-
-          // 3. ปุ่มขวา (Shop)
-          _buildItemCard(
-            imagePath: 'assets/images/shop.png',
-            customImageSize: scale.rs(80, min: 64, max: 80),
-            customImageBottom: scale.rs(5, min: 3, max: 5),
-            topBadgeWidget: Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: scale.rs(16, min: 12, max: 16),
-                vertical: scale.rs(6, min: 4, max: 6),
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius:
-                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
-              ),
-              child: Text(
-                "SHOP",
-                style: TextStyle(
-                  color: const Color(0xFFFFC107),
-                  fontWeight: FontWeight.w900,
-                  fontSize: scale.rf(14, min: 12, max: 14),
+                    SizedBox(width: scale.rs(5, min: 3, max: 5)),
+                    Text(
+                      '2 coin',
+                      style: TextStyle(
+                        color: const Color(0xFFFFC107),
+                        fontWeight: FontWeight.bold,
+                        fontSize: scale.rf(14, min: 12, max: 14),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              cardWidth: cardWidth,
+              scale: scale,
+              isDisabled: controller.isAnyActionRunning,
+              isBusy: controller.isFeedingCoin.value,
+              onTap: () => controller.feedWithCoin(2),
             ),
-            cardWidth: cardWidth,
-            scale: scale,
-            onTap: () => Get.to(() => const ShopPage()),
+          ),
+          Obx(
+            () => _buildItemCard(
+              imagePath: 'assets/images/shop.png',
+              customImageSize: scale.rs(80, min: 64, max: 80),
+              customImageBottom: scale.rs(5, min: 3, max: 5),
+              topBadgeWidget: Container(
+                padding: EdgeInsets.symmetric(
+                  horizontal: scale.rs(16, min: 12, max: 16),
+                  vertical: scale.rs(6, min: 4, max: 6),
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(
+                    scale.rs(20, min: 16, max: 20),
+                  ),
+                ),
+                child: Text(
+                  'SHOP',
+                  style: TextStyle(
+                    color: const Color(0xFFFFC107),
+                    fontWeight: FontWeight.w900,
+                    fontSize: scale.rf(14, min: 12, max: 14),
+                  ),
+                ),
+              ),
+              cardWidth: cardWidth,
+              scale: scale,
+              isDisabled: controller.isAnyActionRunning,
+              isBusy: controller.isRefreshing.value,
+              onTap: () async {
+                await Get.to(() => const ShopPage());
+                await controller.refreshState(silent: true);
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  // -----------------------------------------------------------
-  // Widget: Item Card Structure
-  // -----------------------------------------------------------
   Widget _buildItemCard({
     required String imagePath,
-    required VoidCallback onTap,
+    required Future<void> Function() onTap,
     Widget? labelWidget,
     Widget? topBadgeWidget,
     int badgeCount = 0,
     double? customImageSize,
     double? customImageBottom,
-    bool isBig = false,
+    bool isDisabled = false,
+    bool isBusy = false,
     double cardWidth = 100,
     required ResponsiveScale scale,
   }) {
     final cardHeight = cardWidth;
     final imageSize = customImageSize ?? (cardWidth * 0.8);
-    final double imageBottom = customImageBottom ?? 10;
+    final imageBottom = customImageBottom ?? 10.0;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: SizedBox(
-        width: cardWidth,
-        height: cardHeight + scale.rs(40, min: 30, max: 40),
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          clipBehavior: Clip.none,
-          children: [
-            Container(
-              width: cardWidth,
-              height: cardHeight,
-              decoration: BoxDecoration(
-                color: const Color(0xFFE3F2FD),
-                borderRadius:
-                    BorderRadius.circular(scale.rs(30, min: 22, max: 30)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.15),
-                    blurRadius: scale.rs(8, min: 6, max: 8),
-                    offset: Offset(0, scale.rs(4, min: 2, max: 4)),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (labelWidget != null)
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: scale.rs(2, min: 1, max: 2),
+    return IgnorePointer(
+      ignoring: isDisabled,
+      child: Opacity(
+        opacity: isDisabled ? 0.68 : 1,
+        child: GestureDetector(
+          onTap: onTap,
+          child: SizedBox(
+            width: cardWidth,
+            height: cardHeight + scale.rs(40, min: 30, max: 40),
+            child: Stack(
+              alignment: Alignment.bottomCenter,
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: cardWidth,
+                  height: cardHeight,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE3F2FD),
+                    borderRadius: BorderRadius.circular(
+                      scale.rs(30, min: 22, max: 30),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.15),
+                        blurRadius: scale.rs(8, min: 6, max: 8),
+                        offset: Offset(0, scale.rs(4, min: 2, max: 4)),
                       ),
-                      child: labelWidget,
-                    ),
-                ],
-              ),
-            ),
-            Positioned(
-              bottom: imageBottom,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Image.asset(
-                  imagePath,
-                  width: imageSize,
-                  height: imageSize,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) =>
-                      Icon(Icons.error, size: imageSize),
-                ),
-              ),
-            ),
-            if (topBadgeWidget != null)
-              Positioned(
-                top: scale.rs(25, min: 18, max: 25),
-                left: 0,
-                right: 0,
-                child: Center(child: topBadgeWidget),
-              ),
-            if (badgeCount > 0)
-              Positioned(
-                top: scale.rs(23, min: 16, max: 23),
-                right: -3,
-                child: Container(
-                  padding: EdgeInsets.all(scale.rs(10, min: 7, max: 10)),
-                  decoration: const BoxDecoration(
-                    color: Colors.redAccent,
-                    shape: BoxShape.circle,
+                    ],
                   ),
-                  child: Text(
-                    "$badgeCount",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: scale.rf(15, min: 12.5, max: 15),
-                      fontWeight: FontWeight.bold,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      if (labelWidget != null)
+                        Padding(
+                          padding: EdgeInsets.only(
+                            bottom: scale.rs(2, min: 1, max: 2),
+                          ),
+                          child: labelWidget,
+                        ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  bottom: imageBottom,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Image.asset(
+                      imagePath,
+                      width: imageSize,
+                      height: imageSize,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) =>
+                          Icon(Icons.error, size: imageSize),
                     ),
                   ),
                 ),
-              ),
-          ],
+                if (topBadgeWidget != null)
+                  Positioned(
+                    top: scale.rs(25, min: 18, max: 25),
+                    left: 0,
+                    right: 0,
+                    child: Center(child: topBadgeWidget),
+                  ),
+                if (badgeCount > 0)
+                  Positioned(
+                    top: scale.rs(23, min: 16, max: 23),
+                    right: -3,
+                    child: Container(
+                      padding: EdgeInsets.all(scale.rs(10, min: 7, max: 10)),
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        '$badgeCount',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: scale.rf(15, min: 12.5, max: 15),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                if (isBusy)
+                  Positioned.fill(
+                    child: Center(
+                      child: Container(
+                        width: scale.rs(36, min: 32, max: 36),
+                        height: scale.rs(36, min: 32, max: 36),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.92),
+                          shape: BoxShape.circle,
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2.4,
+                          color: Color(0xFF4489D7),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
