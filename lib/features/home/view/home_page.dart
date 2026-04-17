@@ -35,9 +35,11 @@ class HomePage extends StatefulWidget {
   const HomePage({
     super.key,
     this.allowPeriodPrompt = false,
+    this.isActive = true,
   });
 
   final bool allowPeriodPrompt;
+  final bool isActive;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -79,7 +81,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
-    _videoClipsStream = _createVideoClipsStream();
+    _videoClipsStream = _buildVideoClipsStream(isActive: widget.isActive);
     _loadUsername();
     _loadMissionDays();
     if (widget.allowPeriodPrompt) {
@@ -88,7 +90,69 @@ class _HomePageState extends State<HomePage> {
       });
     }
 
+    if (widget.isActive) {
+      _startBannerAutoScroll();
+    }
+  }
+
+  @override
+  void dispose() {
+    _stopBannerAutoScroll();
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.allowPeriodPrompt && !oldWidget.allowPeriodPrompt) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_maybeShowPeriodPromptOnHome());
+      });
+    }
+
+    if (widget.isActive != oldWidget.isActive) {
+      _applyHomeActivityState(widget.isActive);
+    }
+  }
+
+  void _applyHomeActivityState(bool isActive) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _videoClipsStream = _buildVideoClipsStream(isActive: isActive);
+    });
+
+    if (isActive) {
+      _startBannerAutoScroll();
+      return;
+    }
+
+    _stopBannerAutoScroll();
+  }
+
+  Stream<List<HomeVideoClip>> _buildVideoClipsStream({
+    required bool isActive,
+  }) {
+    if (!isActive) {
+      _lastWarmupSignature = '';
+      return Stream<List<HomeVideoClip>>.value(const <HomeVideoClip>[]);
+    }
+    return _createVideoClipsStream();
+  }
+
+  void _startBannerAutoScroll() {
+    if (_timer != null) {
+      return;
+    }
+
     _timer = Timer.periodic(const Duration(seconds: 6), (_) {
+      if (!mounted || !widget.isActive) {
+        return;
+      }
+
       if (_currentBannerIndex < 2) {
         _currentBannerIndex++;
       } else {
@@ -105,21 +169,9 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  @override
-  void dispose() {
+  void _stopBannerAutoScroll() {
     _timer?.cancel();
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(covariant HomePage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.allowPeriodPrompt && !oldWidget.allowPeriodPrompt) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(_maybeShowPeriodPromptOnHome());
-      });
-    }
+    _timer = null;
   }
 
   Future<void> _loadUsername() async {
@@ -440,7 +492,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     setState(() {
-      _videoClipsStream = _createVideoClipsStream();
+      _videoClipsStream = _buildVideoClipsStream(isActive: widget.isActive);
     });
   }
 
@@ -448,6 +500,10 @@ class _HomePageState extends State<HomePage> {
     BuildContext context,
     List<HomeVideoClip> clips,
   ) {
+    if (!widget.isActive) {
+      return;
+    }
+
     final visibleClips = clips.take(2).toList(growable: false);
     final signature = visibleClips.map((clip) => clip.id).join('|');
     if (signature.isEmpty || signature == _lastWarmupSignature) {
@@ -952,13 +1008,17 @@ class _HomePageState extends State<HomePage> {
                           key: ValueKey('clip-card-${clip.id}'),
                           onTap: () => _openVideoClip(clips, index - 1),
                           child: FutureBuilder<String?>(
-                            future: index <= 2
-                                ? _homeVideoPrefetchService.prefetchVideo(
+                            future: !widget.isActive
+                                ? _homeVideoPrefetchService.getCachedPath(
                                     clip.videoUrl,
                                   )
-                                : _homeVideoPrefetchService.getCachedPath(
-                                    clip.videoUrl,
-                                  ),
+                                : index <= 2
+                                    ? _homeVideoPrefetchService.prefetchVideo(
+                                        clip.videoUrl,
+                                      )
+                                    : _homeVideoPrefetchService.getCachedPath(
+                                        clip.videoUrl,
+                                      ),
                             builder: (context, previewSnapshot) {
                               final cachedPreviewPath =
                                   previewSnapshot.data?.trim() ?? '';

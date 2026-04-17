@@ -9,7 +9,12 @@ import 'package:flutter_application_1/features/shop/view/shop_view.dart';
 import 'package:get/get.dart';
 
 class PetPage extends StatefulWidget {
-  const PetPage({super.key});
+  const PetPage({
+    super.key,
+    required this.isActive,
+  });
+
+  final bool isActive;
 
   @override
   State<PetPage> createState() => _PetPageState();
@@ -18,6 +23,8 @@ class PetPage extends StatefulWidget {
 class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
   late final Pet controller;
   late final AudioPlayer _audioPlayer;
+  bool _isSoundPlaying = false;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -25,33 +32,91 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     controller = Get.isRegistered<Pet>() ? Get.find<Pet>() : Get.put(Pet());
     _audioPlayer = AudioPlayer();
-    unawaited(_startLoopSound());
+    unawaited(_syncSoundPlayback());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.refreshState(silent: true);
+      if (widget.isActive) {
+        unawaited(controller.refreshState(silent: true));
+      }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant PetPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      unawaited(_syncSoundPlayback());
+      if (widget.isActive) {
+        unawaited(controller.refreshState(silent: true));
+      }
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    unawaited(_audioPlayer.stop());
+    unawaited(_stopLoopSound());
     _audioPlayer.dispose();
+    _isDisposed = true;
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      controller.refreshState(silent: true);
+      if (widget.isActive) {
+        unawaited(controller.refreshState(silent: true));
+      }
+      unawaited(_syncSoundPlayback());
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_stopLoopSound());
     }
   }
 
+  Future<void> _syncSoundPlayback() async {
+    if (_isDisposed) {
+      return;
+    }
+
+    if (widget.isActive) {
+      await _startLoopSound();
+      return;
+    }
+
+    await _stopLoopSound();
+  }
+
   Future<void> _startLoopSound() async {
+    if (_isDisposed || _isSoundPlaying) {
+      return;
+    }
+
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.play(AssetSource('Sound/howareyou.mp3'));
+      _isSoundPlaying = true;
     } catch (e) {
+      _isSoundPlaying = false;
       debugPrint('Failed to play looping pet sound: $e');
+    }
+  }
+
+  Future<void> _stopLoopSound() async {
+    if (!_isSoundPlaying) {
+      return;
+    }
+
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      debugPrint('Failed to stop looping pet sound: $e');
+    } finally {
+      _isSoundPlaying = false;
     }
   }
 

@@ -241,10 +241,11 @@ class _BottomNavBarState extends State<BottomNavBar>
         children: [
           HomePage(
             allowPeriodPrompt: _page == 0 && _allowHomePeriodPrompt,
+            isActive: _page == 0,
           ),
-          const FeedPage(),
+          FeedPage(isActive: _page == 1),
           const ChatSelectionPage(),
-          const PetPage(),
+          PetPage(isActive: _page == 3),
           const ProfilePage(),
         ],
       ),

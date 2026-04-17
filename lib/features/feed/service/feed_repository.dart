@@ -63,6 +63,8 @@ class FeedRepository {
       <String, _CachedSignedUrl>{};
   final Map<String, Future<String?>> _inFlightMediaUrlResolvers =
       <String, Future<String?>>{};
+  final Map<String, int> _liveLikeCountsByPostId = <String, int>{};
+  final Map<String, int> _liveCommentCountsByPostId = <String, int>{};
 
   String get _feedImageBucket => _normalizeBucketName(_feedImageBucketConfig);
 
@@ -510,16 +512,27 @@ class FeedRepository {
         // Keep posts visible even if post_media fetch fails.
       }
 
+      for (final postId in postIds) {
+        final liveCount = _liveLikeCountsByPostId[postId];
+        if (liveCount != null) {
+          likeCountsByPostId[postId] = liveCount;
+        }
+      }
+
       final shouldHydrateLikeCounts = rows.any(
-        (row) => _toNullableInt(row['like_count']) == null,
-      );
+            (row) => _toNullableInt(row['like_count']) == null,
+          ) &&
+          postIds.any((postId) => !likeCountsByPostId.containsKey(postId));
       if (shouldHydrateLikeCounts) {
+        final targetPostIds = postIds
+            .where((postId) => !likeCountsByPostId.containsKey(postId))
+            .toList(growable: false);
         try {
           final likeRows = await _client
               .from(_postLikesTable)
               .select('post_id')
               .eq('reaction', _likeReaction)
-              .inFilter('post_id', postIds);
+              .inFilter('post_id', targetPostIds);
 
           for (final row in likeRows) {
             final map = Map<String, dynamic>.from(row);
@@ -529,20 +542,32 @@ class FeedRepository {
             }
             likeCountsByPostId[postId] = (likeCountsByPostId[postId] ?? 0) + 1;
           }
+          _liveLikeCountsByPostId.addAll(likeCountsByPostId);
         } catch (_) {
           // Keep feed visible even if like counts fail to load.
         }
       }
 
+      for (final postId in postIds) {
+        final liveCount = _liveCommentCountsByPostId[postId];
+        if (liveCount != null) {
+          commentCountsByPostId[postId] = liveCount;
+        }
+      }
+
       final shouldHydrateCommentCounts = rows.any(
-        (row) => _toNullableInt(row['comment_count']) == null,
-      );
+            (row) => _toNullableInt(row['comment_count']) == null,
+          ) &&
+          postIds.any((postId) => !commentCountsByPostId.containsKey(postId));
       if (shouldHydrateCommentCounts) {
+        final targetPostIds = postIds
+            .where((postId) => !commentCountsByPostId.containsKey(postId))
+            .toList(growable: false);
         try {
           final commentRows = await _client
               .from(_postCommentsTable)
               .select('post_id')
-              .inFilter('post_id', postIds);
+              .inFilter('post_id', targetPostIds);
 
           for (final row in commentRows) {
             final map = Map<String, dynamic>.from(row);
@@ -553,6 +578,7 @@ class FeedRepository {
             commentCountsByPostId[postId] =
                 (commentCountsByPostId[postId] ?? 0) + 1;
           }
+          _liveCommentCountsByPostId.addAll(commentCountsByPostId);
         } catch (_) {
           // Keep feed visible even if comment counts fail to load.
         }
@@ -719,6 +745,79 @@ class FeedRepository {
     return int.tryParse(value.toString());
   }
 
+  Set<String> _extractPostIdsFromRows(List<Map<String, dynamic>> rows) {
+    return rows
+        .map((row) => row['id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toSet();
+  }
+
+  bool _hasSamePostIds(Set<String> left, Set<String> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    for (final id in left) {
+      if (!right.contains(id)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _syncLiveLikeCounts(
+    List<Map<String, dynamic>> rows,
+    Set<String> trackedPostIds,
+  ) {
+    _liveLikeCountsByPostId.removeWhere(
+      (postId, _) => !trackedPostIds.contains(postId),
+    );
+
+    final counts = <String, int>{};
+    for (final postId in trackedPostIds) {
+      counts[postId] = 0;
+    }
+
+    for (final row in rows) {
+      final postId = row['post_id']?.toString() ?? '';
+      if (postId.isEmpty || !trackedPostIds.contains(postId)) {
+        continue;
+      }
+
+      if (row['reaction']?.toString() != _likeReaction) {
+        continue;
+      }
+
+      counts[postId] = (counts[postId] ?? 0) + 1;
+    }
+
+    _liveLikeCountsByPostId.addAll(counts);
+  }
+
+  void _syncLiveCommentCounts(
+    List<Map<String, dynamic>> rows,
+    Set<String> trackedPostIds,
+  ) {
+    _liveCommentCountsByPostId.removeWhere(
+      (postId, _) => !trackedPostIds.contains(postId),
+    );
+
+    final counts = <String, int>{};
+    for (final postId in trackedPostIds) {
+      counts[postId] = 0;
+    }
+
+    for (final row in rows) {
+      final postId = row['post_id']?.toString() ?? '';
+      if (postId.isEmpty || !trackedPostIds.contains(postId)) {
+        continue;
+      }
+
+      counts[postId] = (counts[postId] ?? 0) + 1;
+    }
+
+    _liveCommentCountsByPostId.addAll(counts);
+  }
+
   Future<String?> _resolveFeedImageUrl(Map<String, dynamic> row) async {
     final storagePath = row['storage_path']?.toString().trim() ?? '';
     final publicUrl = row['public_url']?.toString().trim();
@@ -763,11 +862,6 @@ class FeedRepository {
       }
 
       if (publicUrl != null && publicUrl.isNotEmpty) {
-        _cachedMediaUrls[cacheKey] = _CachedSignedUrl(
-          url: publicUrl,
-          expiresAt: now.add(const Duration(hours: 6)),
-        );
-        _trimMediaUrlCacheIfNeeded();
         return publicUrl;
       }
 
@@ -775,11 +869,6 @@ class FeedRepository {
         final fallbackUrl =
             _client.storage.from(storageBucket).getPublicUrl(storagePath);
         if (fallbackUrl.isNotEmpty) {
-          _cachedMediaUrls[cacheKey] = _CachedSignedUrl(
-            url: fallbackUrl,
-            expiresAt: now.add(const Duration(hours: 6)),
-          );
-          _trimMediaUrlCacheIfNeeded();
           return fallbackUrl;
         }
       } catch (_) {
@@ -875,22 +964,111 @@ class FeedRepository {
     StreamSubscription<List<Map<String, dynamic>>>? mediaSubscription;
     StreamSubscription<List<Map<String, dynamic>>>? likesSubscription;
     StreamSubscription<List<Map<String, dynamic>>>? commentsSubscription;
+    Timer? queryRefreshDebounceTimer;
     Timer? remapDebounceTimer;
     var hasActiveListener = false;
+    var isEmittingPosts = false;
+    var hasPendingEmit = false;
+    Set<String> trackedPostIds = <String>{};
 
     List<Map<String, dynamic>> latestPostRows = const [];
     var hasLoadedPosts = false;
 
     Future<void> emitMappedPosts() async {
-      if (!hasLoadedPosts) {
+      if (!hasLoadedPosts || !hasActiveListener || controller.isClosed) {
         return;
       }
 
+      if (isEmittingPosts) {
+        hasPendingEmit = true;
+        return;
+      }
+
+      isEmittingPosts = true;
       try {
         controller.add(await _mapPosts(latestPostRows));
       } catch (error, stackTrace) {
-        controller.addError(error, stackTrace);
+        if (!controller.isClosed) {
+          controller.addError(error, stackTrace);
+        }
+      } finally {
+        isEmittingPosts = false;
+        if (hasPendingEmit && hasActiveListener && !controller.isClosed) {
+          hasPendingEmit = false;
+          unawaited(emitMappedPosts());
+        }
       }
+    }
+
+    void scheduleEmitMappedPosts({
+      Duration delay = const Duration(milliseconds: 220),
+    }) {
+      if (!hasLoadedPosts || !hasActiveListener) {
+        return;
+      }
+      remapDebounceTimer?.cancel();
+      remapDebounceTimer = Timer(delay, () => unawaited(emitMappedPosts()));
+    }
+
+    Future<void> resubscribeAggregateStreams() async {
+      final nextTrackedPostIds = _extractPostIdsFromRows(latestPostRows);
+      if (_hasSamePostIds(nextTrackedPostIds, trackedPostIds)) {
+        return;
+      }
+
+      trackedPostIds = nextTrackedPostIds;
+      _liveLikeCountsByPostId.removeWhere(
+        (postId, _) => !trackedPostIds.contains(postId),
+      );
+      _liveCommentCountsByPostId.removeWhere(
+        (postId, _) => !trackedPostIds.contains(postId),
+      );
+
+      await mediaSubscription?.cancel();
+      await likesSubscription?.cancel();
+      await commentsSubscription?.cancel();
+      mediaSubscription = null;
+      likesSubscription = null;
+      commentsSubscription = null;
+
+      if (!hasActiveListener || controller.isClosed || trackedPostIds.isEmpty) {
+        return;
+      }
+
+      final postIds = trackedPostIds.toList(growable: false);
+
+      mediaSubscription = _client
+          .from(_postMediaTable)
+          .stream(primaryKey: const ['post_id', 'storage_path'])
+          .inFilter('post_id', postIds)
+          .listen(
+            (_) => scheduleEmitMappedPosts(),
+            onError: (_, __) {},
+          );
+
+      likesSubscription = _client
+          .from(_postLikesTable)
+          .stream(primaryKey: const ['post_id', 'user_id'])
+          .inFilter('post_id', postIds)
+          .listen(
+            (rows) {
+              _syncLiveLikeCounts(rows, trackedPostIds);
+              scheduleEmitMappedPosts();
+            },
+            onError: (_, __) {},
+          );
+
+      commentsSubscription = _client
+          .from(_postCommentsTable)
+          .stream(primaryKey: const ['id'])
+          .inFilter('post_id', postIds)
+          .listen(
+            (rows) {
+              _syncLiveCommentCounts(rows, trackedPostIds);
+              scheduleEmitMappedPosts();
+            },
+            onError: (_, __) {},
+          );
     }
 
     Future<void> refreshPostsFromQuery({bool reportErrors = false}) async {
@@ -901,6 +1079,7 @@ class FeedRepository {
         }
         latestPostRows = rows;
         hasLoadedPosts = true;
+        await resubscribeAggregateStreams();
         await emitMappedPosts();
       } catch (error, stackTrace) {
         if (reportErrors && !controller.isClosed) {
@@ -909,14 +1088,17 @@ class FeedRepository {
       }
     }
 
-    void scheduleEmitMappedPosts({
-      Duration delay = const Duration(milliseconds: 120),
+    void scheduleRefreshPostsFromQuery({
+      Duration delay = const Duration(milliseconds: 260),
     }) {
-      if (!hasLoadedPosts || !hasActiveListener) {
+      if (!hasActiveListener) {
         return;
       }
-      remapDebounceTimer?.cancel();
-      remapDebounceTimer = Timer(delay, () => unawaited(emitMappedPosts()));
+      queryRefreshDebounceTimer?.cancel();
+      queryRefreshDebounceTimer = Timer(
+        delay,
+        () => unawaited(refreshPostsFromQuery()),
+      );
     }
 
     controller = StreamController<List<FeedPost>>(
@@ -927,7 +1109,7 @@ class FeedRepository {
           // FIX: realtime stream อาจดึงมาโดยไม่ filter -> ให้ refresh จาก
           // _loadPostRows แทนการใช้ rows จาก stream โดยตรง
           // เพื่อให้ได้ข้อมูลที่ถูก filter แล้วเสมอ
-          unawaited(refreshPostsFromQuery());
+          scheduleRefreshPostsFromQuery();
         }
 
         unawaited(refreshPostsFromQuery(reportErrors: true));
@@ -940,7 +1122,7 @@ class FeedRepository {
               .order('created_at', ascending: false)
               .listen(
                 onPosts,
-                onError: (_, __) => unawaited(refreshPostsFromQuery()),
+                onError: (_, __) => scheduleRefreshPostsFromQuery(),
               );
         } else {
           postsSubscription = _client
@@ -949,33 +1131,13 @@ class FeedRepository {
               .order('created_at', ascending: false)
               .listen(
                 onPosts,
-                onError: (_, __) => unawaited(refreshPostsFromQuery()),
+                onError: (_, __) => scheduleRefreshPostsFromQuery(),
               );
         }
-
-        mediaSubscription = _client
-            .from(_postMediaTable)
-            .stream(primaryKey: const ['post_id', 'storage_path']).listen(
-          (_) => scheduleEmitMappedPosts(),
-          onError: (_, __) {},
-        );
-
-        likesSubscription = _client
-            .from(_postLikesTable)
-            .stream(primaryKey: const ['post_id', 'user_id']).listen(
-          (_) => scheduleEmitMappedPosts(),
-          onError: (_, __) {},
-        );
-
-        commentsSubscription = _client
-            .from(_postCommentsTable)
-            .stream(primaryKey: const ['id']).listen(
-          (_) => scheduleEmitMappedPosts(),
-          onError: (_, __) {},
-        );
       },
       onCancel: () async {
         hasActiveListener = false;
+        queryRefreshDebounceTimer?.cancel();
         remapDebounceTimer?.cancel();
         await postsSubscription?.cancel();
         await mediaSubscription?.cancel();

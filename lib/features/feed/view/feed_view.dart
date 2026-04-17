@@ -68,9 +68,11 @@ class FeedPage extends StatefulWidget {
   const FeedPage({
     super.key,
     this.focusPostId,
+    this.isActive = true,
   });
 
   final String? focusPostId;
+  final bool isActive;
 
   @override
   State<FeedPage> createState() => _FeedPageState();
@@ -84,8 +86,8 @@ class _FeedPageState extends State<FeedPage> {
   final User? _currentUser = supabase.auth.currentUser;
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _postItemKeys = <String, GlobalKey>{};
-  late final Stream<List<FeedPost>> _postsStream;
-  late final Stream<Set<String>> _likedPostIdsStream;
+  late Stream<List<FeedPost>> _postsStream;
+  late Stream<Set<String>> _likedPostIdsStream;
   Set<String> _savedPostIds = <String>{};
   bool _isLoadingSavedPostIds = false;
 
@@ -101,12 +103,64 @@ class _FeedPageState extends State<FeedPage> {
     super.initState();
     final focusPostId = widget.focusPostId?.trim() ?? '';
     _pendingFocusPostId = focusPostId.isEmpty ? null : focusPostId;
-    _postsStream = _repository.watchPosts();
-    _likedPostIdsStream = _currentUser == null
-        ? Stream<Set<String>>.value(const <String>{})
-        : _repository.watchLikedPostIds(_currentUser.id);
-    unawaited(_loadSavedPostIds());
-    _loadComposerIdentity();
+    _postsStream = _buildPostsStream(isActive: widget.isActive);
+    _likedPostIdsStream = _buildLikedPostIdsStream(isActive: widget.isActive);
+    if (widget.isActive) {
+      unawaited(_loadSavedPostIds());
+      _loadComposerIdentity();
+    } else {
+      _isLoadingComposer = false;
+    }
+  }
+
+  void _restartPostsStream() {
+    if (!mounted || !widget.isActive) {
+      return;
+    }
+    setState(() {
+      _postsStream = _repository.watchPosts();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant FeedPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _applyFeedActivityState(widget.isActive);
+    }
+  }
+
+  void _applyFeedActivityState(bool isActive) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _postsStream = _buildPostsStream(isActive: isActive);
+      _likedPostIdsStream = _buildLikedPostIdsStream(isActive: isActive);
+      if (!isActive) {
+        _isLoadingComposer = false;
+      }
+    });
+
+    if (isActive) {
+      unawaited(_loadSavedPostIds());
+      unawaited(_loadComposerIdentity());
+    }
+  }
+
+  Stream<List<FeedPost>> _buildPostsStream({required bool isActive}) {
+    if (!isActive) {
+      return Stream<List<FeedPost>>.value(const <FeedPost>[]);
+    }
+    return _repository.watchPosts();
+  }
+
+  Stream<Set<String>> _buildLikedPostIdsStream({required bool isActive}) {
+    if (!isActive || _currentUser == null) {
+      return Stream<Set<String>>.value(const <String>{});
+    }
+    return _repository.watchLikedPostIds(_currentUser.id);
   }
 
   @override
@@ -159,9 +213,15 @@ class _FeedPageState extends State<FeedPage> {
 
     if (!mounted || created != true) return;
 
+    _restartPostsStream();
     await _refreshFeed();
-
     if (!mounted) return;
+
+    // Retry once more after upload/moderation hooks settle to avoid stale image URLs.
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+    _restartPostsStream();
+
     _showSnackBar('โพสต์ของคุณถูกเผยแพร่แล้ว');
   }
 
