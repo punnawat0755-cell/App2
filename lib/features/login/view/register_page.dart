@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -37,6 +38,58 @@ class _RegisterPageState extends State<RegisterPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text), backgroundColor: Colors.red),
     );
+  }
+
+  bool _isValidPhone(String phone) => RegExp(r'^\d{10}$').hasMatch(phone);
+
+  Future<bool> _isUsernameTaken(String username) async {
+    final normalized = username.trim();
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    try {
+      final row = await supabase
+          .from('profiles')
+          .select('id')
+          .ilike('username', normalized)
+          .limit(1)
+          .maybeSingle();
+      return row != null;
+    } on PostgrestException {
+      // Skip pre-check when table access is blocked by RLS and rely on DB
+      // unique constraints to catch duplicates.
+      return false;
+    }
+  }
+
+  String _prettyPostgrestMessage(PostgrestException error) {
+    final code = (error.code ?? '').trim();
+    final message = error.message.trim();
+    final details = error.details?.toString().trim() ?? '';
+    final hint = (error.hint ?? '').trim();
+    final combined = '$message $details $hint'.toLowerCase();
+
+    if (code == '23505') {
+      if (combined.contains('username')) {
+        return 'ชื่อนี้มีคนใช้แล้ว';
+      }
+      if (combined.contains('email')) {
+        return 'อีเมลนี้ถูกใช้งานแล้ว';
+      }
+      return 'ข้อมูลนี้ถูกใช้งานแล้ว';
+    }
+
+    if (message.isNotEmpty) {
+      return message;
+    }
+    if (details.isNotEmpty) {
+      return details;
+    }
+    if (hint.isNotEmpty) {
+      return hint;
+    }
+    return 'บันทึกข้อมูลไม่สำเร็จ';
   }
 
   String _prettyAuthMessage(String message) {
@@ -159,7 +212,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final username = _usernameController.text.trim();
-      final email = _emailController.text.trim();
+      final email = _emailController.text.trim().toLowerCase();
       final phone = _phoneController.text.trim();
       final password = _passwordController.text.trim();
 
@@ -185,6 +238,15 @@ class _RegisterPageState extends State<RegisterPage> {
           'กรุณากรอกข้อมูลที่จำเป็นให้ครบ: '
           '${missingRequiredFields.join(', ')}',
         );
+      }
+
+      if (phone.isNotEmpty && !_isValidPhone(phone)) {
+        throw const AuthException('เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก');
+      }
+
+      final isTaken = await _isUsernameTaken(username);
+      if (isTaken) {
+        throw const AuthException('ชื่อนี้มีคนใช้แล้ว');
       }
 
       String gender;
@@ -252,6 +314,9 @@ class _RegisterPageState extends State<RegisterPage> {
         context,
         MaterialPageRoute(builder: (_) => const LoginPage()),
       );
+    } on PostgrestException catch (e) {
+      if (!mounted) return;
+      _showError(_prettyPostgrestMessage(e));
     } on AuthException catch (e) {
       if (!mounted) return;
       _showError(_prettyAuthMessage(e.message));
@@ -306,6 +371,7 @@ class _RegisterPageState extends State<RegisterPage> {
     bool isPassword = false,
     bool readOnly = false,
     TextInputType? keyboardType,
+    List<TextInputFormatter>? inputFormatters,
     VoidCallback? onTap,
     Widget? suffix,
   }) {
@@ -319,6 +385,7 @@ class _RegisterPageState extends State<RegisterPage> {
         obscureText: isPassword,
         readOnly: readOnly,
         keyboardType: keyboardType,
+        inputFormatters: inputFormatters,
         onTap: onTap,
         style: const TextStyle(
           fontSize: 16,
@@ -427,6 +494,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 controller: _phoneController,
                 hintText: '',
                 keyboardType: TextInputType.phone,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(10),
+                ],
               ),
               _buildInputLabel('รหัสผ่าน', isRequired: true),
               _buildTextField(

@@ -40,6 +40,75 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String _email = '';
   String _phone = '';
 
+  bool _isValidPhone(String phone) => RegExp(r'^\d{10}$').hasMatch(phone);
+
+  Future<bool> _isUsernameTakenByOtherUser({
+    required String username,
+    required String currentUserId,
+  }) async {
+    final normalized = username.trim();
+    if (normalized.isEmpty) {
+      return false;
+    }
+
+    try {
+      final row = await _supabase
+          .from('profiles')
+          .select('id')
+          .neq('id', currentUserId)
+          .ilike('username', normalized)
+          .limit(1)
+          .maybeSingle();
+      return row != null;
+    } on PostgrestException {
+      // If lookup is blocked by RLS, continue and rely on unique constraints.
+      return false;
+    }
+  }
+
+  String _prettyAuthMessage(String message) {
+    final m = message.toLowerCase();
+    if (m.contains('user already registered')) {
+      return 'อีเมลนี้ถูกใช้งานแล้ว';
+    }
+    if (m.contains('email address is invalid')) {
+      return 'อีเมลไม่ถูกต้อง';
+    }
+    if (m.contains('only request this after')) {
+      return 'คุณกดทำรายการซ้ำเร็วเกินไป กรุณารอสักครู่แล้วลองใหม่';
+    }
+    return message;
+  }
+
+  String _prettyPostgrestMessage(PostgrestException error) {
+    final code = (error.code ?? '').trim();
+    final message = error.message.trim();
+    final details = error.details?.toString().trim() ?? '';
+    final hint = (error.hint ?? '').trim();
+    final combined = '$message $details $hint'.toLowerCase();
+
+    if (code == '23505') {
+      if (combined.contains('username')) {
+        return 'ชื่อนี้มีคนใช้แล้ว';
+      }
+      if (combined.contains('email')) {
+        return 'อีเมลนี้ถูกใช้งานแล้ว';
+      }
+      return 'ข้อมูลนี้ถูกใช้งานแล้ว';
+    }
+
+    if (message.isNotEmpty) {
+      return message;
+    }
+    if (details.isNotEmpty) {
+      return details;
+    }
+    if (hint.isNotEmpty) {
+      return hint;
+    }
+    return 'บันทึกข้อมูลไม่สำเร็จ';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -150,7 +219,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       return;
     }
 
-    String? nextPassword;
     String? nextEmail;
 
     switch (_activeField) {
@@ -158,6 +226,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
         final value = _nameController.text.trim();
         if (value.isEmpty) {
           _showError('กรุณากรอกชื่อผู้ใช้');
+          return;
+        }
+        final isTaken = await _isUsernameTakenByOtherUser(
+          username: value,
+          currentUserId: user.id,
+        );
+        if (isTaken) {
+          _showError('ชื่อนี้มีคนใช้แล้ว');
           return;
         }
         _username = value;
@@ -171,7 +247,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         }
         break;
       case 'email':
-        final value = _emailController.text.trim();
+        final value = _emailController.text.trim().toLowerCase();
         if (value.isEmpty || !value.contains('@')) {
           _showError('กรุณากรอกอีเมลให้ถูกต้อง');
           return;
@@ -180,7 +256,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _email = value;
         break;
       case 'phone':
-        _phone = _phoneController.text.trim();
+        final value = _phoneController.text.trim();
+        if (value.isNotEmpty && !_isValidPhone(value)) {
+          _showError('เบอร์โทรศัพท์ต้องเป็นตัวเลข 10 หลัก');
+          return;
+        }
+        _phone = value;
         break;
       case 'password':
         return;
@@ -204,7 +285,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       await _supabase.auth.updateUser(
         UserAttributes(
           email: nextEmail,
-          password: nextPassword,
           data: <String, dynamic>{
             'username': _username,
             'gender': _gender,
@@ -224,19 +304,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
       });
 
       Get.snackbar(
-        nextEmail != null
-            ? 'อัปเดตอีเมลแล้ว'
-            : nextPassword != null
-                ? 'เปลี่ยนรหัสผ่านแล้ว'
-                : 'บันทึกข้อมูลแล้ว',
+        nextEmail != null ? 'อัปเดตอีเมลแล้ว' : 'บันทึกข้อมูลแล้ว',
         nextEmail != null
             ? 'ถ้าระบบให้ยืนยันอีเมล โปรดตรวจกล่องข้อความของคุณ'
             : 'ข้อมูลส่วนตัวถูกอัปเดตเรียบร้อย',
         snackPosition: SnackPosition.BOTTOM,
         duration: const Duration(seconds: 2),
       );
+    } on PostgrestException catch (error) {
+      _showError(_prettyPostgrestMessage(error));
+    } on AuthException catch (error) {
+      _showError(_prettyAuthMessage(error.message));
     } catch (error) {
-      _showError('$error');
+      _showError('บันทึกไม่สำเร็จ: $error');
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -911,6 +991,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                   keyboardType: TextInputType.phone,
                                   inputFormatters: [
                                     FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(10),
                                   ],
                                   style: _cardTextStyle(scale),
                                   decoration: const InputDecoration(

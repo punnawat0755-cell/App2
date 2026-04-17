@@ -12,6 +12,7 @@ import 'package:get/get.dart';
 class Pet extends GetxController {
   static const Duration _freeFoodCooldown = Duration(minutes: 60);
   static const Duration _fedMoodDuration = Duration(seconds: 10);
+  static const Duration _stateRequestTimeout = Duration(seconds: 6);
 
   late final CoinService _coinService;
   late final PetRepository _petRepository;
@@ -37,11 +38,11 @@ class Pet extends GetxController {
   Timer? _timer;
   Timer? _fedMoodTimer;
   bool _isCompletingFoodTimer = false;
+  int _mutationVersion = 0;
   final _temporaryMoodAssetPath = RxnString();
 
   bool get isAnyActionRunning =>
       isLoading.value ||
-      isRefreshing.value ||
       isFeedingFree.value ||
       isFeedingCoin.value ||
       isEquipping.value ||
@@ -90,7 +91,7 @@ class Pet extends GetxController {
         ? Get.find<PetRepository>()
         : Get.put(PetRepository(service: petService), permanent: true);
 
-    unawaited(refreshState());
+    unawaited(refreshState(silent: true));
   }
 
   @override
@@ -104,6 +105,7 @@ class Pet extends GetxController {
     if (isLoading.value || isRefreshing.value) {
       return;
     }
+    final mutationVersionAtStart = _mutationVersion;
 
     if (silent) {
       isRefreshing.value = true;
@@ -112,13 +114,31 @@ class Pet extends GetxController {
     }
 
     try {
-      var state = await _petRepository.loadState();
-      state = await _petRepository.alignFoodCooldown(
-        refillDuration: _freeFoodCooldown,
-        baseState: state,
-      );
+      var state =
+          await _petRepository.loadState().timeout(_stateRequestTimeout);
+      state = await _petRepository
+          .alignFoodCooldown(
+            refillDuration: _freeFoodCooldown,
+            baseState: state,
+          )
+          .timeout(_stateRequestTimeout);
+      if (mutationVersionAtStart != _mutationVersion) {
+        return;
+      }
       _applyState(state);
       _resumeTimerIfNeeded(state);
+    } on TimeoutException catch (error) {
+      Get.log('Pet.refreshState timeout: $error');
+      if (!silent) {
+        Get.snackbar(
+          'โหลดข้อมูลสัตว์เลี้ยงช้าเกินไป',
+          'ลองใหม่อีกครั้งได้ทันที',
+          backgroundColor: Colors.orangeAccent,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.TOP,
+          margin: const EdgeInsets.all(10),
+        );
+      }
     } catch (error) {
       Get.log('Pet.refreshState error: $error');
       if (!silent) {
@@ -149,6 +169,11 @@ class Pet extends GetxController {
       remainingTime.value = '00:00:00';
       isTimerRunning.value = false;
     }
+  }
+
+  void _applyMutationState(PetState state) {
+    _mutationVersion += 1;
+    _applyState(state);
   }
 
   void _resumeTimerIfNeeded(PetState state) {
@@ -182,7 +207,7 @@ class Pet extends GetxController {
   bool isPurchasingItem(int itemId) => purchasingItemId.value == itemId;
 
   Future<bool> purchaseItem(int itemId, int price) async {
-    if (isPurchasingItem(itemId) || isLoading.value || isRefreshing.value) {
+    if (isPurchasingItem(itemId) || isLoading.value) {
       return false;
     }
     if (isOwnedItem(itemId)) {
@@ -198,7 +223,7 @@ class Pet extends GetxController {
       }
 
       final nextState = await _petRepository.addOwnedItem(itemId);
-      _applyState(nextState);
+      _applyMutationState(nextState);
       return true;
     } catch (error) {
       if (didSpendCoins) {
@@ -220,7 +245,7 @@ class Pet extends GetxController {
   }
 
   Future<bool> equipItem(int itemId) async {
-    if (isEquipping.value || isLoading.value || isRefreshing.value) {
+    if (isEquipping.value || isLoading.value) {
       return false;
     }
     if (!isOwnedItem(itemId)) {
@@ -241,7 +266,7 @@ class Pet extends GetxController {
     isEquipping.value = true;
     try {
       final nextState = await _petRepository.equipItem(itemId);
-      _applyState(nextState);
+      _applyMutationState(nextState);
       return true;
     } catch (error) {
       Get.log('Pet.equipItem error: $error');
@@ -260,7 +285,7 @@ class Pet extends GetxController {
   }
 
   Future<bool> unequipItem() async {
-    if (isEquipping.value || isLoading.value || isRefreshing.value) {
+    if (isEquipping.value || isLoading.value) {
       return false;
     }
     if (equippedItemId.value == null) {
@@ -270,7 +295,7 @@ class Pet extends GetxController {
     isEquipping.value = true;
     try {
       final nextState = await _petRepository.unequipItem();
-      _applyState(nextState);
+      _applyMutationState(nextState);
       return true;
     } catch (error) {
       Get.log('Pet.unequipItem error: $error');
@@ -310,7 +335,7 @@ class Pet extends GetxController {
         refillDuration: _freeFoodCooldown,
       );
       final leveledUp = nextState.level > level.value;
-      _applyState(nextState);
+      _applyMutationState(nextState);
       _resumeTimerIfNeeded(nextState);
       _showFedMoodTemporarily();
 
@@ -371,7 +396,7 @@ class Pet extends GetxController {
 
       final nextState = await _petRepository.feedWithCoin();
       final leveledUp = nextState.level > level.value;
-      _applyState(nextState);
+      _applyMutationState(nextState);
       _showFedMoodTemporarily();
 
       Get.snackbar(
@@ -455,7 +480,7 @@ class Pet extends GetxController {
       final nextState = await _petRepository.markFoodRefillReady(
         refillDuration: _freeFoodCooldown,
       );
-      _applyState(nextState);
+      _applyMutationState(nextState);
       _resumeTimerIfNeeded(nextState);
 
       if (showSnackBar) {
