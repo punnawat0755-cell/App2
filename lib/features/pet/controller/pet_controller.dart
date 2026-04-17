@@ -10,7 +10,7 @@ import 'package:flutter_application_1/features/shop/model/shop_item.dart';
 import 'package:get/get.dart';
 
 class Pet extends GetxController {
-  static const Duration _freeFoodCooldown = Duration(hours: 6);
+  static const Duration _freeFoodCooldown = Duration(minutes: 60);
   static const Duration _fedMoodDuration = Duration(seconds: 10);
 
   late final CoinService _coinService;
@@ -36,6 +36,7 @@ class Pet extends GetxController {
   final isTimerRunning = false.obs;
   Timer? _timer;
   Timer? _fedMoodTimer;
+  bool _isCompletingFoodTimer = false;
   final _temporaryMoodAssetPath = RxnString();
 
   bool get isAnyActionRunning =>
@@ -111,7 +112,11 @@ class Pet extends GetxController {
     }
 
     try {
-      final state = await _petRepository.loadState();
+      var state = await _petRepository.loadState();
+      state = await _petRepository.alignFoodCooldown(
+        refillDuration: _freeFoodCooldown,
+        baseState: state,
+      );
       _applyState(state);
       _resumeTimerIfNeeded(state);
     } catch (error) {
@@ -147,6 +152,13 @@ class Pet extends GetxController {
   }
 
   void _resumeTimerIfNeeded(PetState state) {
+    if (state.foodCount >= PetState.maxFoodCount) {
+      _timer?.cancel();
+      remainingTime.value = '00:00:00';
+      isTimerRunning.value = false;
+      return;
+    }
+
     final nextFoodReadyAt = state.nextFoodReadyAt;
     if (nextFoodReadyAt == null) {
       _timer?.cancel();
@@ -431,27 +443,33 @@ class Pet extends GetxController {
   }
 
   Future<void> _completeFoodTimer({bool showSnackBar = true}) async {
-    if (isRefreshing.value) {
+    if (_isCompletingFoodTimer) {
       return;
     }
-
-    isTimerRunning.value = false;
-    remainingTime.value = '00:00:00';
+    _isCompletingFoodTimer = true;
 
     try {
-      final nextState = await _petRepository.markFoodRefillReady();
+      isTimerRunning.value = false;
+      remainingTime.value = '00:00:00';
+
+      final nextState = await _petRepository.markFoodRefillReady(
+        refillDuration: _freeFoodCooldown,
+      );
       _applyState(nextState);
+      _resumeTimerIfNeeded(nextState);
 
       if (showSnackBar) {
         Get.snackbar(
           'ปลามาแล้ว!',
-          'ได้รับปลาฟรี 1 ตัวจากการรอ',
+          'ได้รับปลาฟรีแล้ว ตอนนี้มี ${nextState.foodCount}/${PetState.maxFoodCount}',
           backgroundColor: Colors.blueAccent,
           colorText: Colors.white,
         );
       }
     } catch (error) {
       Get.log('Pet._completeFoodTimer error: $error');
+    } finally {
+      _isCompletingFoodTimer = false;
     }
   }
 

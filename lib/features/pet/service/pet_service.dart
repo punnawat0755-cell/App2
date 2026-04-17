@@ -49,14 +49,16 @@ class PetService {
       return normalized;
     }
 
-    try {
-      final savedToTable = await _saveStateToTable(user.id, normalized);
-      if (!savedToTable) {
-        await _saveStateToMetadata(user, normalized);
-      }
-    } catch (error) {
-      debugPrint('PetService.saveState error: $error');
-      rethrow;
+    var saved = await _saveStateToTable(user.id, normalized);
+
+    if (!saved) {
+      saved = await _saveStateToMetadataWithRecovery(user, normalized);
+    }
+
+    if (!saved) {
+      debugPrint(
+        'PetService.saveState warning: unable to persist remotely, kept local cache only.',
+      );
     }
 
     _cachedState = normalized;
@@ -66,16 +68,13 @@ class PetService {
   PetState _normalize(PetState state) {
     var normalized = state.copyWith(
       energyPercent: state.energyPercent.clamp(0, 100),
-      foodCount: state.foodCount < 0 ? 0 : state.foodCount,
+      foodCount: state.foodCount.clamp(0, PetState.maxFoodCount),
       ownedItems: state.ownedItems.toSet().toList()..sort(),
     );
 
-    final nextFoodReadyAt = normalized.nextFoodReadyAt;
-    if (normalized.foodCount == 0 &&
-        nextFoodReadyAt != null &&
-        !nextFoodReadyAt.isAfter(DateTime.now())) {
+    if (normalized.foodCount >= PetState.maxFoodCount &&
+        normalized.nextFoodReadyAt != null) {
       normalized = normalized.copyWith(
-        foodCount: 1,
         clearNextFoodReadyAt: true,
       );
     }
@@ -167,6 +166,68 @@ class PetService {
     await supabaseClient.auth.updateUser(
       UserAttributes(data: currentMetadata),
     );
+  }
+
+  Future<bool> _saveStateToMetadataWithRecovery(
+    User user,
+    PetState state,
+  ) async {
+    try {
+      await _saveStateToMetadata(user, state);
+      return true;
+    } on AuthApiException catch (error) {
+      if (!_isSessionNotFound(error)) {
+        debugPrint('PetService._saveStateToMetadata auth error: $error');
+        return false;
+      }
+
+      final refreshed = await _refreshAuthSessionSafely();
+      if (!refreshed) {
+        debugPrint(
+          'PetService._saveStateToMetadata: session missing and refresh failed.',
+        );
+        return false;
+      }
+
+      final refreshedUser = supabaseClient.auth.currentUser;
+      if (refreshedUser == null) {
+        debugPrint(
+          'PetService._saveStateToMetadata: refresh succeeded but user is null.',
+        );
+        return false;
+      }
+
+      try {
+        await _saveStateToMetadata(refreshedUser, state);
+        return true;
+      } catch (retryError) {
+        debugPrint('PetService._saveStateToMetadata retry error: $retryError');
+        return false;
+      }
+    } catch (error) {
+      debugPrint('PetService._saveStateToMetadata error: $error');
+      return false;
+    }
+  }
+
+  bool _isSessionNotFound(AuthApiException error) {
+    final code = (error.code ?? '').trim().toLowerCase();
+    final message = error.message.toLowerCase();
+    return code == 'session_not_found' || message.contains('session_id claim');
+  }
+
+  Future<bool> _refreshAuthSessionSafely() async {
+    try {
+      final currentSession = supabaseClient.auth.currentSession;
+      if (currentSession == null) {
+        return false;
+      }
+      final response = await supabaseClient.auth.refreshSession();
+      return response.session != null;
+    } catch (error) {
+      debugPrint('PetService._refreshAuthSessionSafely error: $error');
+      return false;
+    }
   }
 
   Map<String, dynamic>? _readMap(dynamic value) {

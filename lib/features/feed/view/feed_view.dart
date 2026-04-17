@@ -17,6 +17,53 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 final bool _isFeedCommentEnabled = false;
 
+String _buildLikeUpdateErrorMessage(
+  Object error, {
+  required bool isOwnPost,
+}) {
+  if (error is PostgrestException && _isPostReactionsRlsDenied(error)) {
+    if (isOwnPost) {
+      return 'ยังไลก์โพสต์ตัวเองไม่ได้ เพราะสิทธิ์ฐานข้อมูลยังไม่เปิด';
+    }
+    return 'อัปเดตการกดถูกใจไม่สำเร็จ เพราะสิทธิ์ฐานข้อมูลยังไม่อนุญาต';
+  }
+
+  return 'อัปเดตการกดถูกใจไม่สำเร็จ: $error';
+}
+
+bool _isPostReactionsRlsDenied(PostgrestException error) {
+  final code = (error.code ?? '').trim();
+  final message = error.message.toLowerCase();
+  final details = (error.details ?? '').toString().toLowerCase();
+
+  if (code != '42501') {
+    return false;
+  }
+
+  return message.contains('post_reactions') ||
+      details.contains('post_reactions') ||
+      message.contains('row-level security policy');
+}
+
+String _buildSavedUpdateErrorMessage(
+  Object error, {
+  required bool isOwnPost,
+}) {
+  if (error is PostgrestException) {
+    final code = (error.code ?? '').trim();
+    final message = error.message.toLowerCase();
+
+    if (code == 'P0001' && message.contains('post not found')) {
+      if (isOwnPost) {
+        return 'บันทึกโพสต์ตัวเองไม่สำเร็จ เพราะฟังก์ชันฐานข้อมูลยังไม่รองรับ';
+      }
+      return 'บันทึกโพสต์ไม่สำเร็จ เพราะไม่พบโพสต์ในฐานข้อมูล';
+    }
+  }
+
+  return 'อัปเดตการบันทึกไม่สำเร็จ: $error';
+}
+
 class FeedPage extends StatefulWidget {
   const FeedPage({
     super.key,
@@ -127,7 +174,13 @@ class _FeedPageState extends State<FeedPage> {
       }
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar('อัปเดตการกดถูกใจไม่สำเร็จ: $error', isError: true);
+      _showSnackBar(
+        _buildLikeUpdateErrorMessage(
+          error,
+          isOwnPost: _currentUser?.id == post.authorId,
+        ),
+        isError: true,
+      );
       rethrow;
     }
   }
@@ -230,7 +283,13 @@ class _FeedPageState extends State<FeedPage> {
       setState(() {
         _savedPostIds = previousSavedPostIds;
       });
-      _showSnackBar('อัปเดตการบันทึกไม่สำเร็จ: $error', isError: true);
+      _showSnackBar(
+        _buildSavedUpdateErrorMessage(
+          error,
+          isOwnPost: _currentUser?.id == post.authorId,
+        ),
+        isError: true,
+      );
       rethrow;
     }
   }
@@ -539,7 +598,12 @@ class FeedProfilePage extends StatelessWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('อัปเดตการกดถูกใจไม่สำเร็จ: $error'),
+          content: Text(
+            _buildLikeUpdateErrorMessage(
+              error,
+              isOwnPost: currentUserId == post.authorId,
+            ),
+          ),
           backgroundColor: Colors.red,
         ),
       );

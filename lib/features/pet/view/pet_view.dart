@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/pet/controller/pet_controller.dart';
+import 'package:flutter_application_1/features/pet/model/pet_state.dart';
 import 'package:flutter_application_1/features/shop/view/shop_view.dart';
 import 'package:get/get.dart';
 
@@ -400,15 +401,20 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Obx(() {
-            final isOutOfFood = controller.foodCount.value == 0;
+            final isFoodRefillPending =
+                controller.foodCount.value < PetState.maxFoodCount;
             return _buildItemCard(
               imagePath: 'assets/images/fish1.png',
               customImageSize: scale.rs(90, min: 72, max: 90),
               customImageBottom: scale.rs(10, min: 6, max: 10),
               labelWidget: Text(
-                isOutOfFood ? controller.remainingTime.value : '00:00:00',
+                isFoodRefillPending
+                    ? controller.remainingTime.value
+                    : '00:00:00',
                 style: TextStyle(
-                  color: isOutOfFood ? Colors.grey : const Color(0xFF1565C0),
+                  color: isFoodRefillPending
+                      ? const Color(0xFF1565C0)
+                      : Colors.grey,
                   fontWeight: FontWeight.w900,
                   fontSize: screenWidth < 360
                       ? scale.rf(14, min: 12, max: 14)

@@ -31,6 +31,15 @@ class FeedRepository {
   static const _postLikesTable = 'post_reactions';
   static const _postCommentsTable = 'post_comments';
   static const _profilesTable = 'profiles';
+  static const List<String> _savedPostsTableCandidates = <String>[
+    'user_saved_posts',
+    'saved_posts',
+    'post_saves',
+  ];
+  static const List<String> _savedPostIdColumnCandidates = <String>[
+    'post_id',
+    'saved_post_id',
+  ];
   static const _feedImageBucketConfig = String.fromEnvironment(
     'SUPABASE_FEED_IMAGE_BUCKET',
     defaultValue: 'app_media',
@@ -119,23 +128,65 @@ class FeedRepository {
   }
 
   Future<void> savePost(String postId) async {
-    _requireUser();
-    await _client.rpc(
-      'save_post',
-      params: {
-        'p_post_id': postId,
-      },
-    );
+    final user = _requireUser();
+    final normalizedPostId = postId.trim();
+
+    if (normalizedPostId.isEmpty) {
+      throw const PostgrestException(
+        message: 'ไม่พบรหัสโพสต์สำหรับบันทึก',
+      );
+    }
+
+    try {
+      await _client.rpc(
+        'save_post',
+        params: {
+          'p_post_id': normalizedPostId,
+        },
+      );
+    } on PostgrestException catch (error) {
+      if (_isRpcPostNotFound(error)) {
+        final saved = await _savePostByDirectInsertFallback(
+          userId: user.id,
+          postId: normalizedPostId,
+        );
+        if (saved) {
+          return;
+        }
+      }
+      rethrow;
+    }
   }
 
   Future<void> unsavePost(String postId) async {
-    _requireUser();
-    await _client.rpc(
-      'unsave_post',
-      params: {
-        'p_post_id': postId,
-      },
-    );
+    final user = _requireUser();
+    final normalizedPostId = postId.trim();
+
+    if (normalizedPostId.isEmpty) {
+      throw const PostgrestException(
+        message: 'ไม่พบรหัสโพสต์สำหรับยกเลิกบันทึก',
+      );
+    }
+
+    try {
+      await _client.rpc(
+        'unsave_post',
+        params: {
+          'p_post_id': normalizedPostId,
+        },
+      );
+    } on PostgrestException catch (error) {
+      if (_isRpcPostNotFound(error)) {
+        final removed = await _unsavePostByDirectDeleteFallback(
+          userId: user.id,
+          postId: normalizedPostId,
+        );
+        if (removed) {
+          return;
+        }
+      }
+      rethrow;
+    }
   }
 
   Stream<List<FeedComment>> watchCommentsByPost(String postId) {
@@ -1094,6 +1145,56 @@ class FeedRepository {
     }
 
     return '';
+  }
+
+  bool _isRpcPostNotFound(PostgrestException error) {
+    final code = (error.code ?? '').trim();
+    final message = error.message.toLowerCase();
+    return code == 'P0001' && message.contains('post not found');
+  }
+
+  Future<bool> _savePostByDirectInsertFallback({
+    required String userId,
+    required String postId,
+  }) async {
+    for (final table in _savedPostsTableCandidates) {
+      for (final postIdColumn in _savedPostIdColumnCandidates) {
+        try {
+          await _client.from(table).upsert(
+            {
+              'user_id': userId,
+              postIdColumn: postId,
+            },
+            onConflict: 'user_id,$postIdColumn',
+          );
+          return true;
+        } catch (_) {
+          continue;
+        }
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _unsavePostByDirectDeleteFallback({
+    required String userId,
+    required String postId,
+  }) async {
+    for (final table in _savedPostsTableCandidates) {
+      for (final postIdColumn in _savedPostIdColumnCandidates) {
+        try {
+          await _client
+              .from(table)
+              .delete()
+              .eq('user_id', userId)
+              .eq(postIdColumn, postId);
+          return true;
+        } catch (_) {
+          continue;
+        }
+      }
+    }
+    return false;
   }
 
   String _resolveImageExtension(String? imageFileName) {
