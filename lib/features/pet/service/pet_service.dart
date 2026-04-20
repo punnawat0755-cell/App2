@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_application_1/features/pet/model/pet_state.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +8,7 @@ class PetService {
   PetService({SupabaseClient? supabaseClient}) : _supabase = supabaseClient;
 
   static const _petProfilesTable = 'pet_profiles';
+  static const _requestTimeout = Duration(seconds: 6);
   static PetState? _cachedState;
   final SupabaseClient? _supabase;
 
@@ -22,10 +25,13 @@ class PetService {
 
     try {
       final metadata = user.userMetadata ?? const <String, dynamic>{};
-      var state = await _loadStateFromTable(user.id);
+      final stateFuture = _loadStateFromTable(user.id);
+      final usernameFuture = _loadUsername(user.id, metadata);
+
+      var state = await stateFuture;
       state ??= PetState.fromMap(_readMap(metadata['pet_state']));
 
-      final username = await _loadUsername(user.id, metadata);
+      final username = await usernameFuture;
       if (username.isNotEmpty) {
         state = state.copyWith(username: username);
       }
@@ -49,14 +55,16 @@ class PetService {
       return normalized;
     }
 
-    try {
-      final savedToTable = await _saveStateToTable(user.id, normalized);
-      if (!savedToTable) {
-        await _saveStateToMetadata(user, normalized);
-      }
-    } catch (error) {
-      debugPrint('PetService.saveState error: $error');
-      rethrow;
+    var saved = await _saveStateToTable(user.id, normalized);
+
+    if (!saved) {
+      saved = await _saveStateToMetadataWithRecovery(user, normalized);
+    }
+
+    if (!saved) {
+      debugPrint(
+        'PetService.saveState warning: unable to persist remotely, kept local cache only.',
+      );
     }
 
     _cachedState = normalized;
@@ -66,16 +74,13 @@ class PetService {
   PetState _normalize(PetState state) {
     var normalized = state.copyWith(
       energyPercent: state.energyPercent.clamp(0, 100),
-      foodCount: state.foodCount < 0 ? 0 : state.foodCount,
+      foodCount: state.foodCount.clamp(0, PetState.maxFoodCount),
       ownedItems: state.ownedItems.toSet().toList()..sort(),
     );
 
-    final nextFoodReadyAt = normalized.nextFoodReadyAt;
-    if (normalized.foodCount == 0 &&
-        nextFoodReadyAt != null &&
-        !nextFoodReadyAt.isAfter(DateTime.now())) {
+    if (normalized.foodCount >= PetState.maxFoodCount &&
+        normalized.nextFoodReadyAt != null) {
       normalized = normalized.copyWith(
-        foodCount: 1,
         clearNextFoodReadyAt: true,
       );
     }
@@ -87,20 +92,6 @@ class PetService {
     String userId,
     Map<String, dynamic> metadata,
   ) async {
-    try {
-      final row = await supabaseClient
-          .from('profiles')
-          .select('username')
-          .eq('id', userId)
-          .maybeSingle();
-      final username = row?['username']?.toString().trim();
-      if (username != null && username.isNotEmpty) {
-        return username;
-      }
-    } catch (error) {
-      debugPrint('PetService._loadUsername profiles error: $error');
-    }
-
     final metadataCandidates = [
       metadata['username'],
       metadata['name'],
@@ -114,19 +105,39 @@ class PetService {
       }
     }
 
+    try {
+      final row = await _withRequestTimeout(
+        supabaseClient
+            .from('profiles')
+            .select('username')
+            .eq('id', userId)
+            .maybeSingle(),
+        operation: '_loadUsername',
+      );
+      final username = row?['username']?.toString().trim();
+      if (username != null && username.isNotEmpty) {
+        return username;
+      }
+    } catch (error) {
+      debugPrint('PetService._loadUsername profiles error: $error');
+    }
+
     return '';
   }
 
   Future<PetState?> _loadStateFromTable(String userId) async {
     try {
-      final row = await supabaseClient
-          .from(_petProfilesTable)
-          .select(
-            'level, exp, energy_percent, food_count, owned_items, '
-            'equipped_item_id, next_food_ready_at',
-          )
-          .eq('user_id', userId)
-          .maybeSingle();
+      final row = await _withRequestTimeout(
+        supabaseClient
+            .from(_petProfilesTable)
+            .select(
+              'level, exp, energy_percent, food_count, owned_items, '
+              'equipped_item_id, next_food_ready_at',
+            )
+            .eq('user_id', userId)
+            .maybeSingle(),
+        operation: '_loadStateFromTable',
+      );
 
       if (row == null) {
         return null;
@@ -141,16 +152,19 @@ class PetService {
 
   Future<bool> _saveStateToTable(String userId, PetState state) async {
     try {
-      await supabaseClient.from(_petProfilesTable).upsert({
-        'user_id': userId,
-        'level': state.level,
-        'exp': state.exp,
-        'energy_percent': state.energyPercent,
-        'food_count': state.foodCount,
-        'owned_items': state.ownedItems,
-        'equipped_item_id': state.equippedItemId,
-        'next_food_ready_at': state.nextFoodReadyAt?.toIso8601String(),
-      });
+      await _withRequestTimeout(
+        supabaseClient.from(_petProfilesTable).upsert({
+          'user_id': userId,
+          'level': state.level,
+          'exp': state.exp,
+          'energy_percent': state.energyPercent,
+          'food_count': state.foodCount,
+          'owned_items': state.ownedItems,
+          'equipped_item_id': state.equippedItemId,
+          'next_food_ready_at': state.nextFoodReadyAt?.toIso8601String(),
+        }),
+        operation: '_saveStateToTable',
+      );
       return true;
     } catch (error) {
       debugPrint('PetService._saveStateToTable error: $error');
@@ -164,9 +178,91 @@ class PetService {
     );
     currentMetadata['pet_state'] = state.toMap();
 
-    await supabaseClient.auth.updateUser(
-      UserAttributes(data: currentMetadata),
+    await _withRequestTimeout(
+      supabaseClient.auth.updateUser(
+        UserAttributes(data: currentMetadata),
+      ),
+      operation: '_saveStateToMetadata',
     );
+  }
+
+  Future<bool> _saveStateToMetadataWithRecovery(
+    User user,
+    PetState state,
+  ) async {
+    try {
+      await _saveStateToMetadata(user, state);
+      return true;
+    } on AuthApiException catch (error) {
+      if (!_isSessionNotFound(error)) {
+        debugPrint('PetService._saveStateToMetadata auth error: $error');
+        return false;
+      }
+
+      final refreshed = await _refreshAuthSessionSafely();
+      if (!refreshed) {
+        debugPrint(
+          'PetService._saveStateToMetadata: session missing and refresh failed.',
+        );
+        return false;
+      }
+
+      final refreshedUser = supabaseClient.auth.currentUser;
+      if (refreshedUser == null) {
+        debugPrint(
+          'PetService._saveStateToMetadata: refresh succeeded but user is null.',
+        );
+        return false;
+      }
+
+      try {
+        await _saveStateToMetadata(refreshedUser, state);
+        return true;
+      } catch (retryError) {
+        debugPrint('PetService._saveStateToMetadata retry error: $retryError');
+        return false;
+      }
+    } catch (error) {
+      debugPrint('PetService._saveStateToMetadata error: $error');
+      return false;
+    }
+  }
+
+  bool _isSessionNotFound(AuthApiException error) {
+    final code = (error.code ?? '').trim().toLowerCase();
+    final message = error.message.toLowerCase();
+    return code == 'session_not_found' || message.contains('session_id claim');
+  }
+
+  Future<bool> _refreshAuthSessionSafely() async {
+    try {
+      final currentSession = supabaseClient.auth.currentSession;
+      if (currentSession == null) {
+        return false;
+      }
+      final response = await _withRequestTimeout(
+        supabaseClient.auth.refreshSession(),
+        operation: '_refreshAuthSessionSafely',
+      );
+      return response.session != null;
+    } catch (error) {
+      debugPrint('PetService._refreshAuthSessionSafely error: $error');
+      return false;
+    }
+  }
+
+  Future<T> _withRequestTimeout<T>(
+    Future<T> request, {
+    required String operation,
+  }) async {
+    try {
+      return await request.timeout(_requestTimeout);
+    } on TimeoutException {
+      throw TimeoutException(
+        'PetService.$operation timeout after '
+        '${_requestTimeout.inSeconds}s',
+      );
+    }
   }
 
   Map<String, dynamic>? _readMap(dynamic value) {

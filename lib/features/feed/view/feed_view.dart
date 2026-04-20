@@ -17,13 +17,62 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 final bool _isFeedCommentEnabled = false;
 
+String _buildLikeUpdateErrorMessage(
+  Object error, {
+  required bool isOwnPost,
+}) {
+  if (error is PostgrestException && _isPostReactionsRlsDenied(error)) {
+    if (isOwnPost) {
+      return 'ยังไลก์โพสต์ตัวเองไม่ได้ เพราะสิทธิ์ฐานข้อมูลยังไม่เปิด';
+    }
+    return 'อัปเดตการกดถูกใจไม่สำเร็จ เพราะสิทธิ์ฐานข้อมูลยังไม่อนุญาต';
+  }
+
+  return 'อัปเดตการกดถูกใจไม่สำเร็จ: $error';
+}
+
+bool _isPostReactionsRlsDenied(PostgrestException error) {
+  final code = (error.code ?? '').trim();
+  final message = error.message.toLowerCase();
+  final details = (error.details ?? '').toString().toLowerCase();
+
+  if (code != '42501') {
+    return false;
+  }
+
+  return message.contains('post_reactions') ||
+      details.contains('post_reactions') ||
+      message.contains('row-level security policy');
+}
+
+String _buildSavedUpdateErrorMessage(
+  Object error, {
+  required bool isOwnPost,
+}) {
+  if (error is PostgrestException) {
+    final code = (error.code ?? '').trim();
+    final message = error.message.toLowerCase();
+
+    if (code == 'P0001' && message.contains('post not found')) {
+      if (isOwnPost) {
+        return 'บันทึกโพสต์ตัวเองไม่สำเร็จ เพราะฟังก์ชันฐานข้อมูลยังไม่รองรับ';
+      }
+      return 'บันทึกโพสต์ไม่สำเร็จ เพราะไม่พบโพสต์ในฐานข้อมูล';
+    }
+  }
+
+  return 'อัปเดตการบันทึกไม่สำเร็จ: $error';
+}
+
 class FeedPage extends StatefulWidget {
   const FeedPage({
     super.key,
     this.focusPostId,
+    this.isActive = true,
   });
 
   final String? focusPostId;
+  final bool isActive;
 
   @override
   State<FeedPage> createState() => _FeedPageState();
@@ -37,8 +86,9 @@ class _FeedPageState extends State<FeedPage> {
   final User? _currentUser = supabase.auth.currentUser;
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _postItemKeys = <String, GlobalKey>{};
-  late final Stream<List<FeedPost>> _postsStream;
-  late final Stream<Set<String>> _likedPostIdsStream;
+  late Stream<List<FeedPost>> _postsStream;
+  late Stream<Set<String>> _likedPostIdsStream;
+  int _feedStreamSession = 0;
   Set<String> _savedPostIds = <String>{};
   bool _isLoadingSavedPostIds = false;
 
@@ -54,12 +104,66 @@ class _FeedPageState extends State<FeedPage> {
     super.initState();
     final focusPostId = widget.focusPostId?.trim() ?? '';
     _pendingFocusPostId = focusPostId.isEmpty ? null : focusPostId;
-    _postsStream = _repository.watchPosts();
-    _likedPostIdsStream = _currentUser == null
-        ? Stream<Set<String>>.value(const <String>{})
-        : _repository.watchLikedPostIds(_currentUser.id);
-    unawaited(_loadSavedPostIds());
-    _loadComposerIdentity();
+    _postsStream = _buildPostsStream(isActive: widget.isActive);
+    _likedPostIdsStream = _buildLikedPostIdsStream(isActive: widget.isActive);
+    if (widget.isActive) {
+      unawaited(_loadSavedPostIds());
+      _loadComposerIdentity();
+    } else {
+      _isLoadingComposer = false;
+    }
+  }
+
+  void _restartPostsStream() {
+    if (!mounted || !widget.isActive) {
+      return;
+    }
+    setState(() {
+      _postsStream = _repository.watchPosts();
+      _feedStreamSession++;
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant FeedPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _applyFeedActivityState(widget.isActive);
+    }
+  }
+
+  void _applyFeedActivityState(bool isActive) {
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _postsStream = _buildPostsStream(isActive: isActive);
+      _likedPostIdsStream = _buildLikedPostIdsStream(isActive: isActive);
+      _feedStreamSession++;
+      if (!isActive) {
+        _isLoadingComposer = false;
+      }
+    });
+
+    if (isActive) {
+      unawaited(_loadSavedPostIds());
+      unawaited(_loadComposerIdentity());
+    }
+  }
+
+  Stream<List<FeedPost>> _buildPostsStream({required bool isActive}) {
+    if (!isActive) {
+      return Stream<List<FeedPost>>.value(const <FeedPost>[]);
+    }
+    return _repository.watchPosts();
+  }
+
+  Stream<Set<String>> _buildLikedPostIdsStream({required bool isActive}) {
+    if (!isActive || _currentUser == null) {
+      return Stream<Set<String>>.value(const <String>{});
+    }
+    return _repository.watchLikedPostIds(_currentUser.id);
   }
 
   @override
@@ -112,9 +216,15 @@ class _FeedPageState extends State<FeedPage> {
 
     if (!mounted || created != true) return;
 
+    _restartPostsStream();
     await _refreshFeed();
-
     if (!mounted) return;
+
+    // Retry once more after upload/moderation hooks settle to avoid stale image URLs.
+    await Future<void>.delayed(const Duration(milliseconds: 900));
+    if (!mounted) return;
+    _restartPostsStream();
+
     _showSnackBar('โพสต์ของคุณถูกเผยแพร่แล้ว');
   }
 
@@ -127,7 +237,13 @@ class _FeedPageState extends State<FeedPage> {
       }
     } catch (error) {
       if (!mounted) return;
-      _showSnackBar('อัปเดตการกดถูกใจไม่สำเร็จ: $error', isError: true);
+      _showSnackBar(
+        _buildLikeUpdateErrorMessage(
+          error,
+          isOwnPost: _currentUser?.id == post.authorId,
+        ),
+        isError: true,
+      );
       rethrow;
     }
   }
@@ -181,6 +297,13 @@ class _FeedPageState extends State<FeedPage> {
   }
 
   Future<void> _refreshFeed() async {
+    if (widget.isActive && mounted) {
+      setState(() {
+        _postsStream = _repository.watchPosts();
+        _likedPostIdsStream = _buildLikedPostIdsStream(isActive: true);
+        _feedStreamSession++;
+      });
+    }
     await _loadComposerIdentity();
     await _repository.refreshPosts();
     await _loadSavedPostIds();
@@ -231,7 +354,13 @@ class _FeedPageState extends State<FeedPage> {
       setState(() {
         _savedPostIds = previousSavedPostIds;
       });
-      _showSnackBar('อัปเดตการบันทึกไม่สำเร็จ: $error', isError: true);
+      _showSnackBar(
+        _buildSavedUpdateErrorMessage(
+          error,
+          isOwnPost: _currentUser?.id == post.authorId,
+        ),
+        isError: true,
+      );
       rethrow;
     }
   }
@@ -367,6 +496,7 @@ class _FeedPageState extends State<FeedPage> {
               child: SizedBox(
                 width: maxContentWidth,
                 child: StreamBuilder<List<FeedPost>>(
+                  key: ValueKey<int>(_feedStreamSession),
                   stream: _postsStream,
                   builder: (context, postSnapshot) {
                     final feedHeader = _FeedHeader(
@@ -436,6 +566,8 @@ class _FeedPageState extends State<FeedPage> {
                         return RefreshIndicator(
                           onRefresh: _refreshFeed,
                           child: ListView.builder(
+                            addAutomaticKeepAlives: false,
+                            addRepaintBoundaries: true,
                             controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: EdgeInsets.only(
@@ -473,23 +605,26 @@ class _FeedPageState extends State<FeedPage> {
                                   padding: EdgeInsets.only(
                                     top: scale.rs(14, min: 10, max: 14),
                                   ),
-                                  child: FeedPostCard(
-                                    key: ValueKey(post.id),
-                                    post: post,
-                                    isLiked: isLiked,
-                                    isSaved: _savedPostIds.contains(post.id),
-                                    onAuthorTap: () => _openAuthorProfile(post),
-                                    onToggleLike:
-                                        _repository.supportsLikeActions
-                                            ? () => _toggleLike(post, isLiked)
-                                            : null,
-                                    onToggleSaved: () => _toggleSavedPost(
-                                      post,
-                                      _savedPostIds.contains(post.id),
+                                  child: RepaintBoundary(
+                                    child: FeedPostCard(
+                                      key: ValueKey(post.id),
+                                      post: post,
+                                      isLiked: isLiked,
+                                      isSaved: _savedPostIds.contains(post.id),
+                                      onAuthorTap: () =>
+                                          _openAuthorProfile(post),
+                                      onToggleLike:
+                                          _repository.supportsLikeActions
+                                              ? () => _toggleLike(post, isLiked)
+                                              : null,
+                                      onToggleSaved: () => _toggleSavedPost(
+                                        post,
+                                        _savedPostIds.contains(post.id),
+                                      ),
+                                      onDelete: post.authorId == currentUser.id
+                                          ? () => _deletePost(post)
+                                          : null,
                                     ),
-                                    onDelete: post.authorId == currentUser.id
-                                        ? () => _deletePost(post)
-                                        : null,
                                   ),
                                 ),
                               );
@@ -556,7 +691,12 @@ class _FeedProfilePageState extends State<FeedProfilePage> {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('อัปเดตการกดถูกใจไม่สำเร็จ: $error'),
+          content: Text(
+            _buildLikeUpdateErrorMessage(
+              error,
+              isOwnPost: currentUserId == post.authorId,
+            ),
+          ),
           backgroundColor: Colors.red,
         ),
       );
@@ -1934,12 +2074,20 @@ class FeedPostCard extends StatefulWidget {
 class _FeedPostCardState extends State<FeedPostCard> {
   static const _accent = Color(0xFF4489D7);
   static const _cardBorder = Color(0xFFDCEBFA);
+  static final RegExp _hashTagPattern =
+      RegExp(r'#([\p{L}\p{N}_]+)', unicode: true);
+  static final RegExp _nonWordPattern =
+      RegExp(r'[^\p{L}\p{N}\s]', unicode: true);
+  static final RegExp _whitespacePattern = RegExp(r'\s+');
 
   late bool _displayIsLiked;
   late int _displayLikeCount;
   bool _isUpdatingLike = false;
   late bool _displayIsSaved;
   bool _isUpdatingSaved = false;
+  late List<String> _displayTags;
+  late _PostBadge _displayPostBadge;
+  late String _displayHandle;
 
   String _formatRelativeTime(DateTime createdAt) {
     final now = DateTime.now();
@@ -1982,6 +2130,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
     _displayIsLiked = widget.isLiked;
     _displayLikeCount = widget.post.likeCount;
     _displayIsSaved = widget.isSaved;
+    _refreshDerivedPostViewData();
   }
 
   @override
@@ -1995,6 +2144,10 @@ class _FeedPostCardState extends State<FeedPostCard> {
     }
     if (widget.isSaved != oldWidget.isSaved) {
       _displayIsSaved = widget.isSaved;
+    }
+    if (widget.post.content != oldWidget.post.content ||
+        widget.post.authorName != oldWidget.post.authorName) {
+      _refreshDerivedPostViewData();
     }
   }
 
@@ -2058,12 +2211,65 @@ class _FeedPostCardState extends State<FeedPostCard> {
     }
   }
 
+  void _refreshDerivedPostViewData() {
+    _displayTags = _buildTags(widget.post.content);
+    _displayPostBadge = _resolvePostBadge(widget.post.content);
+    _displayHandle = _buildHandle(widget.post.authorName);
+  }
+
+  int _toCacheDimension(double logicalSize, double devicePixelRatio) {
+    final value = (logicalSize * devicePixelRatio).round();
+    if (value < 1) {
+      return 1;
+    }
+    if (value > 4096) {
+      return 4096;
+    }
+    return value;
+  }
+
+  Widget _buildPostImage(ResponsiveScale scale) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxCardWidth = constraints.maxWidth;
+        final imageWidth = maxCardWidth.clamp(220.0, 420.0).toDouble();
+        final imageHeight = imageWidth * 0.78;
+        final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+        final cacheWidth = _toCacheDimension(imageWidth, devicePixelRatio);
+        final cacheHeight = _toCacheDimension(imageHeight, devicePixelRatio);
+
+        return Center(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(scale.rs(18, min: 14, max: 18)),
+            child: SizedBox(
+              width: imageWidth,
+              height: imageHeight,
+              child: Image.network(
+                widget.post.imageUrl!,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.low,
+                cacheWidth: cacheWidth,
+                cacheHeight: cacheHeight,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: const Color(0xFFF0F3F8),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.broken_image_outlined,
+                    color: Color(0xFF97A0B5),
+                    size: 32,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scale = context.responsive;
-    final tags = _buildTags(widget.post.content);
-    final postBadge = _resolvePostBadge(widget.post.content);
-    final handle = _buildHandle(widget.post.authorName);
 
     return Container(
       padding: EdgeInsets.fromLTRB(
@@ -2078,9 +2284,9 @@ class _FeedPostCardState extends State<FeedPostCard> {
         border: Border.all(color: _cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.035),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -2119,7 +2325,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
                         runSpacing: scale.rs(4, min: 4, max: 4),
                         children: [
                           Text(
-                            handle,
+                            _displayHandle,
                             style: TextStyle(
                               fontSize: scale.rf(12.5, min: 11.5, max: 12.5),
                               color: const Color(0xFF6A7489),
@@ -2138,15 +2344,15 @@ class _FeedPostCardState extends State<FeedPostCard> {
                               vertical: scale.rs(3, min: 2, max: 3),
                             ),
                             decoration: BoxDecoration(
-                              color: postBadge.backgroundColor,
+                              color: _displayPostBadge.backgroundColor,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Text(
-                              postBadge.label,
+                              _displayPostBadge.label,
                               style: TextStyle(
                                 fontSize: scale.rf(11, min: 10, max: 11),
                                 fontWeight: FontWeight.w700,
-                                color: postBadge.foregroundColor,
+                                color: _displayPostBadge.foregroundColor,
                               ),
                             ),
                           ),
@@ -2188,43 +2394,14 @@ class _FeedPostCardState extends State<FeedPostCard> {
           ],
           if ((widget.post.imageUrl ?? '').isNotEmpty) ...[
             SizedBox(height: scale.rs(14, min: 10, max: 14)),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final maxCardWidth = constraints.maxWidth;
-                final imageWidth = maxCardWidth.clamp(220.0, 420.0);
-
-                return Center(
-                  child: ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(scale.rs(18, min: 14, max: 18)),
-                    child: SizedBox(
-                      width: imageWidth,
-                      height: imageWidth * 0.78,
-                      child: Image.network(
-                        widget.post.imageUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: const Color(0xFFF0F3F8),
-                          alignment: Alignment.center,
-                          child: const Icon(
-                            Icons.broken_image_outlined,
-                            color: Color(0xFF97A0B5),
-                            size: 32,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+            _buildPostImage(scale),
           ],
-          if (tags.isNotEmpty) ...[
+          if (_displayTags.isNotEmpty) ...[
             SizedBox(height: scale.rs(14, min: 10, max: 14)),
             Wrap(
               spacing: scale.rs(8, min: 6, max: 8),
               runSpacing: scale.rs(8, min: 6, max: 8),
-              children: tags
+              children: _displayTags
                   .map(
                     (tag) => Container(
                       padding: EdgeInsets.symmetric(
@@ -2350,7 +2527,7 @@ class _FeedPostCardState extends State<FeedPostCard> {
   }
 
   List<String> _buildTags(String content) {
-    final matches = RegExp(r'#([\p{L}\p{N}_]+)', unicode: true)
+    final matches = _hashTagPattern
         .allMatches(content)
         .map((match) => '#${match.group(1)}')
         .where((tag) => tag.length > 1)
@@ -2362,8 +2539,8 @@ class _FeedPostCardState extends State<FeedPostCard> {
     }
 
     return content
-        .replaceAll(RegExp(r'[^\p{L}\p{N}\s]', unicode: true), ' ')
-        .split(RegExp(r'\s+'))
+        .replaceAll(_nonWordPattern, ' ')
+        .split(_whitespacePattern)
         .map((word) => word.trim())
         .where((word) => word.length >= 4)
         .take(3)

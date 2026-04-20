@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/app/navigation/bottom_nav_bar.dart';
 import 'package:flutter_application_1/core/services/coin_service.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
+import 'package:flutter_application_1/core/services/app_snackbar.dart';
+import 'package:flutter_application_1/features/role_logic/view/pages/role_selection_page.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_1/features/profile/view/profile_view.dart';
@@ -10,6 +12,7 @@ import 'package:flutter_application_1/features/home/service/daily_mood_status_se
 
 class DailyMoodPage extends StatefulWidget {
   const DailyMoodPage({super.key});
+  static const String openEncouragementResult = '__open_encouragement__';
 
   @override
   State<DailyMoodPage> createState() => _DailyMoodPageState();
@@ -123,6 +126,10 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   SupabaseClient get _sb => Supabase.instance.client;
   bool get _isLoggedIn => _sb.auth.currentUser != null;
 
+  bool _shouldOpenEncouragement(_MoodOption option) {
+    return option.label == 'แย่มาก' || option.label == 'แย่';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -218,11 +225,9 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     if (!mounted) return;
 
     if (showSnackbar) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('รีเซ็ตสถานะวันนี้แล้ว กดส่งพลังใจเพื่อบันทึกคำตอบใหม่'),
-        ),
+      AppSnackbar.success(
+        'รีเซ็ตแล้ว',
+        'รีเซ็ตสถานะวันนี้แล้ว กดส่งพลังใจเพื่อบันทึกคำตอบใหม่',
       );
     }
   }
@@ -320,19 +325,9 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     final canEditNow = _answeredToday && _isEditMode && !_editUsedToday;
 
     if (!isFirstAnswer && !canEditNow) return;
-    if (_selectedTags.isEmpty) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณาเลือกความรู้สึกอย่างน้อย 1 ข้อก่อนส่งพลังใจ'),
-        ),
-      );
-      return;
-    }
     if (!_isLoggedIn) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('กรุณาเข้าสู่ระบบก่อนบันทึก Daily Mood')),
-      );
+      AppSnackbar.error(
+          'กรุณาเข้าสู่ระบบ', 'กรุณาเข้าสู่ระบบก่อนบันทึก Daily Mood');
       return;
     }
 
@@ -350,9 +345,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('บันทึกไม่สำเร็จ (Supabase): $e')),
-      );
+      AppSnackbar.error('บันทึกไม่สำเร็จ', 'บันทึกไม่สำเร็จ (Supabase): $e');
       return;
     }
 
@@ -376,17 +369,28 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       _isEditMode = false;
     });
 
+    if (_shouldOpenEncouragement(option)) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pop(DailyMoodPage.openEncouragementResult);
+      return;
+    }
+
+    await Get.to<void>(() => const RoleSelectionPage());
+    if (!mounted) {
+      return;
+    }
+
     Get.offAll(() => const BottomNavBar());
   }
 
   bool get _canLeavePage => _answeredToday;
-  bool get _hasSelectedMoodTags => _selectedTags.isNotEmpty;
 
   void _showLockedExitHint() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('กรุณาทำ Daily Mood ของวันนี้ก่อน จึงจะออกจากหน้านี้ได้'),
-      ),
+    AppSnackbar.error(
+      'ยังออกจากหน้านี้ไม่ได้',
+      'กรุณาทำ Daily Mood ของวันนี้ก่อน จึงจะออกจากหน้านี้ได้',
     );
   }
 
@@ -512,18 +516,6 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               SizedBox(height: scale.rs(12, min: 8, max: 12)),
                               _buildTagRow(currentTags.sublist(4, 8),
                                   enabled: canSelectMood, scale: scale),
-                              if (canSelectMood && !_hasSelectedMoodTags) ...[
-                                SizedBox(
-                                  height: scale.rs(8, min: 6, max: 8),
-                                ),
-                                Text(
-                                  'กรุณาเลือกความรู้สึกอย่างน้อย 1 ข้อ',
-                                  style: TextStyle(
-                                    color: const Color(0xFF607D8B),
-                                    fontSize: scale.rf(12, min: 10.5, max: 12),
-                                  ),
-                                ),
-                              ],
                             ],
                           ),
                           SizedBox(height: scale.rs(30, min: 16, max: 54)),
@@ -611,10 +603,9 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
                               width: scale.rw(0.85, min: 220, max: 420),
                               height: scale.rs(55, min: 46, max: 55),
                               child: ElevatedButton(
-                                onPressed:
-                                    (canSelectMood && _hasSelectedMoodTags)
-                                        ? () => _submitMood(selectedOption)
-                                        : null,
+                                onPressed: canSelectMood
+                                    ? () => _submitMood(selectedOption)
+                                    : null,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color(0xFFB5EFFF),
                                   disabledBackgroundColor:

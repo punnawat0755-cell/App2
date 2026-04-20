@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
+import 'package:flutter_application_1/core/services/auth_session_marker.dart';
 import 'package:flutter_application_1/features/login/view/login_page.dart';
 import 'package:flutter_application_1/features/profile/controller/profile_avatar_controller.dart';
-import 'package:flutter_application_1/features/login/view/privacy_policy_page.dart';
+import 'package:flutter_application_1/module/home/view/noti.dart';
 import 'package:flutter_application_1/features/setting/view/edit_profile_page.dart';
 import 'package:flutter_application_1/features/setting/view/favorites_page.dart';
 import 'package:get/get.dart';
@@ -86,6 +87,7 @@ class _SettingPageState extends State<SettingPage> {
 
   Future<void> _handleLogout() async {
     try {
+      await AuthSessionMarker.clearExplicitLoginMarker();
       await _supabase.auth.signOut();
       await FirebaseAuth.instance.signOut();
 
@@ -152,13 +154,15 @@ class _SettingPageState extends State<SettingPage> {
             final avatarEditIconSize = pageScale.rs(18, min: 15, max: 18);
             final avatarEditBorder = pageScale.rs(2, min: 1.5, max: 2.4);
 
-            return Center(
+            return Align(
+              // 💡 1. เปลี่ยนจาก Center เป็น Align แบบชิดบน
+              alignment: Alignment.topCenter,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 500),
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     horizontalPadding,
-                    pageScale.rs(24, min: 18, max: 24),
+                    pageScale.rs(10, min: 8, max: 12),
                     horizontalPadding,
                     pageScale.rs(28, min: 22, max: 28),
                   ),
@@ -173,33 +177,13 @@ class _SettingPageState extends State<SettingPage> {
                             clipBehavior: Clip.none,
                             children: [
                               Container(
-                                width: avatarSize,
-                                height: avatarSize,
+                                width: 170,
+                                height: 170,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   image: DecorationImage(
                                     image: avatarController.avatarImageProvider,
                                     fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                              Positioned(
-                                right: 4,
-                                bottom: 4,
-                                child: Container(
-                                  padding: EdgeInsets.all(avatarEditPadding),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF4489D7),
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: avatarEditBorder,
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    Icons.edit_rounded,
-                                    size: avatarEditIconSize,
-                                    color: Colors.white,
                                   ),
                                 ),
                               ),
@@ -218,36 +202,26 @@ class _SettingPageState extends State<SettingPage> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          avatarController.isSaving.value
-                              ? 'กำลังบันทึกรูปโปรไฟล์...'
-                              : 'แตะรูปเพื่อเปลี่ยนรูปโปรไฟล์',
-                          style: GoogleFonts.mitr(
-                            textStyle: TextStyle(
-                              color: Color(0xFF757575),
-                              fontSize: pageScale.rf(15, min: 13, max: 15),
-                            ),
-                          ),
-                        ),
                         SizedBox(height: pageScale.rs(30, min: 22, max: 30)),
+                        _buildSettingItem(
+                          context,
+                          Image.asset('assets/images/bell.png'),
+                          'แจ้งเตือน',
+                          () => Get.to(() => NotiPage()),
+                        ),
+                        SizedBox(height: pageScale.rs(20, min: 14, max: 20)),
                         _buildSettingItem(
                           context,
                           Image.asset('assets/images/person.png'),
                           'แก้ไขข้อมูล',
                           () async {
                             final shouldRefresh = await Get.to<bool>(
-                                () => const EditProfilePage());
+                              () => const EditProfilePage(),
+                            );
                             if (shouldRefresh == true) {
                               await _loadDisplayName();
                             }
                           },
-                        ),
-                        SizedBox(height: pageScale.rs(20, min: 14, max: 20)),
-                        _buildSettingItem(
-                          context,
-                          Image.asset('assets/images/lock.png'),
-                          'ความเป็นส่วนตัว',
-                          () => Get.to(() => const PrivacyDetailPage()),
                         ),
                         SizedBox(height: pageScale.rs(20, min: 14, max: 20)),
                         _buildSettingItem(
@@ -293,8 +267,7 @@ class _SettingPageState extends State<SettingPage> {
                   final scale = ResponsiveScale.fromWidth(constraints.maxWidth);
                   final crossAxisCount = constraints.maxWidth < 360 ? 3 : 4;
                   final gridSpacing = scale.rs(14, min: 10, max: 14);
-                  final canSubmit =
-                      !isSubmitting && !controller.isSaving.value;
+                  final canSubmit = !isSubmitting && !controller.isSaving.value;
 
                   Future<void> submitSelection() async {
                     if (!canSubmit) {
@@ -559,16 +532,16 @@ class _SettingPageState extends State<SettingPage> {
               style: GoogleFonts.mitr(
                 textStyle: TextStyle(
                   color: const Color(0xFF9E9E9E),
-                  fontSize: scale.rf(18, min: 15, max: 18),
+                  fontSize: scale.rf(16, min: 15, max: 18),
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
-            SizedBox(width: scale.rs(12, min: 8, max: 12)),
+            SizedBox(width: scale.rs(8, min: 8, max: 12)),
             Image.asset(
               'assets/images/exit.png',
-              width: scale.rs(34, min: 26, max: 34),
-              height: scale.rs(34, min: 26, max: 34),
+              width: scale.rs(24, min: 26, max: 34),
+              height: scale.rs(24, min: 26, max: 34),
               fit: BoxFit.contain,
             ),
           ],

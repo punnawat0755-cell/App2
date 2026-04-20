@@ -166,7 +166,8 @@ class PostModerationService {
         ),
       );
 
-      final streamedResponse = await _httpClient.send(request).timeout(_timeout);
+      final streamedResponse =
+          await _httpClient.send(request).timeout(_timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
 
       if (streamedResponse.statusCode != 200) {

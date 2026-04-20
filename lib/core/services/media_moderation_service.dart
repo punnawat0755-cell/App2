@@ -212,7 +212,8 @@ class MediaModerationService {
     }
 
     try {
-      final streamedResponse = await _httpClient.send(request).timeout(_timeout);
+      final streamedResponse =
+          await _httpClient.send(request).timeout(_timeout);
       final responseBody = await streamedResponse.stream.bytesToString();
 
       debugPrint('media moderation response body=$responseBody');
@@ -363,9 +364,7 @@ class MediaModerationService {
   http_parser.MediaType _toMediaType(String mimeType) {
     final normalized = mimeType.trim().toLowerCase();
     final parts = normalized.split('/');
-    if (parts.length == 2 &&
-        parts[0].isNotEmpty &&
-        parts[1].isNotEmpty) {
+    if (parts.length == 2 && parts[0].isNotEmpty && parts[1].isNotEmpty) {
       return http_parser.MediaType(parts[0], parts[1]);
     }
     return http_parser.MediaType('application', 'octet-stream');

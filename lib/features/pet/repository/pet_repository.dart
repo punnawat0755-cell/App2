@@ -7,6 +7,7 @@ class PetRepository {
   final PetService _service;
   static const int _freeFeedExpReward = 10;
   static const int _coinFeedExpReward = 18;
+  static const int _maxFreeFoodCount = PetState.maxFoodCount;
 
   Future<PetState> loadState() => _service.loadState();
 
@@ -19,28 +20,28 @@ class PetRepository {
     }
 
     final nextFoodCount = current.foodCount - 1;
-    final nextState = _applyExpGain(
-      current.copyWith(
-        foodCount: nextFoodCount,
-        energyPercent: (current.energyPercent + 5).clamp(0, 100),
-        nextFoodReadyAt:
-            nextFoodCount == 0 ? DateTime.now().add(refillDuration) : null,
-        clearNextFoodReadyAt: nextFoodCount > 0,
-      ),
-      _freeFeedExpReward,
+    final shouldScheduleRefill = nextFoodCount < _maxFreeFoodCount;
+    final nextFoodReadyAt = shouldScheduleRefill
+        ? (current.nextFoodReadyAt ?? DateTime.now().add(refillDuration))
+        : null;
+
+    final fedState = current.copyWith(
+      foodCount: nextFoodCount,
+      energyPercent: (current.energyPercent + 5).clamp(0, 100),
+      nextFoodReadyAt: nextFoodReadyAt,
+      clearNextFoodReadyAt: nextFoodReadyAt == null,
     );
+    final nextState = _applyExpGain(fedState, _freeFeedExpReward);
     return _service.saveState(nextState);
   }
 
   Future<PetState> feedWithCoin() async {
     final current = await _service.loadState();
+    final fedState = current.copyWith(
+      energyPercent: (current.energyPercent + 10).clamp(0, 100),
+    );
     return _service.saveState(
-      _applyExpGain(
-        current.copyWith(
-          energyPercent: (current.energyPercent + 10).clamp(0, 100),
-        ),
-        _coinFeedExpReward,
-      ),
+      _applyExpGain(fedState, _coinFeedExpReward),
     );
   }
 
@@ -67,18 +68,113 @@ class PetRepository {
     );
   }
 
-  Future<PetState> markFoodRefillReady() async {
+  Future<PetState> unequipItem() async {
     final current = await _service.loadState();
-    if (current.foodCount > 0) {
+    if (current.equippedItemId == null) {
       return current;
     }
 
     return _service.saveState(
+      current.copyWith(clearEquippedItemId: true),
+    );
+  }
+
+  Future<PetState> markFoodRefillReady({
+    required Duration refillDuration,
+  }) async {
+    final current = await _service.loadState();
+    if (current.foodCount >= _maxFreeFoodCount) {
+      if (current.nextFoodReadyAt == null) {
+        return current;
+      }
+      return _service.saveState(
+        current.copyWith(
+          foodCount: _maxFreeFoodCount,
+          clearNextFoodReadyAt: true,
+        ),
+      );
+    }
+
+    final scheduledReadyAt = current.nextFoodReadyAt;
+    if (scheduledReadyAt == null) {
+      return _service.saveState(
+        current.copyWith(
+          nextFoodReadyAt: DateTime.now().add(refillDuration),
+        ),
+      );
+    }
+
+    final now = DateTime.now();
+    if (now.isBefore(scheduledReadyAt)) {
+      return current;
+    }
+
+    final refillSeconds =
+        refillDuration.inSeconds <= 0 ? 1 : refillDuration.inSeconds;
+    final elapsedSeconds = now.difference(scheduledReadyAt).inSeconds;
+    final gainedFood = 1 + (elapsedSeconds ~/ refillSeconds);
+    final nextFoodCount =
+        (current.foodCount + gainedFood).clamp(0, _maxFreeFoodCount).toInt();
+
+    if (nextFoodCount >= _maxFreeFoodCount) {
+      return _service.saveState(
+        current.copyWith(
+          foodCount: _maxFreeFoodCount,
+          clearNextFoodReadyAt: true,
+        ),
+      );
+    }
+
+    final nextReadyAt = scheduledReadyAt.add(
+      Duration(seconds: gainedFood * refillSeconds),
+    );
+
+    return _service.saveState(
       current.copyWith(
-        foodCount: 1,
-        clearNextFoodReadyAt: true,
+        foodCount: nextFoodCount,
+        nextFoodReadyAt: nextReadyAt,
       ),
     );
+  }
+
+  Future<PetState> alignFoodCooldown({
+    required Duration refillDuration,
+    PetState? baseState,
+  }) async {
+    final current = baseState ?? await _service.loadState();
+
+    if (current.foodCount >= _maxFreeFoodCount) {
+      if (current.nextFoodReadyAt == null) {
+        return current;
+      }
+      return _service.saveState(
+        current.copyWith(
+          foodCount: _maxFreeFoodCount,
+          clearNextFoodReadyAt: true,
+        ),
+      );
+    }
+
+    final now = DateTime.now();
+    final nextFoodReadyAt = current.nextFoodReadyAt;
+    if (nextFoodReadyAt == null) {
+      return _service.saveState(
+        current.copyWith(
+          nextFoodReadyAt: now.add(refillDuration),
+        ),
+      );
+    }
+
+    final remaining = nextFoodReadyAt.difference(now);
+    if (remaining > refillDuration) {
+      return _service.saveState(
+        current.copyWith(
+          nextFoodReadyAt: now.add(refillDuration),
+        ),
+      );
+    }
+
+    return current;
   }
 
   PetState _applyExpGain(PetState state, int gainedExp) {

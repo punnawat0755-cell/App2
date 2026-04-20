@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/pet/controller/pet_controller.dart';
+import 'package:flutter_application_1/features/pet/model/pet_state.dart';
 import 'package:flutter_application_1/features/shop/view/shop_view.dart';
 import 'package:get/get.dart';
 
@@ -22,6 +23,8 @@ class PetPage extends StatefulWidget {
 class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
   late final Pet controller;
   late final AudioPlayer _audioPlayer;
+  bool _isSoundPlaying = false;
+  bool _isDisposed = false;
 
   @override
   void initState() {
@@ -29,66 +32,23 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     controller = Get.isRegistered<Pet>() ? Get.find<Pet>() : Get.put(Pet());
     _audioPlayer = AudioPlayer();
-    if (widget.isActive) {
-      unawaited(_startLoopSound());
-    }
+    unawaited(_syncSoundPlayback());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.refreshState(silent: true);
-    });
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      controller.refreshState(silent: true);
       if (widget.isActive) {
-        unawaited(_startLoopSound());
+        unawaited(controller.refreshState(silent: true));
       }
-      return;
-    }
-
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.paused ||
-        state == AppLifecycleState.detached) {
-      unawaited(_stopLoopSound());
-    }
-  }
-
-  Future<void> _startLoopSound() async {
-    try {
-      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _audioPlayer.play(AssetSource('Sound/howareyou.mp3'));
-      if (!mounted || !widget.isActive) {
-        await _audioPlayer.stop();
-      }
-    } catch (e) {
-      debugPrint('Failed to play looping pet sound: $e');
-    }
-  }
-
-  Future<void> _stopLoopSound() async {
-    try {
-      await _audioPlayer.stop();
-    } catch (e) {
-      debugPrint('Failed to stop looping pet sound: $e');
-    }
+    });
   }
 
   @override
   void didUpdateWidget(covariant PetPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    if (widget.isActive == oldWidget.isActive) {
-      return;
+    if (oldWidget.isActive != widget.isActive) {
+      unawaited(_syncSoundPlayback());
+      if (widget.isActive) {
+        unawaited(controller.refreshState(silent: true));
+      }
     }
-
-    if (widget.isActive) {
-      unawaited(_startLoopSound());
-      return;
-    }
-
-    unawaited(_stopLoopSound());
   }
 
   @override
@@ -96,7 +56,68 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_stopLoopSound());
     _audioPlayer.dispose();
+    _isDisposed = true;
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      if (widget.isActive) {
+        unawaited(controller.refreshState(silent: true));
+      }
+      unawaited(_syncSoundPlayback());
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_stopLoopSound());
+    }
+  }
+
+  Future<void> _syncSoundPlayback() async {
+    if (_isDisposed) {
+      return;
+    }
+
+    if (widget.isActive) {
+      await _startLoopSound();
+      return;
+    }
+
+    await _stopLoopSound();
+  }
+
+  Future<void> _startLoopSound() async {
+    if (_isDisposed || _isSoundPlaying) {
+      return;
+    }
+
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.play(AssetSource('Sound/howareyou.mp3'));
+      _isSoundPlaying = true;
+    } catch (e) {
+      _isSoundPlaying = false;
+      debugPrint('Failed to play looping pet sound: $e');
+    }
+  }
+
+  Future<void> _stopLoopSound() async {
+    if (!_isSoundPlaying) {
+      return;
+    }
+
+    try {
+      await _audioPlayer.stop();
+    } catch (e) {
+      debugPrint('Failed to stop looping pet sound: $e');
+    } finally {
+      _isSoundPlaying = false;
+    }
   }
 
   @override
@@ -228,58 +249,6 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
                     ),
                   ),
                   SizedBox(height: scale.rs(5, min: 3, max: 5)),
-                  Obx(
-                    () => Container(
-                      width: energyBarWidth,
-                      padding: EdgeInsets.symmetric(
-                        horizontal: scale.rs(12, min: 10, max: 12),
-                        vertical: scale.rs(6, min: 5, max: 6),
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.92),
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'EXP',
-                                style: TextStyle(
-                                  color: const Color(0xFF2C5E92),
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: scale.rf(12, min: 10.5, max: 12),
-                                ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '${controller.exp.value}/${controller.expRequiredForNextLevel}',
-                                style: TextStyle(
-                                  color: const Color(0xFF5D4037),
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: scale.rf(11, min: 10, max: 11),
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: scale.rs(5, min: 4, max: 5)),
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: LinearProgressIndicator(
-                              minHeight: scale.rs(8, min: 6, max: 8),
-                              value: controller.expProgress,
-                              backgroundColor: const Color(0xFFD8ECFA),
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Color(0xFF4489D7),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: scale.rs(5, min: 3, max: 5)),
                   Container(
                     width: energyBarWidth,
                     height: boxHeight,
@@ -377,6 +346,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
+            /*
             Container(
               padding: EdgeInsets.symmetric(
                 horizontal: scale.rs(18, min: 14, max: 18),
@@ -403,6 +373,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
               ),
             ),
             SizedBox(height: scale.rs(16, min: 12, max: 16)),
+            */
             SizedBox(
               width: scale.rs(260, min: 210, max: 260),
               height: scale.rs(230, min: 180, max: 230),
@@ -445,25 +416,6 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
               ),
             ),
             SizedBox(height: scale.rs(8, min: 6, max: 8)),
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: scale.rs(14, min: 10, max: 14),
-                vertical: scale.rs(8, min: 6, max: 8),
-              ),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: Text(
-                'EXP ${controller.exp.value}/${controller.expRequiredForNextLevel}',
-                style: TextStyle(
-                  color: const Color(0xFF2C5E92),
-                  fontWeight: FontWeight.w800,
-                  fontSize: scale.rf(13, min: 11, max: 13),
-                ),
-              ),
-            ),
-            SizedBox(height: scale.rs(8, min: 6, max: 8)),
             if (equippedItem != null)
               Container(
                 padding: EdgeInsets.symmetric(
@@ -485,15 +437,6 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
                     fontWeight: FontWeight.w800,
                     fontSize: scale.rf(13, min: 11, max: 13),
                   ),
-                ),
-              )
-            else
-              Text(
-                'ยังไม่ได้ใส่ไอเท็ม',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.95),
-                  fontWeight: FontWeight.w700,
-                  fontSize: scale.rf(14, min: 12, max: 14),
                 ),
               ),
           ],
@@ -523,15 +466,20 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Obx(() {
-            final isOutOfFood = controller.foodCount.value == 0;
+            final isFoodRefillPending =
+                controller.foodCount.value < PetState.maxFoodCount;
             return _buildItemCard(
               imagePath: 'assets/images/fish1.png',
               customImageSize: scale.rs(90, min: 72, max: 90),
               customImageBottom: scale.rs(10, min: 6, max: 10),
               labelWidget: Text(
-                isOutOfFood ? controller.remainingTime.value : '00:00:00',
+                isFoodRefillPending
+                    ? controller.remainingTime.value
+                    : '00:00:00',
                 style: TextStyle(
-                  color: isOutOfFood ? Colors.grey : const Color(0xFF1565C0),
+                  color: isFoodRefillPending
+                      ? const Color(0xFF1565C0)
+                      : Colors.grey,
                   fontWeight: FontWeight.w900,
                   fontSize: screenWidth < 360
                       ? scale.rf(14, min: 12, max: 14)

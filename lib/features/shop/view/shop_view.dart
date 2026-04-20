@@ -15,7 +15,7 @@ class ShopPage extends StatelessWidget {
     final List<ShopItem> shopItems = shopItemsMock;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFE6F7FF),
       body: SafeArea(
         top: false,
         bottom: false,
@@ -264,6 +264,7 @@ class ShopPage extends StatelessWidget {
             final canTap = !isBusy &&
                 !controller.isLoading.value &&
                 !controller.isRefreshing.value &&
+                !controller.isEquipping.value &&
                 !controller.isFeedingCoin.value &&
                 !controller.isFeedingFree.value;
 
@@ -274,6 +275,20 @@ class ShopPage extends StatelessWidget {
                   opacity: canTap ? 1 : 0.7,
                   child: GestureDetector(
                     onTap: () async {
+                      if (isEquipped) {
+                        final unequipped = await controller.unequipItem();
+                        if (unequipped) {
+                          Get.snackbar(
+                            'ถอดชุดแล้ว',
+                            'ถอด ${item.name} เรียบร้อย',
+                            backgroundColor: Colors.blueGrey,
+                            colorText: Colors.white,
+                            duration: const Duration(seconds: 1),
+                          );
+                        }
+                        return;
+                      }
+
                       final equipped = await controller.equipItem(index);
                       if (equipped) {
                         Get.snackbar(
@@ -311,7 +326,7 @@ class ShopPage extends StatelessWidget {
                               ),
                             )
                           : Text(
-                              isEquipped ? 'กำลังใช้' : 'ใช้เลย',
+                              isEquipped ? 'ถอดออก' : 'ใช้เลย',
                               style: TextStyle(
                                 color: isEquipped
                                     ? Colors.white

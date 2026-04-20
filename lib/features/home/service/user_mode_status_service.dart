@@ -177,10 +177,17 @@ class UserModeStatusService {
     }
 
     await _ensureRoleState();
-    await supabase.rpc(
-      'set_my_mode',
-      params: {'p_mode': normalizedMode},
-    );
+    try {
+      await supabase.rpc(
+        'set_my_mode',
+        params: {'p_mode': normalizedMode},
+      );
+    } on PostgrestException catch (error) {
+      if (!_isAmbiguousUserIdError(error)) {
+        rethrow;
+      }
+      await _saveCurrentModeFallback(normalizedMode);
+    }
     await _saveLocalSelection(userId: currentUser.id, mode: normalizedMode);
   }
 
@@ -559,6 +566,51 @@ class UserModeStatusService {
 
     final message = error.message.toLowerCase();
     return message.contains('could not find the function');
+  }
+
+  static bool _isAmbiguousUserIdError(PostgrestException error) {
+    if ((error.code ?? '').trim() != '42702') {
+      return false;
+    }
+
+    final message = error.message.toLowerCase();
+    return message.contains('user_id') && message.contains('ambiguous');
+  }
+
+  static Future<void> _saveCurrentModeFallback(String mode) async {
+    final currentUser = supabase.auth.currentUser;
+    if (currentUser == null) {
+      throw StateError('กรุณาเข้าสู่ระบบก่อนเลือกบทบาท');
+    }
+
+    if (mode == 'listener') {
+      final passedToday = await hasPassedAssessmentToday();
+      if (!passedToday) {
+        throw StateError('listener mode requires passing assessment today');
+      }
+    }
+
+    final selectedForDay = await _resolveSelectedDateForDb();
+    await supabase.from('user_modes').upsert(
+      {
+        'user_id': currentUser.id,
+        'current_mode': mode,
+        'selected_for_day': selectedForDay,
+      },
+      onConflict: 'user_id',
+    );
+  }
+
+  static Future<String> _resolveSelectedDateForDb() async {
+    try {
+      final raw = await supabase.rpc('current_bangkok_date');
+      final serverDate = _stringOrNull(raw);
+      if (serverDate != null && serverDate.isNotEmpty) {
+        return serverDate;
+      }
+    } catch (_) {}
+
+    return todayAsKey();
   }
 }
 

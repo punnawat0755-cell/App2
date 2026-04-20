@@ -10,7 +10,9 @@ import 'package:flutter_application_1/features/shop/model/shop_item.dart';
 import 'package:get/get.dart';
 
 class Pet extends GetxController {
-  static const Duration _freeFoodCooldown = Duration(hours: 6);
+  static const Duration _freeFoodCooldown = Duration(minutes: 60);
+  static const Duration _fedMoodDuration = Duration(seconds: 10);
+  static const Duration _stateRequestTimeout = Duration(seconds: 6);
 
   late final CoinService _coinService;
   late final PetRepository _petRepository;
@@ -34,10 +36,13 @@ class Pet extends GetxController {
   final remainingTime = '00:00:00'.obs;
   final isTimerRunning = false.obs;
   Timer? _timer;
+  Timer? _fedMoodTimer;
+  bool _isCompletingFoodTimer = false;
+  int _mutationVersion = 0;
+  final _temporaryMoodAssetPath = RxnString();
 
   bool get isAnyActionRunning =>
       isLoading.value ||
-      isRefreshing.value ||
       isFeedingFree.value ||
       isFeedingCoin.value ||
       isEquipping.value ||
@@ -65,6 +70,10 @@ class Pet extends GetxController {
   }
 
   String get petMoodAssetPath {
+    final temporaryPath = _temporaryMoodAssetPath.value;
+    if (temporaryPath != null) {
+      return temporaryPath;
+    }
     final energy = energyPercent.value;
     if (energy >= 80) return 'assets/images/whale_happy.png';
     if (energy >= 60) return 'assets/images/whale_love.png';
@@ -87,12 +96,13 @@ class Pet extends GetxController {
         ? Get.find<PetRepository>()
         : Get.put(PetRepository(service: petService), permanent: true);
 
-    unawaited(refreshState());
+    unawaited(refreshState(silent: true));
   }
 
   @override
   void onClose() {
     _timer?.cancel();
+    _fedMoodTimer?.cancel();
     super.onClose();
   }
 
@@ -100,6 +110,7 @@ class Pet extends GetxController {
     if (isLoading.value || isRefreshing.value) {
       return;
     }
+    final mutationVersionAtStart = _mutationVersion;
 
     if (silent) {
       isRefreshing.value = true;
@@ -108,9 +119,31 @@ class Pet extends GetxController {
     }
 
     try {
-      final state = await _petRepository.loadState();
+      var state =
+          await _petRepository.loadState().timeout(_stateRequestTimeout);
+      state = await _petRepository
+          .alignFoodCooldown(
+            refillDuration: _freeFoodCooldown,
+            baseState: state,
+          )
+          .timeout(_stateRequestTimeout);
+      if (mutationVersionAtStart != _mutationVersion) {
+        return;
+      }
       _applyState(state);
       _resumeTimerIfNeeded(state);
+    } on TimeoutException catch (error) {
+      Get.log('Pet.refreshState timeout: $error');
+      if (!silent) {
+        Get.snackbar(
+          'โหลดข้อมูลสัตว์เลี้ยงช้าเกินไป',
+          'ลองใหม่อีกครั้งได้ทันที',
+          backgroundColor: Colors.orangeAccent,
+          colorText: Colors.white,
+          snackPosition: SnackPosition.TOP,
+          margin: const EdgeInsets.all(10),
+        );
+      }
     } catch (error) {
       Get.log('Pet.refreshState error: $error');
       if (!silent) {
@@ -143,7 +176,19 @@ class Pet extends GetxController {
     }
   }
 
+  void _applyMutationState(PetState state) {
+    _mutationVersion += 1;
+    _applyState(state);
+  }
+
   void _resumeTimerIfNeeded(PetState state) {
+    if (state.foodCount >= PetState.maxFoodCount) {
+      _timer?.cancel();
+      remainingTime.value = '00:00:00';
+      isTimerRunning.value = false;
+      return;
+    }
+
     final nextFoodReadyAt = state.nextFoodReadyAt;
     if (nextFoodReadyAt == null) {
       _timer?.cancel();
@@ -167,7 +212,7 @@ class Pet extends GetxController {
   bool isPurchasingItem(int itemId) => purchasingItemId.value == itemId;
 
   Future<bool> purchaseItem(int itemId, int price) async {
-    if (isPurchasingItem(itemId) || isLoading.value || isRefreshing.value) {
+    if (isPurchasingItem(itemId) || isLoading.value) {
       return false;
     }
     if (isOwnedItem(itemId)) {
@@ -183,7 +228,7 @@ class Pet extends GetxController {
       }
 
       final nextState = await _petRepository.addOwnedItem(itemId);
-      _applyState(nextState);
+      _applyMutationState(nextState);
       return true;
     } catch (error) {
       if (didSpendCoins) {
@@ -205,7 +250,7 @@ class Pet extends GetxController {
   }
 
   Future<bool> equipItem(int itemId) async {
-    if (isEquipping.value || isLoading.value || isRefreshing.value) {
+    if (isEquipping.value || isLoading.value) {
       return false;
     }
     if (!isOwnedItem(itemId)) {
@@ -226,12 +271,41 @@ class Pet extends GetxController {
     isEquipping.value = true;
     try {
       final nextState = await _petRepository.equipItem(itemId);
-      _applyState(nextState);
+      _applyMutationState(nextState);
       return true;
     } catch (error) {
       Get.log('Pet.equipItem error: $error');
       Get.snackbar(
         'สวมใส่ไม่สำเร็จ',
+        '$error',
+        backgroundColor: Colors.redAccent,
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+        margin: const EdgeInsets.all(10),
+      );
+      return false;
+    } finally {
+      isEquipping.value = false;
+    }
+  }
+
+  Future<bool> unequipItem() async {
+    if (isEquipping.value || isLoading.value) {
+      return false;
+    }
+    if (equippedItemId.value == null) {
+      return true;
+    }
+
+    isEquipping.value = true;
+    try {
+      final nextState = await _petRepository.unequipItem();
+      _applyMutationState(nextState);
+      return true;
+    } catch (error) {
+      Get.log('Pet.unequipItem error: $error');
+      Get.snackbar(
+        'ถอดไอเท็มไม่สำเร็จ',
         '$error',
         backgroundColor: Colors.redAccent,
         colorText: Colors.white,
@@ -266,8 +340,9 @@ class Pet extends GetxController {
         refillDuration: _freeFoodCooldown,
       );
       final leveledUp = nextState.level > level.value;
-      _applyState(nextState);
+      _applyMutationState(nextState);
       _resumeTimerIfNeeded(nextState);
+      _showFedMoodTemporarily();
 
       Get.snackbar(
         leveledUp ? 'เลเวลอัป!' : 'งั่มๆ!',
@@ -326,7 +401,8 @@ class Pet extends GetxController {
 
       final nextState = await _petRepository.feedWithCoin();
       final leveledUp = nextState.level > level.value;
-      _applyState(nextState);
+      _applyMutationState(nextState);
+      _showFedMoodTemporarily();
 
       Get.snackbar(
         leveledUp ? 'เลเวลอัป!' : 'อร่อยจัง!',
@@ -370,6 +446,14 @@ class Pet extends GetxController {
     }
   }
 
+  void _showFedMoodTemporarily() {
+    _fedMoodTimer?.cancel();
+    _temporaryMoodAssetPath.value = 'assets/images/whale_love.png';
+    _fedMoodTimer = Timer(_fedMoodDuration, () {
+      _temporaryMoodAssetPath.value = null;
+    });
+  }
+
   void _startTimer(int seconds) {
     _timer?.cancel();
     isTimerRunning.value = true;
@@ -389,27 +473,33 @@ class Pet extends GetxController {
   }
 
   Future<void> _completeFoodTimer({bool showSnackBar = true}) async {
-    if (isRefreshing.value) {
+    if (_isCompletingFoodTimer) {
       return;
     }
-
-    isTimerRunning.value = false;
-    remainingTime.value = '00:00:00';
+    _isCompletingFoodTimer = true;
 
     try {
-      final nextState = await _petRepository.markFoodRefillReady();
-      _applyState(nextState);
+      isTimerRunning.value = false;
+      remainingTime.value = '00:00:00';
+
+      final nextState = await _petRepository.markFoodRefillReady(
+        refillDuration: _freeFoodCooldown,
+      );
+      _applyMutationState(nextState);
+      _resumeTimerIfNeeded(nextState);
 
       if (showSnackBar) {
         Get.snackbar(
           'ปลามาแล้ว!',
-          'ได้รับปลาฟรี 1 ตัวจากการรอ',
+          'ได้รับปลาฟรีแล้ว ตอนนี้มี ${nextState.foodCount}/${PetState.maxFoodCount}',
           backgroundColor: Colors.blueAccent,
           colorText: Colors.white,
         );
       }
     } catch (error) {
       Get.log('Pet._completeFoodTimer error: $error');
+    } finally {
+      _isCompletingFoodTimer = false;
     }
   }
 

@@ -1,4 +1,6 @@
 class PetState {
+  static const int maxFoodCount = 3;
+
   const PetState({
     required this.level,
     required this.exp,
@@ -16,7 +18,7 @@ class PetState {
       exp: 0,
       energyPercent: 50,
       username: 'Seal',
-      foodCount: 3,
+      foodCount: maxFoodCount,
       ownedItems: <int>[],
       equippedItemId: null,
     );
@@ -43,7 +45,7 @@ class PetState {
       username: map['username']?.toString().trim().isNotEmpty == true
           ? map['username'].toString().trim()
           : 'Seal',
-      foodCount: _readInt(map['food_count']) ?? 3,
+      foodCount: _readInt(map['food_count']) ?? maxFoodCount,
       ownedItems: _readIntList(map['owned_items']),
       equippedItemId: _readInt(map['equipped_item_id']),
       nextFoodReadyAt: _readDateTime(map['next_food_ready_at']),
