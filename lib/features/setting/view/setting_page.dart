@@ -149,10 +149,6 @@ class _SettingPageState extends State<SettingPage> {
             final horizontalPadding = constraints.maxWidth < 360
                 ? pageScale.rs(16, min: 14, max: 18)
                 : pageScale.rs(24, min: 20, max: 24);
-            final avatarSize = pageScale.rs(150, min: 118, max: 150);
-            final avatarEditPadding = pageScale.rs(8, min: 6, max: 8);
-            final avatarEditIconSize = pageScale.rs(18, min: 15, max: 18);
-            final avatarEditBorder = pageScale.rs(2, min: 1.5, max: 2.4);
 
             return Align(
               // 💡 1. เปลี่ยนจาก Center เป็น Align แบบชิดบน

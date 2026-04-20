@@ -643,6 +643,7 @@ class _FeedPageState extends State<FeedPage> {
     );
   }
 }
+
 class FeedProfilePage extends StatefulWidget {
   const FeedProfilePage({
     super.key,
@@ -694,7 +695,7 @@ class _FeedProfilePageState extends State<FeedProfilePage> {
           content: Text(
             _buildLikeUpdateErrorMessage(
               error,
-              isOwnPost: currentUserId == post.authorId,
+              isOwnPost: widget.currentUserId == post.authorId,
             ),
           ),
           backgroundColor: Colors.red,
@@ -812,7 +813,8 @@ class _FeedProfilePageState extends State<FeedProfilePage> {
                     stream: _likedPostIdsStream,
                     builder: (context, likeSnapshot) {
                       final posts = postSnapshot.data ?? const <FeedPost>[];
-                      final likedPostIds = likeSnapshot.data ?? const <String>{};
+                      final likedPostIds =
+                          likeSnapshot.data ?? const <String>{};
                       final totalLikes = posts.fold<int>(
                         0,
                         (sum, post) => sum + post.likeCount,
@@ -863,13 +865,14 @@ class _FeedProfilePageState extends State<FeedProfilePage> {
                               post: post,
                               isLiked: isLiked,
                               onAuthorTap: null,
-                              onToggleLike: widget.repository.supportsLikeActions
-                                  ? () => _toggleLike(
-                                        context,
-                                        post,
-                                        isLiked,
-                                      )
-                                  : null,
+                              onToggleLike:
+                                  widget.repository.supportsLikeActions
+                                      ? () => _toggleLike(
+                                            context,
+                                            post,
+                                            isLiked,
+                                          )
+                                      : null,
                               onDelete: post.authorId == widget.currentUserId
                                   ? () => _deletePost(context, post)
                                   : null,
@@ -888,6 +891,7 @@ class _FeedProfilePageState extends State<FeedProfilePage> {
     );
   }
 }
+
 class _FeedComposerSheet extends StatefulWidget {
   const _FeedComposerSheet({
     required this.repository,

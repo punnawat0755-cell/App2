@@ -20,20 +20,35 @@ class _FakePetService extends PetService {
 
 void main() {
   group('PetRepository', () {
-    test('feedPet adds energy and exp without leveling when exp is below cap',
+    test(
+        'feedPet adds energy, exp, and starts refill timer when exp is below cap',
         () async {
       final service = _FakePetService(PetState.initial());
       final repository = PetRepository(service: service);
 
+      final beforeCall = DateTime.now();
       final result = await repository.feedPet(
         refillDuration: const Duration(hours: 6),
       );
+      final afterCall = DateTime.now();
 
       expect(result.energyPercent, 55);
       expect(result.foodCount, 2);
       expect(result.exp, 10);
       expect(result.level, 1);
-      expect(result.nextFoodReadyAt, isNull);
+      expect(result.nextFoodReadyAt, isNotNull);
+      expect(
+        result.nextFoodReadyAt!.isBefore(
+          beforeCall.add(const Duration(hours: 6)),
+        ),
+        isFalse,
+      );
+      expect(
+        result.nextFoodReadyAt!.isAfter(
+          afterCall.add(const Duration(hours: 6)),
+        ),
+        isFalse,
+      );
     });
 
     test(
@@ -125,20 +140,27 @@ void main() {
       );
     });
 
-    test('markFoodRefillReady restores one free food and clears timer',
+    test('markFoodRefillReady restores one free food and schedules next refill',
         () async {
+      final readyAt = DateTime.now().subtract(const Duration(minutes: 5));
       final service = _FakePetService(
         PetState.initial().copyWith(
           foodCount: 0,
-          nextFoodReadyAt: DateTime.now().add(const Duration(minutes: 5)),
+          nextFoodReadyAt: readyAt,
         ),
       );
       final repository = PetRepository(service: service);
 
-      final result = await repository.markFoodRefillReady();
+      final result = await repository.markFoodRefillReady(
+        refillDuration: const Duration(hours: 6),
+      );
 
       expect(result.foodCount, 1);
-      expect(result.nextFoodReadyAt, isNull);
+      expect(result.nextFoodReadyAt, isNotNull);
+      expect(
+        result.nextFoodReadyAt!.difference(readyAt),
+        const Duration(hours: 6),
+      );
     });
   });
 }
