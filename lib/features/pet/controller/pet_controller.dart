@@ -10,7 +10,7 @@ import 'package:flutter_application_1/features/shop/model/shop_item.dart';
 import 'package:get/get.dart';
 
 class Pet extends GetxController {
-  static const Duration _freeFoodCooldown = Duration(minutes: 60);
+  static const Duration _freeFoodCooldown = Duration(minutes: 30);
   static const Duration _fedMoodDuration = Duration(seconds: 10);
   static const Duration _stateRequestTimeout = Duration(seconds: 6);
 
@@ -32,7 +32,7 @@ class Pet extends GetxController {
   final energyPercent = 50.obs;
   final username = 'Seal'.obs;
 
-  final foodCount = 3.obs;
+  final foodCount = PetState.maxFoodCount.obs;
   final remainingTime = '00:00:00'.obs;
   final isTimerRunning = false.obs;
   Timer? _timer;
