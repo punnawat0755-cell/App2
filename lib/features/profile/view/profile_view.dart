@@ -1470,7 +1470,7 @@ class ProfileController extends GetxController {
     return _moodImagePathFromLevel(dailyMoodLevels[dayKey]);
   }
 
-  final List<Map<String, String>> symptomsList = [
+  final List<Map<String, String>> femaleSymptomsList = [
     {'name': 'ปวดท้อง', 'img': 'assets/images/thunder 1.png'},
     {'name': 'แปรปรวน', 'img': 'assets/images/thunder 2.png'},
     {'name': 'ท้องอืด', 'img': 'assets/images/thunder 3.png'},
@@ -1481,7 +1481,18 @@ class ProfileController extends GetxController {
     {'name': 'สิวขึ้น', 'img': 'assets/images/thunder 8.png'},
   ];
 
-  List<Map<String, String>> get maleSymptomsList => symptomsList;
+  final List<Map<String, String>> maleSymptomsList = [
+    {'name': 'เครียด', 'img': 'assets/images/thunder 1.png'},
+    {'name': 'นอนไม่หลับ', 'img': 'assets/images/thunder 2.png'},
+    {'name': 'ปวดหัว', 'img': 'assets/images/thunder 3.png'},
+    {'name': 'อ่อนเพลีย', 'img': 'assets/images/thunder 4.png'},
+    {'name': 'ปวดเมื่อย', 'img': 'assets/images/thunder 5.png'},
+    {'name': 'เป็นไข้', 'img': 'assets/images/thunder 6.png'},
+    {'name': 'เวียนหัว', 'img': 'assets/images/thunder 7.png'},
+    {'name': 'เบื่ออาหาร', 'img': 'assets/images/thunder 8.png'},
+  ];
+
+  List<Map<String, String>> get symptomsList => femaleSymptomsList;
 }
 
 // ==========================================
@@ -2409,7 +2420,7 @@ class ProfilePage extends StatelessWidget {
                 spacing: 15,
                 runSpacing: 20,
                 alignment: WrapAlignment.center,
-                children: controller.symptomsList.map((item) {
+                children: controller.femaleSymptomsList.map((item) {
                   final isSelected = controller
                       .getSymptomsForSelectedDay()
                       .contains(item['name']);

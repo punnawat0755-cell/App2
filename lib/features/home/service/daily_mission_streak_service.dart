@@ -15,6 +15,16 @@ class DailyMissionStreakService {
 
   final SupabaseClient _client;
 
+  static void invalidateCache({String? userId}) {
+    if (userId != null && _lastUserId != null && _lastUserId != userId) {
+      return;
+    }
+    _lastUserId = null;
+    _cachedStreakDays = null;
+    _lastLoadedAt = null;
+    _inFlightRequest = null;
+  }
+
   Future<int> getCurrentStreakDays() async {
     final user = _client.auth.currentUser;
     if (user == null) {
@@ -119,16 +129,17 @@ class DailyMissionStreakService {
       }
 
       for (final row in response) {
-        if (row is! Map<String, dynamic>) {
+        if (row is! Map) {
           continue;
         }
 
-        final moodLevel = _toInt(row['mood_level']);
+        final rowMap = Map<String, dynamic>.from(row);
+        final moodLevel = _toInt(rowMap['mood_level']);
         if (moodLevel == null) {
           continue;
         }
 
-        final date = _readCalendarDate(row['calendar_date']);
+        final date = _readCalendarDate(rowMap['calendar_date']);
         if (date == null) {
           continue;
         }

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_1/features/profile/view/profile_view.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_application_1/features/home/service/daily_mood_status_service.dart';
+import 'package:flutter_application_1/features/home/service/daily_mission_streak_service.dart';
 
 class DailyMoodPage extends StatefulWidget {
   const DailyMoodPage({super.key});
@@ -214,6 +215,9 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
 
   Future<void> _clearDailyMoodCache({bool showSnackbar = true}) async {
     await DailyMoodStatusService.clearLocalCache();
+    DailyMissionStreakService.invalidateCache(
+      userId: _sb.auth.currentUser?.id,
+    );
     _noteCtrl.clear();
     _healingCtrl.clear();
     _selectedTags.clear();
@@ -342,6 +346,9 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
         note: _noteCtrl.text,
         emotions: _selectedTags,
         healingQuote: _healingCtrl.text,
+      );
+      DailyMissionStreakService.invalidateCache(
+        userId: _sb.auth.currentUser?.id,
       );
     } catch (e) {
       if (!mounted) return;
