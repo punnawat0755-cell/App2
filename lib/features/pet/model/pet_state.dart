@@ -1,5 +1,5 @@
 class PetState {
-  static const int maxFoodCount = 3;
+  static const int maxFoodCount = 5;
 
   const PetState({
     required this.level,

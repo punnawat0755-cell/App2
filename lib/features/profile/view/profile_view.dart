@@ -178,6 +178,12 @@ class ProfileController extends GetxController {
     return isFutureDay(day);
   }
 
+  bool get isSelectedDateInPast {
+    final day = selectedDate.value;
+    if (day == 0) return false;
+    return _dateOnly(dateForDay(day)).isBefore(_dateOnly(DateTime.now()));
+  }
+
   void _showFutureDateBlockedSnackbar() {
     Get.snackbar(
       "แจ้งเตือน",
@@ -1349,6 +1355,16 @@ class ProfileController extends GetxController {
       return false;
     }
 
+    if (!isFemaleAccount && isSelectedDateInPast) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "ไม่สามารถบันทึกย้อนหลังได้ (บันทึกได้เฉพาะวันนี้)",
+        backgroundColor: const Color(0xFF2C5282),
+        colorText: Colors.white,
+      );
+      return false;
+    }
+
     final selectedSymptoms = getSymptomsForSelectedDay();
     if (selectedSymptoms.length > maxSymptomsPerDay) {
       Get.snackbar(
@@ -1370,8 +1386,9 @@ class ProfileController extends GetxController {
     isSavingDailyData.value = true;
     try {
       final hasExplicitPeriodStatus = dailyPeriodStatus.containsKey(dateKey);
-      final bool? isPeriod =
-          hasExplicitPeriodStatus ? dailyPeriodStatus[dateKey] : null;
+      final bool? isPeriod = isFemaleAccount
+          ? (hasExplicitPeriodStatus ? dailyPeriodStatus[dateKey] : null)
+          : false;
       await supabase.rpc(
         'save_calendar_health_log',
         params: {
@@ -1470,7 +1487,7 @@ class ProfileController extends GetxController {
     return _moodImagePathFromLevel(dailyMoodLevels[dayKey]);
   }
 
-  final List<Map<String, String>> symptomsList = [
+  final List<Map<String, String>> femaleSymptomsList = [
     {'name': 'ปวดท้อง', 'img': 'assets/images/thunder 1.png'},
     {'name': 'แปรปรวน', 'img': 'assets/images/thunder 2.png'},
     {'name': 'ท้องอืด', 'img': 'assets/images/thunder 3.png'},
@@ -1481,7 +1498,18 @@ class ProfileController extends GetxController {
     {'name': 'สิวขึ้น', 'img': 'assets/images/thunder 8.png'},
   ];
 
-  List<Map<String, String>> get maleSymptomsList => symptomsList;
+  final List<Map<String, String>> maleSymptomsList = [
+    {'name': 'เครียด', 'img': 'assets/images/thunder 1.png'},
+    {'name': 'นอนไม่หลับ', 'img': 'assets/images/thunder 2.png'},
+    {'name': 'ปวดหัว', 'img': 'assets/images/thunder 3.png'},
+    {'name': 'อ่อนเพลีย', 'img': 'assets/images/thunder 4.png'},
+    {'name': 'ปวดเมื่อย', 'img': 'assets/images/thunder 5.png'},
+    {'name': 'เป็นไข้', 'img': 'assets/images/thunder 6.png'},
+    {'name': 'เวียนหัว', 'img': 'assets/images/thunder 7.png'},
+    {'name': 'เบื่ออาหาร', 'img': 'assets/images/thunder 8.png'},
+  ];
+
+  List<Map<String, String>> get symptomsList => femaleSymptomsList;
 }
 
 // ==========================================
@@ -1754,6 +1782,16 @@ class ProfilePage extends StatelessWidget {
       Get.snackbar(
         "แจ้งเตือน",
         "กรุณาเลือกวันที่ต้องการ",
+        backgroundColor: const Color(0xFF2C5282),
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    if (controller.isSelectedDateInPast) {
+      Get.snackbar(
+        "แจ้งเตือน",
+        "ไม่สามารถบันทึกย้อนหลังได้ (บันทึกได้เฉพาะวันนี้)",
         backgroundColor: const Color(0xFF2C5282),
         colorText: Colors.white,
       );
@@ -2409,7 +2447,7 @@ class ProfilePage extends StatelessWidget {
                 spacing: 15,
                 runSpacing: 20,
                 alignment: WrapAlignment.center,
-                children: controller.symptomsList.map((item) {
+                children: controller.femaleSymptomsList.map((item) {
                   final isSelected = controller
                       .getSymptomsForSelectedDay()
                       .contains(item['name']);
@@ -2707,6 +2745,34 @@ class ProfilePage extends StatelessWidget {
               ),
               child: Text(
                 "ไม่สามารถบันทึกล่วงหน้าได้ (บันทึกได้เฉพาะวันนี้และย้อนหลัง)",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: const Color(0xFF5D4037),
+                  fontSize: scale.rf(16, min: 13.5, max: 16),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            );
+          }
+
+          if (controller.isSelectedDateInPast) {
+            return Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(
+                vertical: scale.rs(10, min: 8, max: 10),
+                horizontal: scale.rs(10, min: 8, max: 10),
+              ),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFDA7B),
+                borderRadius:
+                    BorderRadius.circular(scale.rs(20, min: 16, max: 20)),
+                border: Border.all(
+                  color: const Color(0xFF757575),
+                  width: scale.rs(1.5, min: 1.2, max: 1.5),
+                ),
+              ),
+              child: Text(
+                "ไม่สามารถบันทึกย้อนหลังได้ (บันทึกได้เฉพาะวันนี้)",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: const Color(0xFF5D4037),

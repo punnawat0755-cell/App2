@@ -474,7 +474,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
     ResponsiveScale scale,
   ) {
     final usableWidth = (screenWidth - 20).clamp(280.0, 460.0);
-    final cardWidth = ((usableWidth - 24) / 3).clamp(86.0, 110.0);
+    final cardWidth = ((usableWidth - 24) / 5).clamp(86.0, 110.0);
     final cardHeight = cardWidth;
 
     return Container(
@@ -494,7 +494,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
             return _buildItemCard(
               imagePath: 'assets/images/fish1.png',
               customImageSize: scale.rs(90, min: 72, max: 90),
-              customImageBottom: scale.rs(10, min: 6, max: 10),
+              customImageBottom: scale.rs(15, min: 6, max: 10),
               labelWidget: Text(
                 isFoodRefillPending
                     ? controller.remainingTime.value
@@ -506,7 +506,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
                   fontWeight: FontWeight.w900,
                   fontSize: screenWidth < 360
                       ? scale.rf(14, min: 12, max: 14)
-                      : scale.rf(16, min: 13.5, max: 16),
+                      : scale.rf(14, min: 13.5, max: 16),
                 ),
               ),
               badgeCount: controller.foodCount.value,
@@ -700,7 +700,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: scale.rf(15, min: 12.5, max: 15),
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
