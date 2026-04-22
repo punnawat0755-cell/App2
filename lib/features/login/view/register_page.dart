@@ -767,7 +767,6 @@ class _RangeMonthCalendarState extends State<_RangeMonthCalendar> {
 
   bool _isSameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
-  DateTime _firstOfMonth(DateTime d) => DateTime(d.year, d.month, 1);
   DateTime _prevMonth(DateTime month) => DateTime(month.year, month.month - 1);
   DateTime _nextMonth(DateTime month) => DateTime(month.year, month.month + 1);
 
@@ -1041,8 +1040,9 @@ class _RangeMonthCalendarState extends State<_RangeMonthCalendar> {
                         Row(
                           children: List.generate(7, (col) {
                             final date = rowDates[col];
-                            if (date == null)
+                            if (date == null) {
                               return const Expanded(child: SizedBox.expand());
+                            }
                             return Expanded(
                                 child: buildDayCell(date, date.day));
                           }),

@@ -3251,7 +3251,14 @@ class _FeedMessageState extends StatelessWidget {
             if (actionLabel != null && onAction != null) ...[
               SizedBox(height: scale.rs(18, min: 12, max: 18)),
               OutlinedButton(
-                onPressed: () => onAction?.call(),
+                onPressed: () async {
+                  try {
+                    await onAction?.call();
+                  } catch (error, stackTrace) {
+                    debugPrint('Feed retry action failed: $error');
+                    debugPrintStack(stackTrace: stackTrace);
+                  }
+                },
                 child: Text(actionLabel!),
               ),
             ],

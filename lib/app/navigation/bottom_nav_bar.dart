@@ -50,7 +50,7 @@ class _BottomNavBarState extends State<BottomNavBar>
     WidgetsBinding.instance.addObserver(this);
     _warmUpPageDependencies();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await _openRequiredDailyFlowIfNeeded();
+      await _openRequiredDailyFlowSafely();
     });
   }
 
@@ -73,7 +73,7 @@ class _BottomNavBarState extends State<BottomNavBar>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed &&
         !EntryFlowGuard.shouldIgnoreResume) {
-      unawaited(_openRequiredDailyFlowIfNeeded());
+      unawaited(_openRequiredDailyFlowSafely());
     }
   }
 
@@ -228,6 +228,15 @@ class _BottomNavBarState extends State<BottomNavBar>
       if (mounted && !_allowHomePeriodPrompt) {
         setState(() => _allowHomePeriodPrompt = true);
       }
+    }
+  }
+
+  Future<void> _openRequiredDailyFlowSafely() async {
+    try {
+      await _openRequiredDailyFlowIfNeeded();
+    } catch (error, stackTrace) {
+      debugPrint('Required daily flow failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 

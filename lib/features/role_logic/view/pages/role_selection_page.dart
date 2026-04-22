@@ -254,14 +254,17 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                           ),
                         ),
                         SizedBox(height: hintToCardsGap),
-                        Flex(
-                          direction:
-                              isCompact ? Axis.vertical : Axis.horizontal,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: ChoiceCard(
+                        SizedBox(
+                          height: isCompact
+                              ? (cardHeight * 2) + cardsGap
+                              : cardHeight,
+                          child: Flex(
+                            direction:
+                                isCompact ? Axis.vertical : Axis.horizontal,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              ChoiceCard(
                                 id: 'listener',
                                 title: 'ผู้รับฟัง',
                                 imagePath: 'assets/images/fine.png',
@@ -271,13 +274,11 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                                 height: cardHeight,
                                 onTap: _openListenerQuiz,
                               ),
-                            ),
-                            SizedBox(
-                              width: isCompact ? 0 : rowCardGap,
-                              height: isCompact ? cardsGap : 0,
-                            ),
-                            Expanded(
-                              child: ChoiceCard(
+                              SizedBox(
+                                width: isCompact ? 0 : rowCardGap,
+                                height: isCompact ? cardsGap : 0,
+                              ),
+                              ChoiceCard(
                                 id: 'seeker',
                                 title: 'ผู้ขอรับคำปรึกษา',
                                 imagePath: 'assets/images/sad.png',
@@ -287,8 +288,8 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                                 height: cardHeight,
                                 onTap: () => _saveMode('seeker'),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                         SizedBox(height: cardsToDetailGap),
                         Container(
