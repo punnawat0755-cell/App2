@@ -248,6 +248,32 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
     await coinService.loadCoins();
   }
 
+  Future<void> _rewardHealingQuoteIfEligible({
+    required String? healingQuote,
+  }) async {
+    final user = _sb.auth.currentUser;
+    if (user == null) return;
+
+    final nextQuote = healingQuote?.trim() ?? '';
+    final hadQuote = (_serverHealingQuote?.trim().isNotEmpty ?? false);
+    final hasQuoteNow = nextQuote.isNotEmpty;
+
+    if (!hasQuoteNow || hadQuote) return;
+
+    try {
+      await _sb.rpc('_award_coins', params: {
+        'p_user_id': user.id,
+        'p_amount': 2,
+        'p_reason': 'daily_mood_healing_quote',
+        'p_dedupe_key':
+            'daily_mood_healing_quote:${user.id}:${DailyMoodStatusService.todayAsKey()}',
+        'p_ref_type': 'daily_mood',
+      });
+    } catch (e) {
+      debugPrint('Error rewarding daily healing quote coins: $e');
+    }
+  }
+
   // ---------- Supabase ----------
   Future<void> _syncFromSupabaseToday() async {
     if (!_isLoggedIn) return;
@@ -327,6 +353,8 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
   Future<void> _submitMood(_MoodOption option) async {
     final isFirstAnswer = !_answeredToday;
     final canEditNow = _answeredToday && _isEditMode && !_editUsedToday;
+    final nextHealingQuote =
+        _healingCtrl.text.trim().isEmpty ? null : _healingCtrl.text.trim();
 
     if (!isFirstAnswer && !canEditNow) return;
     if (!_isLoggedIn) {
@@ -345,7 +373,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
         option,
         note: _noteCtrl.text,
         emotions: _selectedTags,
-        healingQuote: _healingCtrl.text,
+        healingQuote: nextHealingQuote,
       );
       DailyMissionStreakService.invalidateCache(
         userId: _sb.auth.currentUser?.id,
@@ -356,6 +384,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
       return;
     }
 
+    await _rewardHealingQuoteIfEligible(healingQuote: nextHealingQuote);
     await _saveLocalToday(option, markEditUsed: canEditNow);
     await _refreshProfileCalendarIfNeeded();
     await _refreshCoinsIfNeeded();
@@ -366,8 +395,7 @@ class _DailyMoodPageState extends State<DailyMoodPage> {
 
       _serverNote =
           _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim();
-      _serverHealingQuote =
-          _healingCtrl.text.trim().isEmpty ? null : _healingCtrl.text.trim();
+      _serverHealingQuote = nextHealingQuote;
       _selectedMoodIndex = _indexFromOption(option);
 
       if (canEditNow) {

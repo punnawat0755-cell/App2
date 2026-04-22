@@ -233,6 +233,7 @@ class _BottomNavBarState extends State<BottomNavBar>
   @override
   Widget build(BuildContext context) {
     final scale = context.responsive;
+    final isAndroid = Theme.of(context).platform == TargetPlatform.android;
 
     return Scaffold(
       extendBody: true,
@@ -249,52 +250,56 @@ class _BottomNavBarState extends State<BottomNavBar>
           const ProfilePage(),
         ],
       ),
-      bottomNavigationBar: CurvedNavigationBar(
-        key: _bottomNavigationKey,
-        index: _page,
-        height: scale.rs(60, min: 54, max: 60),
-        items: <Widget>[
-          Icon(
-            Icons.home,
-            size: scale.rs(30, min: 26, max: 30),
-            color: const Color.fromARGB(255, 244, 244, 244),
-          ),
-          Icon(
-            Icons.newspaper,
-            size: scale.rs(30, min: 26, max: 30),
-            color: const Color.fromARGB(255, 244, 244, 244),
-          ),
-          Icon(
-            Icons.chat,
-            size: scale.rs(30, min: 26, max: 30),
-            color: const Color.fromARGB(255, 244, 244, 244),
-          ),
-          Icon(
-            Icons.pets,
-            size: scale.rs(30, min: 26, max: 30),
-            color: const Color.fromARGB(255, 244, 244, 244),
-          ),
-          Icon(
-            Icons.person,
-            size: scale.rs(30, min: 26, max: 30),
-            color: const Color.fromARGB(255, 244, 244, 244),
-          ),
-        ],
-        color: const Color(0xFF5CD9FF),
-        buttonBackgroundColor: const Color(0xFF5CD9FF),
-        backgroundColor: Colors.transparent,
-        animationCurve: Curves.easeInOut,
-        animationDuration: const Duration(milliseconds: 300),
-        onTap: (index) async {
-          setState(() {
-            _page = index;
-          });
+      bottomNavigationBar: SafeArea(
+        top: false,
+        bottom: isAndroid,
+        child: CurvedNavigationBar(
+          key: _bottomNavigationKey,
+          index: _page,
+          height: scale.rs(60, min: 54, max: 60),
+          items: <Widget>[
+            Icon(
+              Icons.home,
+              size: scale.rs(30, min: 26, max: 30),
+              color: const Color.fromARGB(255, 244, 244, 244),
+            ),
+            Icon(
+              Icons.newspaper,
+              size: scale.rs(30, min: 26, max: 30),
+              color: const Color.fromARGB(255, 244, 244, 244),
+            ),
+            Icon(
+              Icons.chat,
+              size: scale.rs(30, min: 26, max: 30),
+              color: const Color.fromARGB(255, 244, 244, 244),
+            ),
+            Icon(
+              Icons.pets,
+              size: scale.rs(30, min: 26, max: 30),
+              color: const Color.fromARGB(255, 244, 244, 244),
+            ),
+            Icon(
+              Icons.person,
+              size: scale.rs(30, min: 26, max: 30),
+              color: const Color.fromARGB(255, 244, 244, 244),
+            ),
+          ],
+          color: const Color(0xFF5CD9FF),
+          buttonBackgroundColor: const Color(0xFF5CD9FF),
+          backgroundColor: Colors.transparent,
+          animationCurve: Curves.easeInOut,
+          animationDuration: const Duration(milliseconds: 300),
+          onTap: (index) async {
+            setState(() {
+              _page = index;
+            });
 
-          if (index == 2) {
-            await _openPausedChatIfNeeded();
-          }
-        },
-        letIndexChange: (index) => true,
+            if (index == 2) {
+              await _openPausedChatIfNeeded();
+            }
+          },
+          letIndexChange: (index) => true,
+        ),
       ),
     );
   }
