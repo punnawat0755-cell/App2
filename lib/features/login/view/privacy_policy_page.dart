@@ -28,9 +28,18 @@ class _PrivacyPolicyPageState extends State<PrivacyPolicyPage> {
       final sb = Supabase.instance.client;
       final userId = sb.auth.currentUser!.id;
 
-      await sb.from('profiles').update({
-        'pdpa_accepted_at': DateTime.now().toIso8601String(),
-      }).eq('id', userId);
+      final existingProfile = await sb
+          .from('profiles')
+          .select('pdpa_accepted_at')
+          .eq('id', userId)
+          .maybeSingle();
+
+      final acceptedAt = existingProfile?['pdpa_accepted_at'];
+      if (acceptedAt == null) {
+        await sb.from('profiles').update({
+          'pdpa_accepted_at': DateTime.now().toIso8601String(),
+        }).eq('id', userId);
+      }
 
       if (!mounted) return;
       widget.onAccepted?.call();

@@ -75,7 +75,10 @@ class AppBootstrapGate extends StatefulWidget {
 }
 
 class _AppBootstrapGateState extends State<AppBootstrapGate> {
+  static const Duration _startupRequestTimeout = Duration(seconds: 8);
+
   late Future<void> _bootstrapFuture;
+  bool _supabaseInitialized = false;
 
   @override
   void initState() {
@@ -110,10 +113,13 @@ class _AppBootstrapGateState extends State<AppBootstrapGate> {
       );
     }
 
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
-    );
+    if (!_supabaseInitialized) {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+      );
+      _supabaseInitialized = true;
+    }
 
     await _validatePersistedSession();
     await _ensureProfileForAuthenticatedUser();
@@ -150,7 +156,9 @@ class _AppBootstrapGateState extends State<AppBootstrapGate> {
     }
 
     try {
-      await supabase.auth.getUser();
+      await supabase.auth.getUser().timeout(_startupRequestTimeout);
+    } on TimeoutException catch (error) {
+      debugPrint('Unable to validate persisted session in time: $error');
     } catch (error) {
       debugPrint('Invalid persisted session. Signing out: $error');
       await supabase.auth.signOut();
@@ -165,7 +173,7 @@ class _AppBootstrapGateState extends State<AppBootstrapGate> {
     }
 
     try {
-      await supabase.rpc('ensure_my_profile');
+      await supabase.rpc('ensure_my_profile').timeout(_startupRequestTimeout);
       return;
     } catch (_) {}
 
@@ -173,7 +181,7 @@ class _AppBootstrapGateState extends State<AppBootstrapGate> {
       await supabase.from('profiles').upsert({
         'id': currentUser.id,
         'coins': 0,
-      });
+      }).timeout(_startupRequestTimeout);
     } catch (error) {
       debugPrint('Unable to ensure profile row: $error');
     }
@@ -238,18 +246,29 @@ class AuthStateHandler extends StatefulWidget {
 }
 
 class _AuthStateHandlerState extends State<AuthStateHandler> {
+  static const Duration _pdpaRequestTimeout = Duration(seconds: 8);
+
   // ใช้ shared client จาก core/supabase/supabase_client.dart
   final _authStream = supabase.auth.onAuthStateChange;
   Future<bool>? _pdpaAcceptedFuture;
   String? _pdpaCheckedUserId;
 
   Future<bool> _loadPdpaAccepted(String userId) async {
-    final response = await supabase
-        .from('profiles')
-        .select('pdpa_accepted_at')
-        .eq('id', userId)
-        .maybeSingle();
-    return response != null && response['pdpa_accepted_at'] != null;
+    try {
+      final response = await supabase
+          .from('profiles')
+          .select('pdpa_accepted_at')
+          .eq('id', userId)
+          .maybeSingle()
+          .timeout(_pdpaRequestTimeout);
+      return response != null && response['pdpa_accepted_at'] != null;
+    } on TimeoutException catch (error) {
+      debugPrint('Unable to load PDPA status in time: $error');
+      return false;
+    } catch (error) {
+      debugPrint('Unable to load PDPA status: $error');
+      return false;
+    }
   }
 
   @override

@@ -74,6 +74,20 @@ android {
     }
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    doFirst {
+        delete("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
+    }
+    exclude("io/flutter/plugins/GeneratedPluginRegistrant.java")
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    doFirst {
+        delete("src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java")
+    }
+    exclude("io/flutter/plugins/GeneratedPluginRegistrant.java")
+}
+
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.core:core-splashscreen:1.0.1")

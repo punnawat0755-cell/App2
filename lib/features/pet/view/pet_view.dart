@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_1/core/responsive/responsive_scale.dart';
 import 'package:flutter_application_1/features/pet/controller/pet_controller.dart';
 import 'package:flutter_application_1/features/pet/model/pet_state.dart';
+import 'package:flutter_application_1/features/shop/model/shop_item.dart';
 import 'package:flutter_application_1/features/shop/view/shop_view.dart';
 import 'package:get/get.dart';
 
@@ -403,15 +404,7 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
                     fit: BoxFit.contain,
                   ),
                   if (equippedItem != null)
-                    Positioned(
-                      top: scale.rs(22, min: 18, max: 22),
-                      child: Image.asset(
-                        equippedItem.imagePath,
-                        width: scale.rs(78, min: 62, max: 78),
-                        height: scale.rs(78, min: 62, max: 78),
-                        fit: BoxFit.contain,
-                      ),
-                    ),
+                    _buildEquippedItemOverlay(equippedItem, scale),
                 ],
               ),
             ),
@@ -443,6 +436,36 @@ class _PetPageState extends State<PetPage> with WidgetsBindingObserver {
         );
       }),
     );
+  }
+
+  Widget _buildEquippedItemOverlay(
+    ShopItem item,
+    ResponsiveScale scale,
+  ) {
+    switch (item.slot) {
+      case ShopItemSlot.mouth:
+        return Positioned(
+          top: scale.rs(128, min: 103, max: 128),
+          left: scale.rs(56, min: 45, max: 56),
+          child: Image.asset(
+            item.imagePath,
+            width: scale.rs(70, min: 56, max: 70),
+            height: scale.rs(50, min: 40, max: 50),
+            fit: BoxFit.contain,
+          ),
+        );
+      case ShopItemSlot.head:
+        return Positioned(
+          top: scale.rs(45, min: 36, max: 45),
+          left: scale.rs(88, min: 71, max: 88),
+          child: Image.asset(
+            item.imagePath,
+            width: scale.rs(78, min: 62, max: 78),
+            height: scale.rs(78, min: 62, max: 78),
+            fit: BoxFit.contain,
+          ),
+        );
+    }
   }
 
   Widget _buildBottomDock(

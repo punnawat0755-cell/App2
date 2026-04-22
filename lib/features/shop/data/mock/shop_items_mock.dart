@@ -10,7 +10,22 @@ const List<ShopItem> shopItemsMock = [
   ShopItem(name: 'หมวกปลา 7', imagePath: 'assets/images/s7.png', price: 95),
   ShopItem(name: 'หมวกปลา 8', imagePath: 'assets/images/s8.png', price: 95),
   ShopItem(name: 'หมวกปลา 9', imagePath: 'assets/images/s9.png', price: 95),
-  ShopItem(name: 'หมวกปลา 10', imagePath: 'assets/images/s10.png', price: 65),
-  ShopItem(name: 'หมวกปลา 11', imagePath: 'assets/images/s11.png', price: 85),
-  ShopItem(name: 'หมวกปลา 12', imagePath: 'assets/images/s12.png', price: 95),
+  ShopItem(
+    name: 'หมวกปลา 10',
+    imagePath: 'assets/images/s10.png',
+    price: 65,
+    slot: ShopItemSlot.mouth,
+  ),
+  ShopItem(
+    name: 'หมวกปลา 11',
+    imagePath: 'assets/images/s11.png',
+    price: 85,
+    slot: ShopItemSlot.mouth,
+  ),
+  ShopItem(
+    name: 'หมวกปลา 12',
+    imagePath: 'assets/images/s12.png',
+    price: 95,
+    slot: ShopItemSlot.mouth,
+  ),
 ];

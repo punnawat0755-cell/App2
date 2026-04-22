@@ -10,6 +10,7 @@ class PetService {
   static const _petProfilesTable = 'pet_profiles';
   static const _requestTimeout = Duration(seconds: 6);
   static PetState? _cachedState;
+  static bool _petProfilesSchemaAvailable = true;
   final SupabaseClient? _supabase;
 
   SupabaseClient get supabaseClient => _supabase ?? Supabase.instance.client;
@@ -126,6 +127,10 @@ class PetService {
   }
 
   Future<PetState?> _loadStateFromTable(String userId) async {
+    if (!_petProfilesSchemaAvailable) {
+      return null;
+    }
+
     try {
       final row = await _withRequestTimeout(
         supabaseClient
@@ -145,12 +150,24 @@ class PetService {
 
       return PetState.fromMap(row);
     } catch (error) {
+      if (_isMissingColumnError(error)) {
+        _petProfilesSchemaAvailable = false;
+        debugPrint(
+          'PetService._loadStateFromTable skipped: pet_profiles schema is '
+          'missing one or more expected columns.',
+        );
+        return null;
+      }
       debugPrint('PetService._loadStateFromTable error: $error');
       return null;
     }
   }
 
   Future<bool> _saveStateToTable(String userId, PetState state) async {
+    if (!_petProfilesSchemaAvailable) {
+      return false;
+    }
+
     try {
       await _withRequestTimeout(
         supabaseClient.from(_petProfilesTable).upsert({
@@ -167,6 +184,14 @@ class PetService {
       );
       return true;
     } catch (error) {
+      if (_isMissingColumnError(error)) {
+        _petProfilesSchemaAvailable = false;
+        debugPrint(
+          'PetService._saveStateToTable skipped: pet_profiles schema is '
+          'missing one or more expected columns.',
+        );
+        return false;
+      }
       debugPrint('PetService._saveStateToTable error: $error');
       return false;
     }
@@ -275,5 +300,19 @@ class PetService {
       );
     }
     return null;
+  }
+
+  bool _isMissingColumnError(Object error) {
+    if (error is! PostgrestException) {
+      return false;
+    }
+
+    final message = error.message.toLowerCase();
+    final hasMissingColumnCode =
+        error.code == '42703' || message.contains('"code":"42703"');
+
+    return hasMissingColumnCode &&
+        message.contains(_petProfilesTable) &&
+        message.contains('does not exist');
   }
 }

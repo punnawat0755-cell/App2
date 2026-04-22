@@ -42,6 +42,7 @@ class _BottomNavBarState extends State<BottomNavBar>
   bool _checkingDailyMood = false;
   bool _dailyMoodPageOpen = false;
   bool _allowHomePeriodPrompt = false;
+  final Set<int> _loadedPages = <int>{0};
 
   @override
   void initState() {
@@ -230,6 +231,26 @@ class _BottomNavBarState extends State<BottomNavBar>
     }
   }
 
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return HomePage(
+          allowPeriodPrompt: _page == 0 && _allowHomePeriodPrompt,
+          isActive: _page == 0,
+        );
+      case 1:
+        return FeedPage(isActive: _page == 1);
+      case 2:
+        return const ChatSelectionPage();
+      case 3:
+        return PetPage(isActive: _page == 3);
+      case 4:
+        return const ProfilePage();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scale = context.responsive;
@@ -238,16 +259,12 @@ class _BottomNavBarState extends State<BottomNavBar>
       extendBody: true,
       body: IndexedStack(
         index: _page,
-        children: [
-          HomePage(
-            allowPeriodPrompt: _page == 0 && _allowHomePeriodPrompt,
-            isActive: _page == 0,
-          ),
-          FeedPage(isActive: _page == 1),
-          const ChatSelectionPage(),
-          PetPage(isActive: _page == 3),
-          const ProfilePage(),
-        ],
+        children: List<Widget>.generate(5, (index) {
+          if (!_loadedPages.contains(index)) {
+            return const SizedBox.shrink();
+          }
+          return _buildPage(index);
+        }),
       ),
       bottomNavigationBar: CurvedNavigationBar(
         key: _bottomNavigationKey,
@@ -288,6 +305,7 @@ class _BottomNavBarState extends State<BottomNavBar>
         onTap: (index) async {
           setState(() {
             _page = index;
+            _loadedPages.add(index);
           });
 
           if (index == 2) {
